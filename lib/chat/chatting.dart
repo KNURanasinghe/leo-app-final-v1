@@ -362,6 +362,16 @@ class _DemoChattingPageState extends State<DemoChattingMessageListPage> {
     // Handle new messages
     _socketService.onNewMessage = (message) {
       if (message.senderId == widget.receiverId) {
+        print("===== CHAT RECEIVED NEW MESSAGE =====");
+        print("Message ID: ${message.messageId}");
+        print("Message Type: ${message.messageType}");
+        if (message.messageType == 'status_share') {
+          print("STATUS SHARE MESSAGE RECEIVED IN CHAT");
+          print("Status ID: '${message.statusId}'");
+          print("Status Type: '${message.statusType}'");
+          print("Status Content: '${message.statusContent}'");
+          print("Status File URL: '${message.statusFileUrl}'");
+        }
         setState(() {
           _messages.add(message);
         });

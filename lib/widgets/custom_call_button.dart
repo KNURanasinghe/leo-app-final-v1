@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:leo_app_01/Provider/call_history_provider.dart';
 import 'package:leo_app_01/constants/app_constants.dart';
+import 'package:leo_app_01/models/call_istory_model.dart';
 import '../services/socket_service.dart';
 import 'package:tencent_calls_uikit/tencent_calls_uikit.dart';
 import 'package:tencent_calls_uikit/debug/generate_test_user_sig.dart';
@@ -36,26 +38,35 @@ class _CallButtonsState extends State<CallButtons> {
 
   // Initialize TUICallKit with the current user
   Future<void> _initializeTUICallKit() async {
-    if (!isInitialized) {
-      // Import this if not already imported
+    print("Initializing TUICallKit for user: ${widget.currentUserId}");
 
+    try {
       // Generate UserSig
       String userSig = GenerateTestUserSig.genTestSig(
           widget.currentUserId, sdkAppID, secretKey);
+
+      print("Generated UserSig, attempting login...");
 
       // Login to TUICallKit
       TUIResult result = await TUICallKit.instance
           .login(sdkAppID, widget.currentUserId, userSig);
 
+      print(
+          "Login result code: '${result.code}', message: '${result.message}'");
+
       if (result.code.isEmpty) {
         setState(() {
           isInitialized = true;
         });
-        print('TUICallKit initialized for user: ${widget.currentUserId}');
+        print('TUICallKit initialized and logged in successfully');
+
+        // Verify login state
+        // Some SDKs have a method to check login state, if available
       } else {
-        print(
-            'TUICallKit initialization failed: ${result.code} ${result.message}');
+        print('TUICallKit login failed: ${result.code} ${result.message}');
       }
+    } catch (e) {
+      print("Exception during TUICallKit initialization: $e");
     }
   }
 
@@ -68,14 +79,27 @@ class _CallButtonsState extends State<CallButtons> {
   void _startCall(BuildContext context, bool isVideoCall) {
     final roomId = _generateRoomId();
     final SocketService socketService = SocketService();
+    final callId = "call_${DateTime.now().millisecondsSinceEpoch}";
+    CallHistoryService().addCall(CallHistoryEntry(
+      callId: callId,
+      callerId: widget.currentUserId,
+      receiverId: widget.targetUserId,
+      isOutgoing: true,
+      isVideoCall: isVideoCall,
+      isMissed: false, // We don't know yet if it will be missed
+      timestamp: DateTime.now().millisecondsSinceEpoch,
+      roomId: roomId,
+    ));
 
+    // ✨ ADD THIS: Save the history to storage
+    CallHistoryService().saveHistory();
     // Check if user is online first
     socketService.debugCallFlow("START_CALL_ATTEMPT", {
       "caller": widget.currentUserId,
       "target": widget.targetUserId,
       "isVideoCall": isVideoCall
     });
-
+    print("Initiating direct call to ${widget.targetUserId}");
     socketService.checkUserOnline(widget.targetUserId);
 
     // Set up online status callback
@@ -131,17 +155,39 @@ class _CallButtonsState extends State<CallButtons> {
 
   // Make a call using Tencent UIKit
   void _makeTencentCall(bool isVideoCall) async {
-    // Ensure TUICallKit is initialized
-    if (!isInitialized) {
-      await _initializeTUICallKit();
+    try {
+      // Check if we're initialized and logged in
+      print("Checking TUICallKit initialization and login state");
+
+      // Re-login to ensure we're logged in
+      String userSig = GenerateTestUserSig.genTestSig(
+          widget.currentUserId, sdkAppID, secretKey);
+
+      print("Re-logging in before making the call...");
+      TUIResult loginResult = await TUICallKit.instance
+          .login(sdkAppID, widget.currentUserId, userSig);
+
+      if (loginResult.code.isNotEmpty) {
+        print(
+            "Login failed with code: ${loginResult.code}, message: ${loginResult.message}");
+        return; // Don't proceed with the call if login fails
+      }
+
+      print("Successfully logged in, now making the call");
+
+      // Determine media type based on isVideoCall
+      TUICallMediaType mediaType =
+          isVideoCall ? TUICallMediaType.video : TUICallMediaType.audio;
+
+      // Make the call using Tencent UIKit
+      TUIResult callResult =
+          await TUICallKit.instance.call(widget.targetUserId, mediaType);
+
+      print(
+          "Call result: code=${callResult.code}, message=${callResult.message}");
+    } catch (e) {
+      print("Exception in _makeTencentCall: $e");
     }
-
-    // Determine media type based on isVideoCall
-    TUICallMediaType mediaType =
-        isVideoCall ? TUICallMediaType.video : TUICallMediaType.audio;
-
-    // Make the call using Tencent UIKit
-    TUICallKit.instance.call(widget.targetUserId, mediaType);
   }
 
   @override

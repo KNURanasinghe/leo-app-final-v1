@@ -234,6 +234,18 @@ class _HomePagePopupMenuButtonState extends State<HomePagePopupMenuButton> {
               );
             },
           ),
+          PopupMenuItem(
+            value: 'Call History',
+            child: const ListTile(
+                leading: Icon(Icons.delete),
+                title: Text('Delete All', maxLines: 1)),
+            onTap: () {
+              ZIMKit().deleteAllConversation(
+                isAlsoDeleteFromServer: true,
+                isAlsoDeleteMessages: true,
+              );
+            },
+          ),
         ];
       },
     );

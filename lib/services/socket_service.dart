@@ -1,3 +1,5 @@
+import 'package:leo_app_01/Provider/call_history_provider.dart';
+import 'package:leo_app_01/models/call_istory_model.dart';
 import 'package:socket_io_client/socket_io_client.dart' as IO;
 import '../constants/app_constants.dart';
 import '../models/message.dart';
@@ -88,7 +90,7 @@ class SocketService {
   StatusUnlikedCallback? onStatusUnliked;
   StatusLikesCallback? onStatusLikes;
   StatusLikeStatusCallback? onStatusLikeStatus;
-
+  Function(Message)? onStatusShareMessage;
   Function(String blockedUserId)? onUserBlocked;
   Function(String unblockedUserId)? onUserUnblocked;
   Function(List<String> blockedUsers)? onBlockedUsersList;
@@ -282,6 +284,30 @@ class SocketService {
 
   void _setupSocketListeners() {
     _setupStatusLikeListeners();
+    _socket.on('statusShareMessage', (data) {
+      print("RECEIVED: Status share message: $data");
+
+      try {
+        final message = Message.fromJson(data);
+
+        print("PARSED: Status ID: ${message.statusId}");
+        print("PARSED: Status Type: ${message.statusType}");
+        print("PARSED: Status Content: ${message.statusContent}");
+        print("PARSED: Status URL: ${message.statusFileUrl}");
+
+        // Notify listeners
+        if (onStatusShareMessage != null) {
+          onStatusShareMessage!(message);
+        }
+
+        // Also notify through regular message channel
+        if (onNewMessage != null) {
+          onNewMessage!(message);
+        }
+      } catch (e) {
+        print("Error parsing status share message: $e");
+      }
+    });
     _socket.on('messageDeleted', (data) {
       print(
           '✅ Message deleted: ${data['messageId']}, for everyone: ${data['forEveryone']}');
@@ -319,15 +345,47 @@ class SocketService {
     });
 
     // Implement message listener with deduplication
+    // In SocketService.dart, modify the 'newMessage' listener
+// Add this patch inside the _setupSocketListeners method
+
     _socket.on('newMessage', (data) {
       print(
           "Received message: ${data['messageType']} from ${data['senderId']}");
 
-      if (data['isBroadcast'] == true) {
-        print("🔴 This is a broadcast message!");
+      // Special handling for status_share messages
+      if (data['messageType'] == 'status_share') {
+        print("⭐ STATUS SHARE MESSAGE RECEIVED ⭐");
+
+        // Check if status fields are present
+        bool hasStatusFields =
+            data['statusId'] != null && data['statusFileUrl'] != null;
+
+        if (!hasStatusFields) {
+          print(
+              "⚠️ Status fields missing! Attempting to restore from metadata...");
+
+          // This is where we would ideally fetch the missing information
+          // For now, let's check if we have metadata stored locally
+
+          // If no restoration is possible, add log warning
+          print(
+              "⚠️ Unable to restore status fields, message will be incomplete");
+        } else {
+          print("Status ID: ${data['statusId']}");
+          print("Status Type: ${data['statusType']}");
+          print("Status Content: ${data['statusContent']}");
+          print("Status File URL: ${data['statusFileUrl']}");
+        }
       }
 
+      // Create message from data
       final message = Message.fromJson(data);
+
+      // For status_share messages with missing fields, let's try to handle them
+      if (message.messageType == 'status_share' &&
+          (message.statusId == null || message.statusId!.isEmpty)) {
+        print("⚠️ Received status_share message with missing fields");
+      }
 
       if (!_processedMessageIds.contains(message.messageId)) {
         _processedMessageIds.add(message.messageId);
@@ -518,24 +576,97 @@ class SocketService {
     // Call listeners - listen to the correct event names
     _socket.on('incoming_call', (data) {
       print("INCOMING CALL RECEIVED: ${data.toString()}");
+      final callId =
+          data['callId'] ?? "call_${DateTime.now().millisecondsSinceEpoch}";
+
+      // We don't know if missed yet, will update later
+      CallHistoryService().addCall(CallHistoryEntry(
+        callId: callId,
+        callerId: data['caller'],
+        receiverId: data['target'],
+        isOutgoing: false,
+        isVideoCall: data['isVideoCall'] ?? false,
+        isMissed: false, // Will update this when call is accepted/rejected
+        timestamp: data['timestamp'] ?? DateTime.now().millisecondsSinceEpoch,
+        roomId: data['roomId'],
+      ));
       if (onIncomingCall != null) {
         onIncomingCall!(Map<String, dynamic>.from(data));
       }
     });
 
     _socket.on('call_requested', (data) {
+      final callId = "call_${DateTime.now().millisecondsSinceEpoch}";
+
+      CallHistoryService().addCall(CallHistoryEntry(
+        callId: callId,
+        callerId: data['caller'],
+        receiverId: data['target'],
+        isOutgoing: true,
+        isVideoCall: data['isVideoCall'] ?? false,
+        isMissed: false, // We don't know yet
+        timestamp: DateTime.now().millisecondsSinceEpoch,
+        roomId: data['roomId'],
+      ));
       if (onCallRequested != null) {
         onCallRequested!(Map<String, dynamic>.from(data));
       }
     });
 
     _socket.on('call_accepted', (data) {
+      final callEntries = CallHistoryService().allCalls;
+      final callEntry = callEntries.lastWhere(
+        (call) =>
+            call.callerId == data['caller'] &&
+            call.receiverId == data['target'],
+        orElse: () => CallHistoryEntry(
+          callId:
+              data['callId'] ?? "call_${DateTime.now().millisecondsSinceEpoch}",
+          callerId: data['caller'],
+          receiverId: data['target'],
+          isOutgoing: false,
+          isVideoCall: data['isVideoCall'] ?? false,
+          isMissed: true, // Default to missed until we know otherwise
+          timestamp: data['timestamp'] ?? DateTime.now().millisecondsSinceEpoch,
+          roomId: data['roomId'],
+        ),
+      );
+
+      if (callEntry != null) {
+        // Update the entry (you'll need to implement this)
+        // For now we'll assume the list always has the most recent call first
+        callEntries[0] = CallHistoryEntry(
+          callId: callEntry.callId,
+          callerId: callEntry.callerId,
+          receiverId: callEntry.receiverId,
+          isOutgoing: callEntry.isOutgoing,
+          isVideoCall: callEntry.isVideoCall,
+          isMissed: false, // Call was accepted
+          timestamp: callEntry.timestamp,
+          roomId: callEntry.roomId,
+        );
+      }
       if (onCallAccepted != null) {
         onCallAccepted!(Map<String, dynamic>.from(data));
       }
     });
 
     _socket.on('call_rejected', (data) {
+      final callEntries = CallHistoryService().allCalls;
+      if (callEntries.isNotEmpty) {
+        // Assume the first entry is the most recent call
+        final callEntry = callEntries[0];
+        callEntries[0] = CallHistoryEntry(
+          callId: callEntry.callId,
+          callerId: callEntry.callerId,
+          receiverId: callEntry.receiverId,
+          isOutgoing: callEntry.isOutgoing,
+          isVideoCall: callEntry.isVideoCall,
+          isMissed: true, // Call was missed/rejected
+          timestamp: callEntry.timestamp,
+          roomId: callEntry.roomId,
+        );
+      }
       if (onCallRejected != null) {
         onCallRejected!(Map<String, dynamic>.from(data));
       }
@@ -1097,5 +1228,56 @@ class SocketService {
       'userId': userId,
       'statusId': statusId,
     });
+  }
+
+  void _setupStatusShareHandler() {
+    _socket.on('statusShareMessage', (data) {
+      print('Received status share message: $data');
+
+      // Parse the message
+      final message = Message.fromJson(data);
+
+      // Notify listeners
+      if (onStatusShareMessage != null) {
+        onStatusShareMessage!(message);
+      }
+
+      // Also notify through regular message channel
+      if (onNewMessage != null) {
+        onNewMessage!(message);
+      }
+    });
+  }
+
+  void sendStatusShareMessage(Message message) {
+    // Add to processed IDs to prevent echoing
+    _processedMessageIds.add(message.messageId);
+
+    print("SOCKET SERVICE: Sending status share message");
+    print("SOCKET SERVICE: Status ID: ${message.statusId}");
+    print("SOCKET SERVICE: Status Type: ${message.statusType}");
+    print("SOCKET SERVICE: Status Content: ${message.statusContent}");
+    print("SOCKET SERVICE: Status URL: ${message.statusFileUrl}");
+
+    // Convert to JSON and check fields again
+    final json = message.toJson();
+    print("SOCKET SERVICE: JSON: $json");
+
+    // Make sure we're sending the correct fields
+    if (message.statusId == null || message.statusId!.isEmpty) {
+      print("WARNING: statusId is empty or null!");
+    }
+    if (message.statusType == null || message.statusType!.isEmpty) {
+      print("WARNING: statusType is empty or null!");
+    }
+    if (message.statusFileUrl == null || message.statusFileUrl!.isEmpty) {
+      print("WARNING: statusFileUrl is empty or null!");
+    }
+
+    // Send as specific status share event
+    _socket.emit('statusShareMessage', json);
+
+    // Also send as regular message for compatibility
+    _socket.emit('sendMessage', json);
   }
 }

@@ -54,7 +54,26 @@ class Message {
     if (json['deletedForUsers'] != null) {
       deletedForUsers = List<String>.from(json['deletedForUsers']);
     }
+// Explicitly handle status fields to ensure they're properly typed
+    final statusId =
+        json['statusId'] != null && json['statusId'].toString().isNotEmpty
+            ? json['statusId'].toString()
+            : null;
 
+    final statusType =
+        json['statusType'] != null && json['statusType'].toString().isNotEmpty
+            ? json['statusType'].toString()
+            : null;
+
+    final statusContent = json['statusContent'] != null &&
+            json['statusContent'].toString().isNotEmpty
+        ? json['statusContent'].toString()
+        : null;
+
+    final statusFileUrl = json['statusFileUrl'] != null &&
+            json['statusFileUrl'].toString().isNotEmpty
+        ? json['statusFileUrl'].toString()
+        : null;
     return Message(
       messageId: json['messageId'] ?? '',
       senderId: json['senderId'] ?? '',
@@ -66,10 +85,10 @@ class Message {
       fileName: json['fileName'],
       fileUrl: json['fileUrl'],
       receiverId: json['receiverId'] ?? '',
-      statusId: json['statusId'],
-      statusType: json['statusType'],
-      statusContent: json['statusContent'],
-      statusFileUrl: json['statusFileUrl'],
+      statusId: statusId,
+      statusType: statusType,
+      statusContent: statusContent,
+      statusFileUrl: statusFileUrl,
       isBroadcast: json['isBroadcast'] ?? false,
       deletedForEveryone: json['deletedForEveryone'],
       deletedForUsers: deletedForUsers,
@@ -92,11 +111,18 @@ class Message {
     // Add optional fields only if they're not null
     if (fileName != null) map['fileName'] = fileName!;
     if (fileUrl != null) map['fileUrl'] = fileUrl!;
-    if (statusId != null) map['statusId'] = statusId!;
-    if (statusType != null) map['statusType'] = statusType!;
-    if (statusContent != null) map['statusContent'] = statusContent!;
-    if (statusFileUrl != null) map['statusFileUrl'] = statusFileUrl!;
-
+    if (messageType == 'status_share') {
+      if (statusId != null) map['statusId'] = statusId!;
+      if (statusType != null) map['statusType'] = statusType!;
+      if (statusContent != null) map['statusContent'] = statusContent!;
+      if (statusFileUrl != null) map['statusFileUrl'] = statusFileUrl!;
+    } else {
+      // For other message types, include status fields if available
+      if (statusId != null) map['statusId'] = statusId!;
+      if (statusType != null) map['statusType'] = statusType!;
+      if (statusContent != null) map['statusContent'] = statusContent!;
+      if (statusFileUrl != null) map['statusFileUrl'] = statusFileUrl!;
+    }
     if (deletedForEveryone != null)
       map['deletedForEveryone'] = deletedForEveryone!;
     if (deletedForUsers != null) map['deletedForUsers'] = deletedForUsers!;

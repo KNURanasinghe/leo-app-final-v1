@@ -1,10 +1,11 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:leo_app_01/widgets/call_history.dart';
 import 'package:zego_zimkit/zego_zimkit.dart';
 import 'default_dialogs.dart';
 
 class HomePagePopupMenuButton extends StatefulWidget {
-  const HomePagePopupMenuButton({Key? key}) : super(key: key);
+  const HomePagePopupMenuButton({super.key});
 
   @override
   State<HomePagePopupMenuButton> createState() =>
@@ -60,6 +61,21 @@ class _HomePagePopupMenuButtonState extends State<HomePagePopupMenuButton> {
                 isAlsoDeleteFromServer: true,
                 isAlsoDeleteMessages: true,
               );
+            },
+          ),
+          PopupMenuItem(
+            value: 'Call History ',
+            child: const ListTile(
+                leading: Icon(Icons.phone_missed_sharp),
+                title: Text('Call History', maxLines: 1)),
+            onTap: () {
+              Future.delayed(Duration.zero, () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                      builder: (context) => const CallHistoryScreen()),
+                );
+              });
             },
           ),
         ];

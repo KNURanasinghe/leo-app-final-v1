@@ -14,6 +14,7 @@ class AppConstants {
   static const String messageTypeVideo = 'video';
   static const String messageTypeDocument = 'document';
   static const String messageTypeAudio = 'audio';
+  static const String messageTypeStatusShare = 'status_share';
   static const Color iconColor = Color(0xFF128C7E);
   // UI Constants
   static const double messageBubbleRadius = 16.0;
