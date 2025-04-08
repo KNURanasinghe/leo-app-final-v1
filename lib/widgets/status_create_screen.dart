@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:http/http.dart' as http;
+import 'package:leo_app_01/widgets/status_screen.dart';
 import 'dart:convert';
 import 'package:path/path.dart' as path_helper;
 import 'package:http_parser/http_parser.dart';
@@ -11,10 +12,15 @@ import '../services/socket_service.dart';
 
 class StatusCreateScreen extends StatefulWidget {
   final String currentUserId;
-
+  final File? sharedMedia;
+  final String? sharedMediaType;
+  final String? sharedCaption;
   const StatusCreateScreen({
     super.key,
     required this.currentUserId,
+    this.sharedMedia,
+    this.sharedMediaType,
+    this.sharedCaption,
   });
 
   @override
@@ -33,6 +39,18 @@ class _StatusCreateScreenState extends State<StatusCreateScreen> {
   final Color darkBlue = const Color(0xFF0D47A1);
   final Color lightBlue = const Color(0xFFBBDEFB);
   final Color accentBlue = const Color(0xFF42A5F5);
+// Add this to your initState() method
+  @override
+  void initState() {
+    super.initState();
+
+    // Initialize with shared values if provided
+    if (widget.sharedMedia != null) {
+      _mediaFile = widget.sharedMedia;
+      _mediaType = widget.sharedMediaType;
+      _textController.text = widget.sharedCaption ?? '';
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -376,7 +394,12 @@ class _StatusCreateScreenState extends State<StatusCreateScreen> {
 
       // Set up callback for when status is posted
       _socketService.onStatusPosted = (statusData) {
-        Navigator.pop(context, true); // Return true to indicate success
+        Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+                builder: (context) => StatusScreen(
+                    currentUserId: widget
+                        .currentUserId))); // Return true to indicate success
       };
     } catch (e) {
       setState(() {

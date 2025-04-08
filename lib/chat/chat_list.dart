@@ -37,6 +37,9 @@ class _ChatListScreenState extends State<ChatListScreenUser>
   Timer? _refreshTimer;
   bool _isOnChatListScreen = true;
 
+  final List<String> _blockedUsers = [];
+  bool _isLoadingBlockedUsers = true;
+
   void _startPeriodicRefresh() {
     // Cancel any existing timer first
     _stopPeriodicRefresh();
@@ -72,7 +75,24 @@ class _ChatListScreenState extends State<ChatListScreenUser>
 
     // Initialize the TabController
     _tabController = TabController(length: 1, vsync: this);
+    _socketService.onUserBlocked = (blockedUserId) {
+      print("🔒 User blocked: $blockedUserId");
+      setState(() {
+        if (!_blockedUsers.contains(blockedUserId)) {
+          _blockedUsers.add(blockedUserId);
+        }
+      });
+    };
 
+    _socketService.onUserUnblocked = (unblockedUserId) {
+      print("🔓 User unblocked: $unblockedUserId");
+      setState(() {
+        _blockedUsers.remove(unblockedUserId);
+      });
+    };
+
+    // Fetch blocked users initially
+    _fetchBlockedUsers();
     _socketService.onChattedUsers = (List<String> userIds) {
       print('📦 RECEIVED chatted users: $userIds');
       setState(() {
@@ -217,6 +237,23 @@ class _ChatListScreenState extends State<ChatListScreenUser>
     print("⭐ Requested chatted users for: ${widget.currentUserId}");
   }
 
+  void _fetchBlockedUsers() {
+    if (widget.currentUserId.isEmpty) return;
+
+    setState(() {
+      _isLoadingBlockedUsers = true;
+    });
+
+    _socketService.getBlockedUsers(widget.currentUserId, (blockedUsers) {
+      print("🚫 Received blocked users: $blockedUsers");
+      setState(() {
+        _blockedUsers.clear();
+        _blockedUsers.addAll(blockedUsers);
+        _isLoadingBlockedUsers = false;
+      });
+    });
+  }
+
   // Sort chat users based on latest message timestamp (newest first)
   void _sortChatUsers() {
     setState(() {
@@ -258,7 +295,7 @@ class _ChatListScreenState extends State<ChatListScreenUser>
     _socketService.getChattedUsers(widget.currentUserId);
     _socketService.getUnreadCounts(widget.currentUserId);
     _socketService.getUserStatus();
-
+    _fetchBlockedUsers();
     // Fetch user profiles
     if (_chatUsers.isNotEmpty) {
       _fetchUserProfiles(_chatUsers);
@@ -396,6 +433,8 @@ class _ChatListScreenState extends State<ChatListScreenUser>
     _focusNode.removeListener(_onFocusChange);
     _focusNode.dispose();
     _socketService.onChattedUsers = null;
+    _socketService.onUserBlocked = null;
+    _socketService.onUserUnblocked = null;
     // Dispose the TabController
     _tabController.removeListener(() {});
     _tabController.dispose();
@@ -437,21 +476,28 @@ class _ChatListScreenState extends State<ChatListScreenUser>
   }
 
   Widget _buildChatsTab() {
-    if (_isLoading) {
+    if (_isLoading || _isLoadingBlockedUsers) {
       return const Center(child: CircularProgressIndicator());
     }
 
-    // Empty state
-    if (_chatUsers.isEmpty) {
+    // Filter out blocked users from the chat list
+    final filteredChatUsers =
+        _chatUsers.where((userId) => !_blockedUsers.contains(userId)).toList();
+
+    // Your existing chat list building code, but use filteredChatUsers instead of _chatUsers
+    if (filteredChatUsers.isEmpty) {
       return const Center(
         child: Text('No conversations available'),
       );
     }
-    _sortChatUsers();
+
+    // Sort the filtered list
+    _sortFilteredChatUsers(filteredChatUsers);
+
     return ListView(
       children: [
         // Regular users section
-        if (_chatUsers.isNotEmpty) ...[
+        if (filteredChatUsers.isNotEmpty) ...[
           const Padding(
             padding: EdgeInsets.fromLTRB(16, 8, 16, 8),
             child: Text(
@@ -463,10 +509,21 @@ class _ChatListScreenState extends State<ChatListScreenUser>
               ),
             ),
           ),
-          ..._chatUsers.map((userId) => _buildUserChatItem(userId)),
+          ...filteredChatUsers.map((userId) => _buildUserChatItem(userId)),
         ],
       ],
     );
+  }
+
+  void _sortFilteredChatUsers(List<String> users) {
+    users.sort((a, b) {
+      // Get timestamps for the latest messages from both users
+      final aTimestamp = _latestMessages[a]?.timestamp ?? 0;
+      final bTimestamp = _latestMessages[b]?.timestamp ?? 0;
+
+      // Sort in descending order (newest first)
+      return bTimestamp.compareTo(aTimestamp);
+    });
   }
 
   Widget _buildUserChatItem(String userId) {
@@ -614,6 +671,7 @@ class _ChatListScreenState extends State<ChatListScreenUser>
           _socketService.getChattedUsers(widget.currentUserId);
           _socketService.getUnreadCounts(widget.currentUserId);
           _socketService.getUserStatus();
+          _fetchBlockedUsers();
           _startPeriodicRefresh();
           // Also refresh the specific chat history
           _socketService.getChatHistory(widget.currentUserId, userId, limit: 1);

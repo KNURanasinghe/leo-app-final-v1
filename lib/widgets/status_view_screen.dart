@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:leo_app_01/widgets/status_share_dialog.dart';
 import 'dart:async';
 import 'dart:io';
 import 'package:path_provider/path_provider.dart';
@@ -6,60 +7,49 @@ import 'package:http/http.dart' as http;
 import '../models/status_model.dart';
 import '../services/socket_service.dart';
 import 'package:video_player/video_player.dart';
-import 'package:flutter/foundation.dart';
 
 class StatusViewScreen extends StatefulWidget {
   final String currentUserId;
   final String statusUserId;
+  final String? userName;
+  final String imageUrl;
 
-  const StatusViewScreen({
-    super.key,
-    required this.currentUserId,
-    required this.statusUserId,
-  });
+  const StatusViewScreen(
+      {super.key,
+      required this.currentUserId,
+      required this.statusUserId,
+      required this.userName,
+      required this.imageUrl});
 
   @override
   _StatusViewScreenState createState() => _StatusViewScreenState();
 }
 
-class _StatusViewScreenState extends State<StatusViewScreen>
-    with SingleTickerProviderStateMixin {
+class _StatusViewScreenState extends State<StatusViewScreen> {
   final SocketService _socketService = SocketService();
   final TextEditingController _replyController = TextEditingController();
   List<Status> _statuses = [];
   int _currentIndex = 0;
   bool _isLoading = true;
   bool _isReplying = false;
-  late AnimationController _progressController;
-  Timer? _statusTimer;
 
-  // Video player controllers
-  VideoPlayerController? _videoPlayerController;
-  bool _isVideoInitialized = false;
-  String? _videoError;
-  bool _useVideoFallback = false;
+  // PageController for TikTok-style vertical scrolling
+  late PageController _pageController;
 
-  // Video file tracking
-  String? _localVideoPath;
-  bool _isDownloadingVideo = false;
-  double _downloadProgress = 0.0;
+  // Video player controllers map - one for each status
+  final Map<int, VideoPlayerController?> _videoControllers = {};
+  final Map<int, bool> _videoInitialized = {};
+  final Map<int, String?> _videoErrors = {};
+  final Map<int, bool> _downloadingVideos = {};
+  final Map<int, double> _downloadProgress = {};
+
+  final Map<String, bool> _likedStatuses = {};
+  final Map<String, int> _likesCounts = {};
 
   @override
   void initState() {
     super.initState();
-    _progressController = AnimationController(
-      vsync: this,
-      duration: const Duration(seconds: 5),
-    )
-      ..addListener(() {
-        setState(() {});
-      })
-      ..addStatusListener((status) {
-        if (status == AnimationStatus.completed) {
-          _goToNextStatus();
-        }
-      });
-
+    _pageController = PageController();
     _setupSocketListeners();
     _loadStatuses();
   }
@@ -72,77 +62,151 @@ class _StatusViewScreenState extends State<StatusViewScreen>
           _isLoading = false;
         });
 
+        // Initialize the first status
         if (_statuses.isNotEmpty) {
-          _initializeCurrentStatus();
+          _preloadStatus(0);
+
+          // Check if current user has liked each status
+          for (var status in statuses) {
+            _checkStatusLike(status.statusId);
+          }
+
+          // Preload the next status if available
+          if (_statuses.length > 1) {
+            _preloadStatus(1, autoPlay: false);
+          }
         }
       }
     };
+    _socketService.onStatusLikeStatus = (statusId, hasLiked, likeCount) {
+      setState(() {
+        _likedStatuses[statusId] = hasLiked;
+        _likesCounts[statusId] = likeCount;
+      });
+    };
+
+    _socketService.onStatusLiked = (statusId, likeCount) {
+      setState(() {
+        _likedStatuses[statusId] = true;
+        _likesCounts[statusId] = likeCount;
+      });
+    };
+
+    _socketService.onStatusUnliked = (statusId, likeCount) {
+      setState(() {
+        _likedStatuses[statusId] = false;
+        _likesCounts[statusId] = likeCount;
+      });
+    };
+  }
+
+  void _checkStatusLike(String statusId) {
+    _socketService.checkStatusLike(widget.currentUserId, statusId);
+  }
+
+  void _handleLikeStatus(bool isActive) {
+    final currentStatus = _statuses[_currentIndex];
+    _socketService.likeStatus(widget.currentUserId, currentStatus.statusId);
+
+    if (isActive) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Liked status')),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('UNLiked status')),
+      );
+    }
   }
 
   void _loadStatuses() {
     _socketService.getUserStatuses(widget.statusUserId);
   }
 
-  void _initializeCurrentStatus() {
-    // Dispose any existing video controller
-    _disposeVideoController();
-    _clearLocalVideoFile();
+  void _onPageChanged(int index) {
+    // Pause current video if any
+    if (_videoControllers[_currentIndex] != null &&
+        _videoControllers[_currentIndex]!.value.isInitialized &&
+        _videoControllers[_currentIndex]!.value.isPlaying) {
+      _videoControllers[_currentIndex]!.pause();
+    }
 
     setState(() {
-      _videoError = null;
-      _useVideoFallback = false;
-      _isDownloadingVideo = false;
-      _downloadProgress = 0.0;
+      _currentIndex = index;
+      _isReplying = false;
     });
 
-    if (_currentIndex < _statuses.length) {
-      final currentStatus = _statuses[_currentIndex];
+    // Play current video
+    _preloadStatus(index);
 
-      // If this is a video status, initialize the video player
-      if (currentStatus.statusType == 'video' &&
-          currentStatus.fileUrl != null &&
-          currentStatus.fileUrl!.isNotEmpty) {
-        _handleVideoPlayback(currentStatus.fileUrl!);
-      } else {
-        // For non-video statuses, just start the timer
-        _startStatusTimer();
+    // Preload next video if available
+    if (index < _statuses.length - 1) {
+      _preloadStatus(index + 1, autoPlay: false);
+    }
+
+    // Preload previous video if available
+    if (index > 0) {
+      _preloadStatus(index - 1, autoPlay: false);
+    }
+
+    // Dispose videos that are far away
+    for (int i = 0; i < _statuses.length; i++) {
+      if (i < index - 1 || i > index + 1) {
+        _disposeVideoController(i);
       }
     }
   }
 
-  // New approach to handle video playback
-  Future<void> _handleVideoPlayback(String videoUrl) async {
+  void _preloadStatus(int index, {bool autoPlay = true}) {
+    if (index < 0 || index >= _statuses.length) return;
+
+    final status = _statuses[index];
+
+    // If this is a video status that hasn't been initialized yet
+    if (status.statusType == 'video' &&
+        status.fileUrl != null &&
+        status.fileUrl!.isNotEmpty &&
+        (_videoControllers[index] == null || !_videoInitialized[index]!)) {
+      _handleVideoPlayback(status.fileUrl!, index, autoPlay: autoPlay);
+    }
+  }
+
+  Future<void> _handleVideoPlayback(String videoUrl, int index,
+      {bool autoPlay = true}) async {
     try {
       setState(() {
-        _isVideoInitialized = false;
-        _isDownloadingVideo = true;
-        _downloadProgress = 0.0;
+        _videoInitialized[index] = false;
+        _downloadingVideos[index] = true;
+        _downloadProgress[index] = 0.0;
       });
 
-      print('Preparing video: $videoUrl');
+      print('Preparing video at index $index: $videoUrl');
 
       // First try direct network playback
-      await _tryDirectVideoPlayback(videoUrl);
+      await _tryDirectVideoPlayback(videoUrl, index, autoPlay: autoPlay);
     } catch (e) {
-      print('Direct video playback failed: $e');
+      print('Direct video playback failed for index $index: $e');
 
       // If direct playback fails, try downloading and using a local file
       try {
-        await _downloadAndPlayVideo(videoUrl);
+        await _downloadAndPlayVideo(videoUrl, index, autoPlay: autoPlay);
       } catch (e) {
-        print('Local video playback failed: $e');
+        print('Local video playback failed for index $index: $e');
         setState(() {
-          _videoError = 'Video playback not supported on this device: $e';
-          _useVideoFallback = true;
-          _isDownloadingVideo = false;
+          _videoErrors[index] =
+              'Video playback not supported on this device: $e';
+          _downloadingVideos[index] = false;
         });
-        _startStatusTimer();
       }
     }
   }
 
-  Future<void> _tryDirectVideoPlayback(String videoUrl) async {
-    _videoPlayerController = VideoPlayerController.network(
+  Future<void> _tryDirectVideoPlayback(String videoUrl, int index,
+      {bool autoPlay = true}) async {
+    // Dispose any existing controller
+    _disposeVideoController(index);
+
+    _videoControllers[index] = VideoPlayerController.network(
       videoUrl,
       videoPlayerOptions: VideoPlayerOptions(
         mixWithOthers: true,
@@ -151,63 +215,56 @@ class _StatusViewScreenState extends State<StatusViewScreen>
 
     // Set up error listener
     bool hasError = false;
-    _videoPlayerController!.addListener(() {
-      if (_videoPlayerController!.value.hasError && !hasError) {
+    _videoControllers[index]!.addListener(() {
+      if (_videoControllers[index]!.value.hasError && !hasError) {
         hasError = true;
         print(
-            'Network video error: ${_videoPlayerController!.value.errorDescription}');
-        // We'll handle this error in the catch block
-        throw Exception(_videoPlayerController!.value.errorDescription);
+            'Network video error for index $index: ${_videoControllers[index]!.value.errorDescription}');
+        throw Exception(_videoControllers[index]!.value.errorDescription);
       }
     });
 
     // Try to initialize with timeout
-    await _videoPlayerController!.initialize().timeout(
+    await _videoControllers[index]!.initialize().timeout(
       const Duration(seconds: 5),
       onTimeout: () {
         throw TimeoutException('Video initialization timed out');
       },
     );
 
-    if (_videoPlayerController!.value.isInitialized) {
-      print('Direct network playback successful');
+    if (_videoControllers[index]!.value.isInitialized) {
+      print('Direct network playback successful for index $index');
 
-      // Set the progress controller duration based on video length
-      final videoDuration = _videoPlayerController!.value.duration;
-      final progressDuration = videoDuration.inSeconds < 5
-          ? const Duration(seconds: 5)
-          : (videoDuration.inSeconds > 30
-              ? const Duration(seconds: 30)
-              : videoDuration);
+      // Set video to loop
+      await _videoControllers[index]!.setLooping(true);
 
-      _progressController.duration = progressDuration;
-
-      // Start playing and update UI
-      await _videoPlayerController!.play();
+      // Start playing if autoPlay is true and this is the current index
+      if (autoPlay && index == _currentIndex) {
+        await _videoControllers[index]!.play();
+      }
 
       setState(() {
-        _isVideoInitialized = true;
-        _isDownloadingVideo = false;
+        _videoInitialized[index] = true;
+        _downloadingVideos[index] = false;
       });
-
-      _startStatusTimer();
     } else {
       throw Exception('Video failed to initialize properly');
     }
   }
 
-  Future<void> _downloadAndPlayVideo(String videoUrl) async {
+  Future<void> _downloadAndPlayVideo(String videoUrl, int index,
+      {bool autoPlay = true}) async {
     setState(() {
-      _isDownloadingVideo = true;
-      _downloadProgress = 0.0;
+      _downloadingVideos[index] = true;
+      _downloadProgress[index] = 0.0;
     });
 
     try {
       // Get temporary directory
       final directory = await getTemporaryDirectory();
       final fileName =
-          'status_video_${DateTime.now().millisecondsSinceEpoch}.mp4';
-      _localVideoPath = '${directory.path}/$fileName';
+          'status_video_${index}_${DateTime.now().millisecondsSinceEpoch}.mp4';
+      final localVideoPath = '${directory.path}/$fileName';
 
       // Download the file with progress updates
       final response =
@@ -216,7 +273,7 @@ class _StatusViewScreenState extends State<StatusViewScreen>
       final contentLength = response.contentLength ?? 0;
       int bytesReceived = 0;
 
-      final file = File(_localVideoPath!);
+      final file = File(localVideoPath);
       final sink = file.openWrite();
 
       await response.stream.listen((chunk) {
@@ -225,7 +282,7 @@ class _StatusViewScreenState extends State<StatusViewScreen>
 
         if (contentLength > 0 && mounted) {
           setState(() {
-            _downloadProgress = bytesReceived / contentLength;
+            _downloadProgress[index] = bytesReceived / contentLength;
           });
         }
       }).asFuture();
@@ -233,120 +290,50 @@ class _StatusViewScreenState extends State<StatusViewScreen>
       await sink.flush();
       await sink.close();
 
-      print('Video downloaded to: $_localVideoPath');
+      print('Video downloaded to: $localVideoPath');
+
+      // Dispose existing controller if any
+      _disposeVideoController(index);
 
       // Initialize player with local file
-      if (_videoPlayerController != null) {
-        await _videoPlayerController!.dispose();
-      }
+      _videoControllers[index] =
+          VideoPlayerController.file(File(localVideoPath));
 
-      _videoPlayerController =
-          VideoPlayerController.file(File(_localVideoPath!));
+      await _videoControllers[index]!.initialize();
 
-      await _videoPlayerController!.initialize();
+      if (_videoControllers[index]!.value.isInitialized) {
+        // Set video to loop
+        await _videoControllers[index]!.setLooping(true);
 
-      if (_videoPlayerController!.value.isInitialized) {
-        // Set the progress controller duration based on video length
-        final videoDuration = _videoPlayerController!.value.duration;
-        final progressDuration = videoDuration.inSeconds < 5
-            ? const Duration(seconds: 5)
-            : (videoDuration.inSeconds > 30
-                ? const Duration(seconds: 30)
-                : videoDuration);
-
-        _progressController.duration = progressDuration;
-
-        // Start playing
-        await _videoPlayerController!.play();
+        // Start playing if autoPlay is true and this is the current index
+        if (autoPlay && index == _currentIndex) {
+          await _videoControllers[index]!.play();
+        }
 
         setState(() {
-          _isVideoInitialized = true;
-          _isDownloadingVideo = false;
+          _videoInitialized[index] = true;
+          _downloadingVideos[index] = false;
         });
-
-        _startStatusTimer();
       } else {
         throw Exception('Local video failed to initialize');
       }
     } catch (e) {
-      print('Error playing downloaded video: $e');
+      print('Error playing downloaded video for index $index: $e');
       setState(() {
-        _videoError = 'Error playing video: $e';
-        _useVideoFallback = true;
-        _isDownloadingVideo = false;
+        _videoErrors[index] = 'Error playing video: $e';
+        _downloadingVideos[index] = false;
       });
-      _startStatusTimer();
     }
   }
 
-  void _clearLocalVideoFile() async {
-    if (_localVideoPath != null) {
-      try {
-        final file = File(_localVideoPath!);
-        if (await file.exists()) {
-          await file.delete();
-          print('Deleted local video file: $_localVideoPath');
-        }
-      } catch (e) {
-        print('Error deleting local video file: $e');
-      }
-      _localVideoPath = null;
-    }
-  }
-
-  void _disposeVideoController() {
-    if (_videoPlayerController != null) {
-      _videoPlayerController!.removeListener(() {});
-      _videoPlayerController!.dispose();
-      _videoPlayerController = null;
+  void _disposeVideoController(int index) {
+    if (_videoControllers[index] != null) {
+      _videoControllers[index]!.removeListener(() {});
+      _videoControllers[index]!.dispose();
+      _videoControllers[index] = null;
     }
 
-    _isVideoInitialized = false;
-  }
-
-  void _startStatusTimer() {
-    // Reset and start the progress controller
-    _progressController.reset();
-    _progressController.forward();
-  }
-
-  void _goToNextStatus() {
-    if (_currentIndex < _statuses.length - 1) {
-      setState(() {
-        _currentIndex++;
-      });
-      _initializeCurrentStatus();
-    } else {
-      // No more statuses, close the screen
-      Navigator.pop(context);
-    }
-  }
-
-  void _goToPreviousStatus() {
-    if (_currentIndex > 0) {
-      setState(() {
-        _currentIndex--;
-      });
-      _initializeCurrentStatus();
-    }
-  }
-
-  void _pauseStatus() {
-    _progressController.stop();
-    if (_videoPlayerController != null &&
-        _videoPlayerController!.value.isInitialized &&
-        _videoPlayerController!.value.isPlaying) {
-      _videoPlayerController!.pause();
-    }
-  }
-
-  void _resumeStatus() {
-    _progressController.forward();
-    if (_videoPlayerController != null &&
-        _videoPlayerController!.value.isInitialized &&
-        !_videoPlayerController!.value.isPlaying) {
-      _videoPlayerController!.play();
-    }
+    _videoInitialized[index] = false;
   }
 
   void _toggleReplyInput() {
@@ -355,9 +342,17 @@ class _StatusViewScreenState extends State<StatusViewScreen>
     });
 
     if (_isReplying) {
-      _pauseStatus();
+      if (_videoControllers[_currentIndex] != null &&
+          _videoControllers[_currentIndex]!.value.isInitialized &&
+          _videoControllers[_currentIndex]!.value.isPlaying) {
+        _videoControllers[_currentIndex]!.pause();
+      }
     } else {
-      _resumeStatus();
+      if (_videoControllers[_currentIndex] != null &&
+          _videoControllers[_currentIndex]!.value.isInitialized &&
+          !_videoControllers[_currentIndex]!.value.isPlaying) {
+        _videoControllers[_currentIndex]!.play();
+      }
     }
   }
 
@@ -383,15 +378,56 @@ class _StatusViewScreenState extends State<StatusViewScreen>
       _replyController.clear();
     });
 
-    _resumeStatus();
+    if (_videoControllers[_currentIndex] != null &&
+        _videoControllers[_currentIndex]!.value.isInitialized &&
+        !_videoControllers[_currentIndex]!.value.isPlaying) {
+      _videoControllers[_currentIndex]!.play();
+    }
+  }
+
+  void _handleShareStatus() {
+    final currentStatus = _statuses[_currentIndex];
+
+    // Pause video if playing
+    if (_videoControllers[_currentIndex] != null &&
+        _videoControllers[_currentIndex]!.value.isInitialized &&
+        _videoControllers[_currentIndex]!.value.isPlaying) {
+      _videoControllers[_currentIndex]!.pause();
+    }
+
+    // Show share dialog
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return StatusShareDialog(
+          statusId: currentStatus.statusId,
+          mediaUrl: currentStatus.fileUrl ?? '',
+          mediaType: currentStatus.statusType,
+          caption: currentStatus.content,
+          statusOwnerName: widget.userName ?? 'User',
+        );
+      },
+    ).then((_) {
+      // Resume video playback when dialog is closed if needed
+      if (_videoControllers[_currentIndex] != null &&
+          _videoControllers[_currentIndex]!.value.isInitialized &&
+          !_videoControllers[_currentIndex]!.value.isPlaying) {
+        _videoControllers[_currentIndex]!.play();
+      }
+    });
   }
 
   @override
   void dispose() {
-    _progressController.dispose();
-    _statusTimer?.cancel();
-    _disposeVideoController();
-    _clearLocalVideoFile();
+    _pageController.dispose();
+
+    // Dispose all video controllers
+    for (var controller in _videoControllers.values) {
+      if (controller != null) {
+        controller.dispose();
+      }
+    }
+
     super.dispose();
   }
 
@@ -399,11 +435,32 @@ class _StatusViewScreenState extends State<StatusViewScreen>
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.black,
+      extendBodyBehindAppBar: true,
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.close, color: Colors.white),
+          onPressed: () => Navigator.pop(context),
+        ),
+        // title: Text(
+        //   widget.userName ?? 'Status',
+        //   style: const TextStyle(color: Colors.black),
+        // ),
+      ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator(color: Colors.white))
           : _statuses.isEmpty
               ? _buildNoStatus()
-              : _buildStatusView(),
+              : PageView.builder(
+                  scrollDirection: Axis.vertical,
+                  controller: _pageController,
+                  itemCount: _statuses.length,
+                  onPageChanged: _onPageChanged,
+                  itemBuilder: (context, index) {
+                    return _buildStatusPage(index);
+                  },
+                ),
     );
   }
 
@@ -432,207 +489,238 @@ class _StatusViewScreenState extends State<StatusViewScreen>
     );
   }
 
-  Widget _buildStatusView() {
-    final currentStatus = _statuses[_currentIndex];
+  Widget _buildStatusPage(int index) {
+    final status = _statuses[index];
+    final bool isLiked = _likedStatuses[status.statusId] ?? false;
+    final int likeCount = _likesCounts[status.statusId] ?? 0;
+    return Stack(
+      children: [
+        // Status Content (takes full screen)
+        Positioned.fill(
+          child: _buildStatusContent(status, index),
+        ),
 
-    return SafeArea(
-      child: Stack(
-        children: [
-          // Progress indicators
-          Positioned(
-            top: 10,
-            left: 10,
-            right: 10,
-            child: Row(
-              children: List.generate(
-                _statuses.length,
-                (index) => Expanded(
-                  child: Container(
-                    height: 2,
-                    margin: const EdgeInsets.symmetric(horizontal: 2),
-                    decoration: BoxDecoration(
-                      color: Colors.grey.withOpacity(0.5),
-                      borderRadius: BorderRadius.circular(2),
-                    ),
-                    child: index == _currentIndex
-                        ? FractionallySizedBox(
-                            widthFactor: _progressController.value,
-                            child: Container(
-                              decoration: BoxDecoration(
-                                color: Colors.white,
-                                borderRadius: BorderRadius.circular(2),
-                              ),
-                            ),
-                          )
-                        : index < _currentIndex
-                            ? Container(color: Colors.white)
-                            : null,
-                  ),
-                ),
-              ),
-            ),
-          ),
-
-          // User info
-          Positioned(
-            top: 20,
-            left: 10,
-            right: 10,
-            child: Row(
-              children: [
+        // User info at top
+        Positioned(
+          top: kToolbarHeight + 20,
+          left: 10,
+          right: 70,
+          child: Row(
+            children: [
+              if (widget.imageUrl.isNotEmpty)
+                CircleAvatar(
+                  backgroundImage: NetworkImage(widget.imageUrl),
+                  radius: 20,
+                )
+              else
                 const CircleAvatar(
                   backgroundColor: Colors.grey,
                   child: Icon(Icons.person, color: Colors.white),
                 ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'User ${widget.statusUserId}',
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
-                        ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      widget.userName ?? 'User',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
                       ),
-                      Text(
-                        _getTimeAgo(currentStatus.timestamp),
-                        style: const TextStyle(
-                          color: Colors.white70,
-                          fontSize: 12,
-                        ),
+                    ),
+                    Text(
+                      _getTimeAgo(status.timestamp),
+                      style: const TextStyle(
+                        color: Colors.white70,
+                        fontSize: 12,
                       ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
-                IconButton(
-                  icon: const Icon(Icons.close, color: Colors.white),
-                  onPressed: () => Navigator.pop(context),
+              ),
+            ],
+          ),
+        ),
+
+        // Caption text (if any)
+        if (status.content.isNotEmpty)
+          Positioned(
+            bottom: 100,
+            left: 16,
+            right: 70, // Leave space for action buttons
+            child: Text(
+              status.content,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 16,
+                fontWeight: FontWeight.w500,
+                shadows: [
+                  Shadow(
+                    blurRadius: 8.0,
+                    color: Colors.black54,
+                    offset: Offset(1.0, 1.0),
+                  ),
+                ],
+              ),
+              maxLines: 3,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+
+        // Action buttons (like, share, reply)
+        if (!_isReplying)
+          Positioned(
+            right: 16,
+            bottom: 100,
+            child: Column(
+              children: [
+                // Like button
+                _buildActionButton(
+                  icon: Icons.favorite,
+                  label: 'Like',
+                  onTap: () => _handleLikeStatus(isLiked),
+                  isActive: isLiked,
+                  count: likeCount,
+                ),
+                const SizedBox(height: 20),
+                // Share button
+                _buildActionButton(
+                  icon: Icons.share,
+                  label: 'Share',
+                  onTap: _handleShareStatus,
+                ),
+                const SizedBox(height: 20),
+
+                // Reply button
+                _buildActionButton(
+                  icon: Icons.reply,
+                  label: 'Reply',
+                  onTap: _toggleReplyInput,
                 ),
               ],
             ),
           ),
 
-          // Left/Right tap areas for navigation
-          Row(
-            children: [
-              Expanded(
-                flex: 1,
-                child: GestureDetector(
-                  onTap: _goToPreviousStatus,
-                  behavior: HitTestBehavior.opaque,
-                  child: Container(color: Colors.transparent),
-                ),
-              ),
-              Expanded(
-                flex: 1,
-                child: GestureDetector(
-                  onTap: _goToNextStatus,
-                  behavior: HitTestBehavior.opaque,
-                  child: Container(color: Colors.transparent),
-                ),
-              ),
-            ],
-          ),
-
-          // Status content
-          Center(
-            child: _buildStatusContent(currentStatus),
-          ),
-
-          // Reply button
+        // Reply input (when active)
+        if (_isReplying)
           Positioned(
-            bottom: 20,
-            left: 0,
-            right: 0,
-            child: _isReplying
-                ? _buildReplyInput()
-                : Center(
-                    child: IconButton(
-                      icon: const Icon(
-                        Icons.reply,
-                        color: Colors.white,
-                        size: 32,
-                      ),
-                      onPressed: _toggleReplyInput,
-                    ),
-                  ),
+            bottom: 16,
+            left: 16,
+            right: 16,
+            child: _buildReplyInput(),
+          ),
+      ],
+    );
+  }
+
+  Widget _buildActionButton({
+    required IconData icon,
+    required String label,
+    required VoidCallback onTap,
+    bool isActive = false,
+    int? count,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Column(
+        children: [
+          Container(
+            width: 50,
+            height: 50,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: isActive ? Colors.red : Colors.black38,
+            ),
+            child: Icon(
+              icon,
+              color: isActive ? Colors.white : Colors.white,
+              size: 30,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            count != null && count > 0 ? '$label ($count)' : label,
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              color: isActive ? Colors.red : Colors.white,
+              fontSize: 14,
+            ),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildStatusContent(Status status) {
+  Widget _buildStatusContent(Status status, int index) {
     switch (status.statusType) {
       case 'image':
-        return Container(
-          constraints: BoxConstraints(
-            maxHeight: MediaQuery.of(context).size.height * 0.7,
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Flexible(
-                child: Image.network(
-                  status.fileUrl!,
-                  fit: BoxFit.contain,
-                  loadingBuilder: (context, child, loadingProgress) {
-                    if (loadingProgress == null) return child;
-                    return Center(
-                      child: CircularProgressIndicator(
-                        value: loadingProgress.expectedTotalBytes != null
-                            ? loadingProgress.cumulativeBytesLoaded /
-                                loadingProgress.expectedTotalBytes!
-                            : null,
-                        color: Colors.white,
-                      ),
-                    );
-                  },
-                  errorBuilder: (context, error, stackTrace) {
-                    return const Center(
-                      child: Icon(
-                        Icons.error_outline,
-                        color: Colors.white,
-                        size: 48,
-                      ),
-                    );
-                  },
-                ),
-              ),
-              if (status.content.isNotEmpty)
-                Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: Text(
-                    status.content,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 18,
-                    ),
-                    textAlign: TextAlign.center,
+        return GestureDetector(
+          onTap: () {
+            // Toggle play/pause for video on tap
+            if (_videoControllers[index] != null &&
+                _videoControllers[index]!.value.isInitialized) {
+              if (_videoControllers[index]!.value.isPlaying) {
+                _videoControllers[index]!.pause();
+              } else {
+                _videoControllers[index]!.play();
+              }
+              setState(() {});
+            }
+          },
+          child: Container(
+            color: Colors.black,
+            child: Image.network(
+              status.fileUrl!,
+              fit: BoxFit.contain,
+              width: double.infinity,
+              height: double.infinity,
+              loadingBuilder: (context, child, loadingProgress) {
+                if (loadingProgress == null) return child;
+                return Center(
+                  child: CircularProgressIndicator(
+                    value: loadingProgress.expectedTotalBytes != null
+                        ? loadingProgress.cumulativeBytesLoaded /
+                            loadingProgress.expectedTotalBytes!
+                        : null,
+                    color: Colors.white,
                   ),
-                ),
-            ],
+                );
+              },
+              errorBuilder: (context, error, stackTrace) {
+                return const Center(
+                  child: Icon(
+                    Icons.error_outline,
+                    color: Colors.white,
+                    size: 48,
+                  ),
+                );
+              },
+            ),
           ),
         );
 
       case 'video':
-        if (_isDownloadingVideo) {
+        if (_downloadingVideos[index] == true) {
           // Show download progress
           return Center(
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
                 CircularProgressIndicator(
-                  value: _downloadProgress > 0 ? _downloadProgress : null,
+                  value: _downloadProgress[index] != null &&
+                          _downloadProgress[index]! > 0
+                      ? _downloadProgress[index]
+                      : null,
                   color: Colors.white,
                 ),
                 const SizedBox(height: 16),
                 Text(
-                  _downloadProgress > 0
-                      ? 'Preparing video... ${(_downloadProgress * 100).toStringAsFixed(0)}%'
-                      : 'Preparing video...',
+                  _downloadProgress[index] != null &&
+                          _downloadProgress[index]! > 0
+                      ? 'Loading video... ${(_downloadProgress[index]! * 100).toStringAsFixed(0)}%'
+                      : 'Loading video...',
                   style: const TextStyle(color: Colors.white),
                 ),
               ],
@@ -640,185 +728,118 @@ class _StatusViewScreenState extends State<StatusViewScreen>
           );
         }
 
-        // Use fallback display for video if there were errors
-        if (_useVideoFallback || _videoError != null) {
-          return _buildVideoFallback(status);
+        // If there's a video error
+        if (_videoErrors[index] != null) {
+          return Container(
+            color: Colors.black,
+            child: Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 120,
+                    height: 120,
+                    decoration: BoxDecoration(
+                      color: Colors.grey[800],
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.videocam,
+                      size: 60,
+                      color: Colors.white70,
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  const Text(
+                    'Video could not be played',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 16,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
         }
 
-        if (!_isVideoInitialized) {
-          // Show loading indicator while video initializes
-          return const Center(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
+        // If video is initialized, show the video player
+        if (_videoControllers[index] != null &&
+            _videoInitialized[index] == true &&
+            _videoControllers[index]!.value.isInitialized) {
+          return GestureDetector(
+            onTap: () {
+              // Toggle play/pause on tap
+              if (_videoControllers[index]!.value.isPlaying) {
+                _videoControllers[index]!.pause();
+              } else {
+                _videoControllers[index]!.play();
+              }
+              setState(() {});
+            },
+            child: Stack(
+              alignment: Alignment.center,
               children: [
-                CircularProgressIndicator(color: Colors.white),
-                SizedBox(height: 16),
-                Text(
-                  'Loading video...',
-                  style: TextStyle(color: Colors.white),
+                Container(
+                  color: Colors.black,
+                  child: AspectRatio(
+                    aspectRatio: _videoControllers[index]!.value.aspectRatio,
+                    child: VideoPlayer(_videoControllers[index]!),
+                  ),
                 ),
+
+                // Play/pause overlay
+                if (!_videoControllers[index]!.value.isPlaying)
+                  Container(
+                    decoration: const BoxDecoration(
+                      color: Colors.black38,
+                      shape: BoxShape.circle,
+                    ),
+                    padding: const EdgeInsets.all(12),
+                    child: const Icon(
+                      Icons.play_arrow,
+                      size: 48,
+                      color: Colors.white,
+                    ),
+                  ),
               ],
             ),
           );
         }
 
-        // Show direct VideoPlayer
-        return Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              constraints: BoxConstraints(
-                maxHeight: MediaQuery.of(context).size.height * 0.7,
-              ),
-              child: _videoPlayerController!.value.isInitialized
-                  ? AspectRatio(
-                      aspectRatio: _videoPlayerController!.value.aspectRatio,
-                      child: Stack(
-                        alignment: Alignment.center,
-                        children: [
-                          // Video player
-                          VideoPlayer(_videoPlayerController!),
-
-                          // Play/pause overlay
-                          if (!_videoPlayerController!.value.isPlaying)
-                            GestureDetector(
-                              onTap: () {
-                                _videoPlayerController!.play();
-                                setState(() {});
-                              },
-                              child: Container(
-                                decoration: const BoxDecoration(
-                                  color: Colors.black26,
-                                  shape: BoxShape.circle,
-                                ),
-                                padding: const EdgeInsets.all(12),
-                                child: const Icon(
-                                  Icons.play_arrow,
-                                  size: 48,
-                                  color: Colors.white,
-                                ),
-                              ),
-                            ),
-                        ],
-                      ),
-                    )
-                  : const Center(
-                      child: CircularProgressIndicator(color: Colors.white),
-                    ),
-            ),
-            if (status.content.isNotEmpty)
-              Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Text(
-                  status.content,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 18,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-              ),
-          ],
+        // Loading state
+        return const Center(
+          child: CircularProgressIndicator(color: Colors.white),
         );
 
       case 'text':
       default:
         return Container(
+          color: Colors.black,
           padding: const EdgeInsets.all(24),
-          margin: const EdgeInsets.symmetric(horizontal: 24),
-          decoration: BoxDecoration(
-            color: Colors.green[800],
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Text(
-            status.content,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 24,
-              fontWeight: FontWeight.bold,
+          alignment: Alignment.center,
+          child: Container(
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              color: Colors.green[800],
+              borderRadius: BorderRadius.circular(12),
             ),
-            textAlign: TextAlign.center,
+            child: Text(
+              status.content,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 24,
+                fontWeight: FontWeight.bold,
+              ),
+              textAlign: TextAlign.center,
+            ),
           ),
         );
     }
   }
 
-  // Build a fallback for video display when playback fails
-  Widget _buildVideoFallback(Status status) {
-    return Center(
-      child: Container(
-        constraints: BoxConstraints(
-          maxWidth: MediaQuery.of(context).size.width * 0.8,
-          maxHeight: MediaQuery.of(context).size.height * 0.6,
-        ),
-        padding: const EdgeInsets.all(20),
-        decoration: BoxDecoration(
-          color: Colors.grey[900],
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            // Video icon
-            Container(
-              width: 120,
-              height: 120,
-              decoration: BoxDecoration(
-                color: Colors.grey[800],
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(
-                Icons.videocam,
-                size: 60,
-                color: Colors.white70,
-              ),
-            ),
-            const SizedBox(height: 20),
-
-            // Video description
-            if (status.content.isNotEmpty)
-              Text(
-                status.content,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                ),
-                textAlign: TextAlign.center,
-              ),
-            const SizedBox(height: 12),
-
-            // Error message
-            if (_videoError != null) ...[
-              Divider(color: Colors.grey[700]),
-              const SizedBox(height: 8),
-              const Text(
-                'Video could not be played',
-                style: TextStyle(
-                  color: Colors.white70,
-                  fontSize: 14,
-                ),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 4),
-              const Text(
-                'Tap to continue',
-                style: TextStyle(
-                  color: Colors.white38,
-                  fontSize: 12,
-                ),
-                textAlign: TextAlign.center,
-              ),
-            ],
-          ],
-        ),
-      ),
-    );
-  }
-
   Widget _buildReplyInput() {
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16),
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       decoration: BoxDecoration(
         color: Colors.white,
@@ -839,6 +860,10 @@ class _StatusViewScreenState extends State<StatusViewScreen>
           IconButton(
             icon: const Icon(Icons.send, color: Colors.green),
             onPressed: _replyToStatus,
+          ),
+          IconButton(
+            icon: const Icon(Icons.close, color: Colors.red),
+            onPressed: _toggleReplyInput,
           ),
         ],
       ),

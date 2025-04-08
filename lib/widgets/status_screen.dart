@@ -43,6 +43,8 @@ class _StatusScreenState extends State<StatusScreen>
   late AnimationController _animationController;
   late Animation<double> _animation;
   final String _pocketbaseUrl = 'http://145.223.21.62:8090';
+  String? username;
+  String? profileImg;
 
   @override
   void initState() {
@@ -103,6 +105,12 @@ class _StatusScreenState extends State<StatusScreen>
                 ? '$_pocketbaseUrl/api/files/users/$userId/${userData['avatar']}'
                 : null,
           );
+          setState(() {
+            username = userData['firstname'] ?? 'Unknown User';
+            profileImg = userData['avatar'] != null
+                ? '$_pocketbaseUrl/api/files/users/$userId/${userData['avatar']}'
+                : null;
+          });
         } else {
           print(
               'Failed to fetch profile for user $userId: ${response.statusCode}');
@@ -156,6 +164,8 @@ class _StatusScreenState extends State<StatusScreen>
         builder: (context) => StatusViewScreen(
           currentUserId: widget.currentUserId,
           statusUserId: userId,
+          userName: username,
+          imageUrl: profileImg ?? '',
         ),
       ),
     );
@@ -177,10 +187,10 @@ class _StatusScreenState extends State<StatusScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: StatusTheme.backgroundBlue,
+      // backgroundColor: StatusTheme.backgroundBlue,
       appBar: AppBar(
         elevation: 0,
-        backgroundColor: StatusTheme.primaryBlue,
+        backgroundColor: Colors.blue[700],
         title: const Text(
           'Status Updates',
           style: TextStyle(
@@ -208,26 +218,26 @@ class _StatusScreenState extends State<StatusScreen>
               : ListView(
                   children: [
                     // Header
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          vertical: 16, horizontal: 16),
-                      decoration: const BoxDecoration(
-                        color: StatusTheme.primaryBlue,
-                        borderRadius: BorderRadius.only(
-                          bottomLeft: Radius.circular(20),
-                          bottomRight: Radius.circular(20),
-                        ),
-                      ),
-                      child: const Text(
-                        'Share moments with friends',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 14,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ),
+                    // Container(
+                    //   padding: const EdgeInsets.symmetric(
+                    //       vertical: 8, horizontal: 8),
+                    //   decoration: const BoxDecoration(
+                    //     color: StatusTheme.primaryBlue,
+                    //     borderRadius: BorderRadius.only(
+                    //       bottomLeft: Radius.circular(20),
+                    //       bottomRight: Radius.circular(20),
+                    //     ),
+                    //   ),
+                    //   child: const Text(
+                    //     'Share moments with friends',
+                    //     textAlign: TextAlign.center,
+                    //     style: TextStyle(
+                    //       color: Colors.white,
+                    //       fontSize: 14,
+                    //       fontWeight: FontWeight.w500,
+                    //     ),
+                    //   ),
+                    // ),
 
                     const SizedBox(height: 16),
 
@@ -349,7 +359,7 @@ class _StatusScreenState extends State<StatusScreen>
                               ),
                         trailing: _hasMyStatus()
                             ? const Icon(
-                                Icons.visibility,
+                                Icons.more_vert_outlined,
                                 color: StatusTheme.accentBlue,
                               )
                             : const Icon(

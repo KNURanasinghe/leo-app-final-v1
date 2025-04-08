@@ -142,8 +142,8 @@ class _PhoneNumberScreenState extends State<PhoneNumberScreen> {
                                   'Generated OTP: $otp'); // Print OTP to console
 
                               // Notify.lk API credentials (Replace these with your actual credentials)
-                              const String userId = '28446';
-                              const String apiKey = 'Qfc88oVCjT7zGQhVbKk9';
+                              const String userId = '29316';
+                              const String apiKey = 'RH9L1weIpJJODyQkFfSe';
                               const String senderId = 'NotifyDEMO';
 
                               // Notify.lk API endpoint

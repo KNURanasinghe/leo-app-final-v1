@@ -38,6 +38,14 @@ typedef ChattedUsersCallback = void Function(
     List<String> users); // New callback type
 typedef AdminUsersCallback = void Function(List<Map<String, dynamic>> admins);
 
+// Add these typedefs to your existing ones in socket_service.dart
+typedef StatusLikedCallback = void Function(String statusId, int likeCount);
+typedef StatusUnlikedCallback = void Function(String statusId, int likeCount);
+typedef StatusLikesCallback = void Function(
+    String statusId, List<String> likedBy, int likeCount);
+typedef StatusLikeStatusCallback = void Function(
+    String statusId, bool hasLiked, int likeCount);
+
 class SocketService {
   static SocketService? _instance;
   late IO.Socket _socket;
@@ -75,6 +83,12 @@ class SocketService {
   BroadcastUnreadCountsCallback? onBroadcastUnreadCounts;
   BroadcastMarkedAsReadCallback? onBroadcastMarkedAsRead;
 
+  // Add these properties to your SocketService class
+  StatusLikedCallback? onStatusLiked;
+  StatusUnlikedCallback? onStatusUnliked;
+  StatusLikesCallback? onStatusLikes;
+  StatusLikeStatusCallback? onStatusLikeStatus;
+
   Function(String blockedUserId)? onUserBlocked;
   Function(String unblockedUserId)? onUserUnblocked;
   Function(List<String> blockedUsers)? onBlockedUsersList;
@@ -101,6 +115,37 @@ class SocketService {
     _initSocket();
     _setupBlockListeners();
     _setupBroadcastListeners();
+  }
+  void _setupStatusLikeListeners() {
+    _socket.on('statusLiked', (data) {
+      print(
+          '👍 Status liked: ${data['statusId']}, count: ${data['likeCount']}');
+      if (onStatusLiked != null) {
+        onStatusLiked!(data['statusId'], data['likeCount']);
+      }
+    });
+
+    _socket.on('statusUnliked', (data) {
+      print(
+          '👎 Status unliked: ${data['statusId']}, count: ${data['likeCount']}');
+      if (onStatusUnliked != null) {
+        onStatusUnliked!(data['statusId'], data['likeCount']);
+      }
+    });
+
+    _socket.on('statusLikes', (data) {
+      if (onStatusLikes != null && data['likedBy'] != null) {
+        List<String> likedBy = List<String>.from(data['likedBy']);
+        onStatusLikes!(data['statusId'], likedBy, data['likeCount']);
+      }
+    });
+
+    _socket.on('statusLikeStatus', (data) {
+      if (onStatusLikeStatus != null) {
+        onStatusLikeStatus!(
+            data['statusId'], data['hasLiked'], data['likeCount']);
+      }
+    });
   }
 
   void _setupBroadcastListeners() {
@@ -236,6 +281,7 @@ class SocketService {
   }
 
   void _setupSocketListeners() {
+    _setupStatusLikeListeners();
     _socket.on('messageDeleted', (data) {
       print(
           '✅ Message deleted: ${data['messageId']}, for everyone: ${data['forEveryone']}');
@@ -511,6 +557,11 @@ class SocketService {
 
     // Status listeners
     _socket.on('statusPosted', (data) {
+      print('✅ Status posted event received: ${data.toString()}');
+      if (data['debug_id'] != null) {
+        print('   Debug ID: ${data['debug_id']}');
+      }
+
       if (onStatusPosted != null) {
         onStatusPosted!(Map<String, dynamic>.from(data));
       }
@@ -552,7 +603,17 @@ class SocketService {
     });
   }
 
-  void getBlockedUsers(String userId) {
+  void getBlockedUsers(String userId, Function(List<String>) callback) {
+    // Clear any existing handler first to avoid duplicates
+    onBlockedUsersList = null;
+
+    // Set up the callback handler
+    onBlockedUsersList = (List<String> blockedUsers) {
+      // Call the provided callback with the results
+      callback(blockedUsers);
+    };
+
+    // Request the blocked users list
     _socket.emit('getBlockedUsers', {
       'userId': userId,
     });
@@ -1013,5 +1074,28 @@ class SocketService {
 
     print('🔍 Requesting admin users list');
     _socket.emit('getAdminUsers');
+  }
+
+  void likeStatus(String userId, String statusId) {
+    print('👍 Sending like for status: $statusId by user: $userId');
+    _socket.emit('likeStatus', {
+      'userId': userId,
+      'statusId': statusId,
+    });
+  }
+
+  void getStatusLikes(String statusId) {
+    print('🔍 Requesting likes for status: $statusId');
+    _socket.emit('getStatusLikes', {
+      'statusId': statusId,
+    });
+  }
+
+  void checkStatusLike(String userId, String statusId) {
+    print('🔍 Checking if user $userId liked status: $statusId');
+    _socket.emit('checkStatusLike', {
+      'userId': userId,
+      'statusId': statusId,
+    });
   }
 }

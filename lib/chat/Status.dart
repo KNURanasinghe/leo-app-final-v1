@@ -47,6 +47,8 @@ class Status {
 }
 
 class StatusPage extends StatefulWidget {
+  const StatusPage({super.key});
+
   @override
   _StatusPageState createState() => _StatusPageState();
 }
@@ -68,10 +70,12 @@ class _StatusPageState extends State<StatusPage> {
 
   Future<void> fetchStatuses() async {
     try {
-      final response = await http.get(
+      final response = await http
+          .get(
         Uri.parse('$baseUrl/api/collections/Status/records'),
-      ).timeout(
-        Duration(seconds: 10),
+      )
+          .timeout(
+        const Duration(seconds: 10),
         onTimeout: () {
           throw Exception('Connection timeout');
         },
@@ -104,7 +108,7 @@ class _StatusPageState extends State<StatusPage> {
       SnackBar(
         content: Text(message),
         backgroundColor: Colors.red,
-        duration: Duration(seconds: 5),
+        duration: const Duration(seconds: 5),
         action: SnackBarAction(
           label: 'Retry',
           textColor: Colors.white,
@@ -130,13 +134,13 @@ class _StatusPageState extends State<StatusPage> {
         controller: controller,
         caption: Text(
           status.caption,
-          style: TextStyle(
+          style: const TextStyle(
             color: Colors.white,
             backgroundColor: Colors.black54,
             fontSize: 17,
           ),
         ),
-        duration: Duration(seconds: 30), // Adjust duration as needed
+        duration: const Duration(seconds: 30), // Adjust duration as needed
       ));
     } else if (status.statusImage != null && status.statusImage!.isNotEmpty) {
       items.add(StoryItem.pageImage(
@@ -144,25 +148,24 @@ class _StatusPageState extends State<StatusPage> {
         controller: controller,
         caption: Text(
           status.caption,
-          style: TextStyle(
+          style: const TextStyle(
             color: Colors.white,
             backgroundColor: Colors.black54,
             fontSize: 17,
           ),
         ),
-        duration: Duration(seconds: 5),
+        duration: const Duration(seconds: 5),
       ));
     } else {
       items.add(StoryItem.text(
         title: status.caption,
         backgroundColor: Colors.orange,
-        duration: Duration(seconds: 3),
+        duration: const Duration(seconds: 3),
       ));
     }
 
     return items;
   }
-
 
   @override
   Widget build(BuildContext context) {
@@ -174,7 +177,7 @@ class _StatusPageState extends State<StatusPage> {
         elevation: 0,
         actions: [
           IconButton(
-            icon: Icon(Icons.refresh, color: Colors.white),
+            icon: const Icon(Icons.refresh, color: Colors.white),
             onPressed: () {
               setState(() {
                 isLoading = true;
@@ -184,11 +187,12 @@ class _StatusPageState extends State<StatusPage> {
             },
           ),
           IconButton(
-            icon: Icon(Icons.add, color: Colors.white),
+            icon: const Icon(Icons.add, color: Colors.white),
             onPressed: () async {
               final result = await Navigator.push(
                 context,
-                MaterialPageRoute(builder: (context) => AddStatusScreen()),
+                MaterialPageRoute(
+                    builder: (context) => const AddStatusScreen()),
               );
               if (result == true) {
                 setState(() {
@@ -201,115 +205,119 @@ class _StatusPageState extends State<StatusPage> {
         ],
       ),
       body: isLoading
-          ? Center(child: CircularProgressIndicator())
+          ? const Center(child: CircularProgressIndicator())
           : hasError
-          ? Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Text(
-              'Error loading statuses',
-              style: TextStyle(
-                fontSize: 18,
-                color: Colors.white,
-              ),
-            ),
-            SizedBox(height: 16),
-            ElevatedButton(
-              onPressed: () {
-                setState(() {
-                  isLoading = true;
-                  hasError = false;
-                });
-                fetchStatuses();
-              },
-              child: Text('Retry'),
-            ),
-          ],
-        ),
-      )
-          : statuses.isEmpty
-          ? Center(
-        child: Text(
-          'No statuses yet',
-          style: TextStyle(color: Colors.white),
-        ),
-      )
-          : PageView.builder(
-        scrollDirection: Axis.vertical,
-        controller: pageController,
-        itemCount: statuses.length,
-        onPageChanged: (index) {
-          setState(() {
-            currentPage = index;
-            // Reset controller for the new page
-            controller.pause();
-            controller.play();
-          });
-        },
-        itemBuilder: (context, index) {
-          return Container(
-            color: Colors.black,
-            child: Stack(
-              children: [
-                StoryView(
-                  storyItems: _buildStoryItems(statuses[index]),
-                  controller: controller,
-                  onComplete: () {
-                    // Auto-scroll to next status
-                    if (index < statuses.length - 1) {
-                      pageController.nextPage(
-                        duration: Duration(milliseconds: 300),
-                        curve: Curves.easeInOut,
-                      );
-                    }
-                  },
-                  onVerticalSwipeComplete: (direction) {
-                    if (direction == Direction.down && index > 0) {
-                      pageController.previousPage(
-                        duration: Duration(milliseconds: 300),
-                        curve: Curves.easeInOut,
-                      );
-                    } else if (direction == Direction.up &&
-                        index < statuses.length - 1) {
-                      pageController.nextPage(
-                        duration: Duration(milliseconds: 300),
-                        curve: Curves.easeInOut,
-                      );
-                    }
-                  },
-                  progressPosition: ProgressPosition.top,
-                ),
-                Positioned(
-                  bottom: 50,
-                  left: 20,
+              ? Center(
                   child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Text(
-                        statuses[index].caption,
+                      const Text(
+                        'Error loading statuses',
                         style: TextStyle(
+                          fontSize: 18,
                           color: Colors.white,
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
                         ),
                       ),
-                      SizedBox(height: 8),
-                      Text(
-                        _formatTimeAgo(statuses[index].created),
-                        style: TextStyle(
-                          color: Colors.white70,
-                          fontSize: 14,
-                        ),
+                      const SizedBox(height: 16),
+                      ElevatedButton(
+                        onPressed: () {
+                          setState(() {
+                            isLoading = true;
+                            hasError = false;
+                          });
+                          fetchStatuses();
+                        },
+                        child: const Text('Retry'),
                       ),
                     ],
                   ),
-                ),
-              ],
-            ),
-          );
-        },
-      ),
+                )
+              : statuses.isEmpty
+                  ? const Center(
+                      child: Text(
+                        'No statuses yet',
+                        style: TextStyle(color: Colors.white),
+                      ),
+                    )
+                  : PageView.builder(
+                      scrollDirection: Axis.vertical,
+                      controller: pageController,
+                      itemCount: statuses.length,
+                      onPageChanged: (index) {
+                        setState(() {
+                          currentPage = index;
+                          // Reset controller for the new page
+                          controller.pause();
+                          controller.play();
+                        });
+                      },
+                      itemBuilder: (context, index) {
+                        return Container(
+                          color: Colors.black,
+                          child: Stack(
+                            children: [
+                              StoryView(
+                                storyItems: _buildStoryItems(statuses[index]),
+                                controller: controller,
+                                onComplete: () {
+                                  // Auto-scroll to next status
+                                  if (index < statuses.length - 1) {
+                                    pageController.nextPage(
+                                      duration:
+                                          const Duration(milliseconds: 300),
+                                      curve: Curves.easeInOut,
+                                    );
+                                  }
+                                },
+                                onVerticalSwipeComplete: (direction) {
+                                  if (direction == Direction.down &&
+                                      index > 0) {
+                                    pageController.previousPage(
+                                      duration:
+                                          const Duration(milliseconds: 300),
+                                      curve: Curves.easeInOut,
+                                    );
+                                  } else if (direction == Direction.up &&
+                                      index < statuses.length - 1) {
+                                    pageController.nextPage(
+                                      duration:
+                                          const Duration(milliseconds: 300),
+                                      curve: Curves.easeInOut,
+                                    );
+                                  }
+                                },
+                                progressPosition: ProgressPosition.top,
+                              ),
+                              Positioned(
+                                bottom: 50,
+                                left: 20,
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      statuses[index].caption,
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 8),
+                                    Text(
+                                      _formatTimeAgo(statuses[index].created),
+                                      style: const TextStyle(
+                                        color: Colors.white70,
+                                        fontSize: 14,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      },
+                    ),
     );
   }
 
@@ -337,7 +345,7 @@ class StoryViewPage extends StatelessWidget {
   final List<StoryItem> storyItems;
   final StoryController controller = StoryController();
 
-  StoryViewPage({required this.storyItems});
+  StoryViewPage({super.key, required this.storyItems});
 
   @override
   Widget build(BuildContext context) {

@@ -392,8 +392,19 @@ class _BlockedUsersPageState extends State<BlockedUsersPage> {
   void _fetchBlockedUsers() {
     if (_currentUserId == null) return;
 
-    // Request the blocked users list from the server
-    _socketService.getBlockedUsers(_currentUserId!);
+    setState(() {
+      _isLoading = true;
+    });
+
+    // Request the blocked users list from the server with a callback
+    _socketService.getBlockedUsers(_currentUserId!,
+        (List<String> blockedUsers) {
+      setState(() {
+        _blockedUsers = blockedUsers;
+        _fetchUserDetails(blockedUsers);
+      });
+      print('Received blocked users: $blockedUsers');
+    });
   }
 
   // Fetch user details for all blocked users

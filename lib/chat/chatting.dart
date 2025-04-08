@@ -90,11 +90,11 @@ class _DemoChattingPageState extends State<DemoChattingMessageListPage> {
       // Give it time to connect before proceeding
       Future.delayed(const Duration(milliseconds: 1000), () {
         _setupBlockListeners();
-        _requestBlockStatus();
+        _fetchBlockedUsers();
       });
     } else {
       _setupBlockListeners();
-      _requestBlockStatus();
+      _fetchBlockedUsers();
     }
   }
 
@@ -107,22 +107,10 @@ class _DemoChattingPageState extends State<DemoChattingMessageListPage> {
     _socketService.onUserUnblocked = null;
     _socketService.onBlockedByUser = null;
     _socketService.onMessageBlocked = null;
+    _socketService.onBlockedUsersList =
+        null; // Add this to clear this listener too
 
-    // Set up block status listeners
-    _socketService.onBlockedStatus = (isUserBlocked, isOtherUserBlocked) {
-      print(
-          "🔒 Block status response received - isUserBlocked: $isUserBlocked, isOtherUserBlocked: $isOtherUserBlocked");
-
-      if (mounted) {
-        setState(() {
-          _isUserBlocked =
-              isOtherUserBlocked; // This shows if the current user has blocked the other user
-          _isCheckingBlockStatus = false;
-          _hasInitializedBlockStatus = true;
-        });
-      }
-    };
-
+    // Add these handlers for specific block/unblock events
     _socketService.onUserBlocked = (blockedUserId) {
       if (blockedUserId == widget.receiverId && mounted) {
         print("🔒 User was blocked: $blockedUserId");
@@ -187,7 +175,6 @@ class _DemoChattingPageState extends State<DemoChattingMessageListPage> {
   }
 
   void _checkBlockStatus() {
-    // Set initial state to checking
     setState(() {
       _isCheckingBlockStatus = true;
       _hasInitializedBlockStatus = false;
@@ -200,11 +187,11 @@ class _DemoChattingPageState extends State<DemoChattingMessageListPage> {
 
       // Wait for connection before checking block status
       Future.delayed(const Duration(milliseconds: 800), () {
-        _requestBlockStatus();
+        _fetchBlockedUsers();
       });
     } else {
       // Socket already connected, request check immediately
-      _requestBlockStatus();
+      _fetchBlockedUsers();
     }
 
     // Set a failsafe timeout in case server doesn't respond
@@ -215,6 +202,29 @@ class _DemoChattingPageState extends State<DemoChattingMessageListPage> {
           _isCheckingBlockStatus = false;
           _hasInitializedBlockStatus = true; // Mark as initialized anyway
         });
+      }
+    });
+  }
+
+  void _fetchBlockedUsers() {
+    if (widget.currentUserId.isEmpty) return;
+
+    print("🔍 Fetching blocked users for: ${widget.currentUserId}");
+
+    // Request the blocked users list from the server with a callback
+    _socketService.getBlockedUsers(widget.currentUserId, (blockedUsers) {
+      print("✅ Received blocked users list: $blockedUsers");
+
+      if (mounted) {
+        setState(() {
+          // Check if the receiver ID is in the blocked list
+          _isUserBlocked = blockedUsers.contains(widget.receiverId);
+          _isCheckingBlockStatus = false;
+          _hasInitializedBlockStatus = true;
+        });
+
+        print(
+            "🔒 Blocked status check complete: ${_isUserBlocked ? 'Blocked' : 'Not blocked'} for receiver: ${widget.receiverId}");
       }
     });
   }
@@ -282,7 +292,7 @@ class _DemoChattingPageState extends State<DemoChattingMessageListPage> {
     showDialog(
       context: currentContext,
       builder: (context) => AlertDialog(
-        title: Text('Block ${widget.receiverId}?'),
+        title: Text('Block ${widget.receiverName}?'),
         content: const Text('When you block someone:\n'
             '• They won\'t be able to send you messages\n'
             '• They\'ll be notified that they\'ve been blocked\n'
@@ -1135,7 +1145,7 @@ class _DemoChattingPageState extends State<DemoChattingMessageListPage> {
           Expanded(
             child: Container(
               decoration: const BoxDecoration(
-                color: Color(0xFFECE5DD),
+                color: Colors.white,
                 image: DecorationImage(
                   image: AssetImage('assets/chat_background.jpg'),
                   fit: BoxFit.cover,

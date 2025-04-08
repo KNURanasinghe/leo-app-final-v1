@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:leo_app_01/constants/app_constants.dart';
 import '../services/socket_service.dart';
 import 'package:tencent_calls_uikit/tencent_calls_uikit.dart';
 import 'package:tencent_calls_uikit/debug/generate_test_user_sig.dart';
@@ -150,13 +151,19 @@ class _CallButtonsState extends State<CallButtons> {
       children: [
         // Audio call button
         IconButton(
-          icon: const Icon(Icons.phone),
+          icon: const Icon(
+            Icons.phone,
+            color: AppConstants.iconColor,
+          ),
           onPressed: () => _startCall(context, false),
           tooltip: 'Audio Call',
         ),
         // Video call button
         IconButton(
-          icon: const Icon(Icons.videocam),
+          icon: const Icon(
+            Icons.videocam,
+            color: AppConstants.iconColor,
+          ),
           onPressed: () => _startCall(context, true),
           tooltip: 'Video Call',
         ),

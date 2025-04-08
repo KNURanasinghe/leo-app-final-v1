@@ -1,7 +1,9 @@
+import 'package:flutter/material.dart';
+
 class AppConstants {
   // Server URL - Change this to your server address
   static const String serverUrl =
-      'http://82.25.180.4:4000'; // For Android emulator
+      'http://82.25.180.10:4000'; // For Android emulator
 
   // For iOS simulator, use:
   // static const String serverUrl = 'http://localhost:3000';
@@ -12,7 +14,7 @@ class AppConstants {
   static const String messageTypeVideo = 'video';
   static const String messageTypeDocument = 'document';
   static const String messageTypeAudio = 'audio';
-
+  static const Color iconColor = Color(0xFF128C7E);
   // UI Constants
   static const double messageBubbleRadius = 16.0;
   static const double chatInputHeight = 60.0;
