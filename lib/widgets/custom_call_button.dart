@@ -38,35 +38,26 @@ class _CallButtonsState extends State<CallButtons> {
 
   // Initialize TUICallKit with the current user
   Future<void> _initializeTUICallKit() async {
-    print("Initializing TUICallKit for user: ${widget.currentUserId}");
+    if (!isInitialized) {
+      // Import this if not already imported
 
-    try {
       // Generate UserSig
       String userSig = GenerateTestUserSig.genTestSig(
           widget.currentUserId, sdkAppID, secretKey);
-
-      print("Generated UserSig, attempting login...");
 
       // Login to TUICallKit
       TUIResult result = await TUICallKit.instance
           .login(sdkAppID, widget.currentUserId, userSig);
 
-      print(
-          "Login result code: '${result.code}', message: '${result.message}'");
-
       if (result.code.isEmpty) {
         setState(() {
           isInitialized = true;
         });
-        print('TUICallKit initialized and logged in successfully');
-
-        // Verify login state
-        // Some SDKs have a method to check login state, if available
+        print('TUICallKit initialized for user: ${widget.currentUserId}');
       } else {
-        print('TUICallKit login failed: ${result.code} ${result.message}');
+        print(
+            'TUICallKit initialization failed: ${result.code} ${result.message}');
       }
-    } catch (e) {
-      print("Exception during TUICallKit initialization: $e");
     }
   }
 
