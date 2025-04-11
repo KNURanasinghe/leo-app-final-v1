@@ -19,6 +19,18 @@ class _UserListItem {
 }
 
 void showDefaultNewPeerChatDialog(BuildContext context) {
+  showDialog(
+    context: context,
+    barrierDismissible: false,
+    builder: (BuildContext context) {
+      return const Center(
+        child: CircularProgressIndicator(
+          valueColor: AlwaysStoppedAnimation<Color>(Colors.blue),
+        ),
+      );
+    },
+  );
+
   Timer.run(() async {
     try {
       // Request contacts permission using flutter_contacts
@@ -156,7 +168,7 @@ void showDefaultNewPeerChatDialog(BuildContext context) {
         }
 
         print('Filtered users count: ${filteredUsers.length}');
-
+        Navigator.of(context, rootNavigator: true).pop();
         // Show dialog with filtered users or all users if filter is empty
         if (context.mounted) {
           if (filteredUsers.isEmpty) {
@@ -303,6 +315,7 @@ class _UserSelectionDialog extends StatefulWidget {
 class _UserSelectionDialogState extends State<_UserSelectionDialog> {
   late List<_UserListItem> filteredUsers;
   final TextEditingController searchController = TextEditingController();
+  bool isLoading = false;
 
   @override
   void initState() {
@@ -310,13 +323,92 @@ class _UserSelectionDialogState extends State<_UserSelectionDialog> {
     filteredUsers = widget.users;
   }
 
-  void _filterUsers(String query) {
+// Helper method to normalize phone numbers
+  String _normalizePhoneNumber(String phoneNumber) {
+    // Remove all non-digit characters except '+'
+    return phoneNumber.replaceAll(RegExp(r'[^\d+]'), '');
+  }
+
+  Future<void> _filterUsers(String query) async {
+    // If query is empty, reset to original list
+    if (query.isEmpty) {
+      setState(() {
+        filteredUsers = widget.users;
+        isLoading = false;
+      });
+      return;
+    }
     setState(() {
-      filteredUsers = widget.users
-          .where(
-              (user) => user.name.toLowerCase().contains(query.toLowerCase()))
-          .toList();
+      isLoading = true;
     });
+    // Normalize the query for phone number search
+    final normalizedQuery = _normalizePhoneNumber(query);
+
+    // First, filter by name as before
+    List<_UserListItem> nameFilteredUsers = widget.users
+        .where((user) => user.name.toLowerCase().contains(query.toLowerCase()))
+        .toList();
+
+    // If name filtering yields results, use those
+    if (nameFilteredUsers.isNotEmpty) {
+      setState(() {
+        filteredUsers = nameFilteredUsers;
+        isLoading = false;
+      });
+      return;
+    }
+
+    // If no name match, try phone number search
+    try {
+      // Fetch users from the database
+      final response = await http.get(
+        Uri.parse('http://145.223.21.62:8090/api/collections/users/records'),
+        headers: {'Content-Type': 'application/json'},
+      );
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        final List<dynamic> userItems = data['items'] as List;
+
+        // Filter users by phone number
+        final phoneFilteredUsers = userItems
+            .where((item) {
+              // Get the phone number from user data
+              String? phoneNumber = item['phonenumber']?.toString();
+
+              if (phoneNumber != null && phoneNumber.isNotEmpty) {
+                // Normalize the phone number for comparison
+                String normalizedNumber = _normalizePhoneNumber(phoneNumber);
+
+                // Check if the normalized phone number contains or matches the query
+                return normalizedNumber.contains(normalizedQuery) ||
+                    normalizedNumber == normalizedQuery;
+              }
+              return false;
+            })
+            .map((item) => _UserListItem(
+                  id: item['id'],
+                  name: '${item['firstname'] ?? ''} ${item['lastname'] ?? ''}'
+                      .trim(),
+                  avatar: item['avatar'],
+                  bio: item['bio'],
+                ))
+            .toList();
+
+        setState(() {
+          filteredUsers = phoneFilteredUsers;
+        });
+      }
+    } catch (e) {
+      print('Error searching users by phone number: $e');
+      // Optionally show a snackbar or handle the error
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error searching users: ${e.toString()}'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
   }
 
   @override
@@ -340,142 +432,153 @@ class _UserSelectionDialogState extends State<_UserSelectionDialog> {
             ),
           ],
         ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            // Header
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  'New Chat',
-                  style: TextStyle(
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.blue[700],
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Header
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'New Chat',
+                    style: TextStyle(
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.blue[700],
+                    ),
                   ),
-                ),
-                IconButton(
-                  onPressed: () => Navigator.of(context).pop(),
-                  icon: const Icon(Icons.close, color: Colors.grey),
-                  splashRadius: 20,
-                ),
-              ],
-            ),
-            const SizedBox(height: 20),
-
-            // Search Bar
-            Container(
-              decoration: BoxDecoration(
-                color: Colors.blue[50],
-                borderRadius: BorderRadius.circular(15),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.blue.withOpacity(0.05),
-                    blurRadius: 10,
-                    offset: const Offset(0, 5),
+                  IconButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    icon: const Icon(Icons.close, color: Colors.grey),
+                    splashRadius: 20,
                   ),
                 ],
               ),
-              child: TextField(
-                controller: searchController,
-                decoration: InputDecoration(
-                  hintText: 'Search users...',
-                  hintStyle: TextStyle(color: Colors.blue[200]),
-                  prefixIcon: Icon(Icons.search, color: Colors.blue[300]),
-                  border: InputBorder.none,
-                  contentPadding:
-                      const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
-                ),
-                onChanged: _filterUsers,
-              ),
-            ),
-            const SizedBox(height: 20),
+              const SizedBox(height: 20),
 
-            // Users List
-            Container(
-              constraints: BoxConstraints(
-                maxHeight: MediaQuery.of(context).size.height * 0.5,
+              // Search Bar
+              Container(
+                decoration: BoxDecoration(
+                  color: Colors.blue[50],
+                  borderRadius: BorderRadius.circular(15),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.blue.withOpacity(0.05),
+                      blurRadius: 10,
+                      offset: const Offset(0, 5),
+                    ),
+                  ],
+                ),
+                child: TextField(
+                  controller: searchController,
+                  decoration: InputDecoration(
+                    hintText: 'Search users...(947XXXXXXX)',
+                    hintStyle: TextStyle(color: Colors.blue[200]),
+                    prefixIcon: Icon(Icons.search, color: Colors.blue[300]),
+                    border: InputBorder.none,
+                    contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 20, vertical: 15),
+                  ),
+                  onChanged: _filterUsers,
+                ),
               ),
-              child: filteredUsers.isEmpty && widget.showingAllUsers
-                  ? Center(
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            Icons.search_off,
-                            size: 48,
-                            color: Colors.blue[200],
-                          ),
-                          const SizedBox(height: 10),
-                          Text(
-                            'No users found',
-                            style: TextStyle(
-                              color: Colors.blue[300],
-                              fontSize: 16,
+              const SizedBox(height: 20),
+
+              // Users List
+              Container(
+                constraints: BoxConstraints(
+                  maxHeight: MediaQuery.of(context).size.height * 0.5,
+                ),
+                child: filteredUsers.isEmpty && widget.showingAllUsers
+                    ? Center(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.search_off,
+                              size: 48,
+                              color: Colors.blue[200],
                             ),
-                          ),
-                        ],
-                      ),
-                    )
-                  : ListView.builder(
-                      shrinkWrap: true,
-                      itemCount: filteredUsers.length,
-                      itemBuilder: (context, index) {
-                        final user = filteredUsers[index];
-                        return Container(
-                          margin: const EdgeInsets.only(bottom: 8),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(15),
-                            border: Border.all(
-                              color: Colors.blue[100]!,
-                              width: 1,
-                            ),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.blue.withOpacity(0.05),
-                                blurRadius: 10,
-                                offset: const Offset(0, 5),
+                            const SizedBox(height: 10),
+                            Text(
+                              'No users found',
+                              style: TextStyle(
+                                color: Colors.blue[300],
+                                fontSize: 16,
                               ),
-                            ],
-                          ),
-                          child: ListTile(
-                            contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 20,
-                              vertical: 8,
                             ),
-                            leading: Container(
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: Colors.blue.withOpacity(0.1),
-                                    blurRadius: 8,
-                                    offset: const Offset(0, 3),
-                                  ),
-                                ],
+                          ],
+                        ),
+                      )
+                    : ListView.builder(
+                        shrinkWrap: true,
+                        itemCount: filteredUsers.length,
+                        itemBuilder: (context, index) {
+                          final user = filteredUsers[index];
+                          return Container(
+                            margin: const EdgeInsets.only(bottom: 8),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(15),
+                              border: Border.all(
+                                color: Colors.blue[100]!,
+                                width: 1,
                               ),
-                              child: user.avatar != null
-                                  ? CachedNetworkImage(
-                                      imageUrl:
-                                          'http://145.223.21.62:8090/api/files/users/${user.id}/${user.avatar}',
-                                      imageBuilder: (context, imageProvider) =>
-                                          CircleAvatar(
-                                        backgroundImage: imageProvider,
-                                        radius: 25,
-                                      ),
-                                      placeholder: (context, url) =>
-                                          CircleAvatar(
-                                        radius: 25,
-                                        backgroundColor: Colors.blue[50],
-                                        child: CircularProgressIndicator(
-                                          strokeWidth: 2,
-                                          color: Colors.blue[300],
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.blue.withOpacity(0.05),
+                                  blurRadius: 10,
+                                  offset: const Offset(0, 5),
+                                ),
+                              ],
+                            ),
+                            child: ListTile(
+                              contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 20,
+                                vertical: 8,
+                              ),
+                              leading: Container(
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: Colors.blue.withOpacity(0.1),
+                                      blurRadius: 8,
+                                      offset: const Offset(0, 3),
+                                    ),
+                                  ],
+                                ),
+                                child: user.avatar != null
+                                    ? CachedNetworkImage(
+                                        imageUrl:
+                                            'http://145.223.21.62:8090/api/files/users/${user.id}/${user.avatar}',
+                                        imageBuilder:
+                                            (context, imageProvider) =>
+                                                CircleAvatar(
+                                          backgroundImage: imageProvider,
+                                          radius: 25,
                                         ),
-                                      ),
-                                      errorWidget: (context, url, error) =>
-                                          CircleAvatar(
+                                        placeholder: (context, url) =>
+                                            CircleAvatar(
+                                          radius: 25,
+                                          backgroundColor: Colors.blue[50],
+                                          child: CircularProgressIndicator(
+                                            strokeWidth: 2,
+                                            color: Colors.blue[300],
+                                          ),
+                                        ),
+                                        errorWidget: (context, url, error) =>
+                                            CircleAvatar(
+                                          radius: 25,
+                                          backgroundColor: Colors.blue[50],
+                                          child: Icon(
+                                            Icons.person,
+                                            color: Colors.blue[300],
+                                          ),
+                                        ),
+                                      )
+                                    : CircleAvatar(
                                         radius: 25,
                                         backgroundColor: Colors.blue[50],
                                         child: Icon(
@@ -483,71 +586,63 @@ class _UserSelectionDialogState extends State<_UserSelectionDialog> {
                                           color: Colors.blue[300],
                                         ),
                                       ),
-                                    )
-                                  : CircleAvatar(
-                                      radius: 25,
-                                      backgroundColor: Colors.blue[50],
-                                      child: Icon(
-                                        Icons.person,
-                                        color: Colors.blue[300],
-                                      ),
-                                    ),
-                            ),
-                            title: Text(
-                              user.name,
-                              style: TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 16,
-                                color: Colors.blue[900],
                               ),
-                            ),
-                            subtitle: Text(
-                              user.bio?.isNotEmpty == true
-                                  ? user.bio!
-                                  : "Hey I'm using Leo Chat",
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                color: Colors.blue[300],
-                                fontSize: 14,
+                              title: Text(
+                                user.name,
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 16,
+                                  color: Colors.blue[900],
+                                ),
                               ),
+                              subtitle: Text(
+                                user.bio?.isNotEmpty == true
+                                    ? user.bio!
+                                    : "Hey I'm using Leo Chat",
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  color: Colors.blue[300],
+                                  fontSize: 14,
+                                ),
+                              ),
+                              trailing: Icon(
+                                Icons.arrow_forward_ios,
+                                size: 16,
+                                color: Colors.blue[200],
+                              ),
+                              onTap: () => Navigator.of(context).pop(user.id),
                             ),
-                            trailing: Icon(
-                              Icons.arrow_forward_ios,
-                              size: 16,
-                              color: Colors.blue[200],
-                            ),
-                            onTap: () => Navigator.of(context).pop(user.id),
-                          ),
-                        );
-                      },
-                    ),
-            ),
-            const SizedBox(height: 20),
+                          );
+                        },
+                      ),
+              ),
+              const SizedBox(height: 20),
 
-            // Cancel Button
-            SizedBox(
-              width: double.infinity,
-              child: TextButton(
-                onPressed: () => Navigator.of(context).pop(),
-                style: TextButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 15),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(15),
+              // Cancel Button
+              SizedBox(
+                width: double.infinity,
+                child: TextButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  style: TextButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 15),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(15),
+                    ),
+                    backgroundColor: Colors.blue[50],
                   ),
-                  backgroundColor: Colors.blue[50],
-                ),
-                child: Text(
-                  'Cancel',
-                  style: TextStyle(
-                    color: Colors.blue[700],
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
+                  child: Text(
+                    'Cancel',
+                    style: TextStyle(
+                      color: Colors.blue[700],
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

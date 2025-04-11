@@ -1,7 +1,9 @@
 // settings_page.dart
 import 'package:flutter/material.dart';
 import 'package:leo_app_01/policy.dart';
+import 'package:leo_app_01/services/api_service.dart';
 import 'package:leo_app_01/services/socket_service.dart';
+import 'package:leo_app_01/splash.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
@@ -140,16 +142,114 @@ class SettingsPage extends StatelessWidget {
             context,
             icon: Icons.logout,
             title: 'Log Out',
-            onTap: () {
-              // Implement logout functionality
+            onTap: () async {
+              final SharedPreferences prefs =
+                  await SharedPreferences.getInstance();
+              await prefs.remove('userId'); // Corrected from removeS to remove
+
+              // Optional: Add navigation to login screen or perform additional logout actions
+              Navigator.of(context).pushReplacement(
+                MaterialPageRoute(
+                    builder: (context) =>
+                        const SplashScreen()), // Replace with your login screen
+              );
             },
           ),
           _buildDangerTile(
             context,
             icon: Icons.delete_forever,
             title: 'Delete Account',
-            onTap: () {
-              // Implement delete account functionality
+            onTap: () async {
+              // Show confirmation dialog
+              final confirmDelete = await showDialog<bool>(
+                context: context,
+                builder: (BuildContext context) {
+                  return AlertDialog(
+                    title: const Text('Delete Account'),
+                    content: const Text(
+                        'Are you sure you want to permanently delete your account? This action cannot be undone.'),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.of(context).pop(false),
+                        child: const Text('Cancel'),
+                      ),
+                      TextButton(
+                        style:
+                            TextButton.styleFrom(foregroundColor: Colors.red),
+                        onPressed: () => Navigator.of(context).pop(true),
+                        child: const Text('Delete'),
+                      ),
+                    ],
+                  );
+                },
+              );
+
+              // If user doesn't confirm, exit
+              if (confirmDelete != true) return;
+
+              // Show loading dialog
+              showDialog(
+                context: context,
+                barrierDismissible: false,
+                builder: (BuildContext context) {
+                  return const Center(
+                    child: CircularProgressIndicator(
+                      valueColor: AlwaysStoppedAnimation<Color>(Colors.red),
+                    ),
+                  );
+                },
+              );
+
+              try {
+                // Get current user ID from SharedPreferences
+                final SharedPreferences prefs =
+                    await SharedPreferences.getInstance();
+                final String? userId = prefs.getString('userId');
+
+                if (userId == null) {
+                  throw Exception('No user ID found');
+                }
+                UserApiService apiservice =
+                    UserApiService(baseUrl: 'http://145.223.21.62:8090');
+                // Delete user from database
+                await apiservice.deleteUser(userId);
+
+                // Remove user ID from SharedPreferences
+                await prefs.remove('userId');
+
+                // Close loading dialog
+                Navigator.of(context, rootNavigator: true).pop();
+
+                // Navigate to Splash screen
+                Navigator.of(context).pushAndRemoveUntil(
+                  MaterialPageRoute(builder: (context) => const SplashScreen()),
+                  (Route<dynamic> route) => false,
+                );
+              } catch (e) {
+                // Close loading dialog
+                Navigator.of(context, rootNavigator: true).pop();
+
+                // Show error dialog
+                showDialog(
+                  context: context,
+                  builder: (BuildContext context) {
+                    return AlertDialog(
+                      title: const Text('Account Deletion Failed'),
+                      content:
+                          Text('Unable to delete account: ${e.toString()}'),
+                      actions: [
+                        TextButton(
+                          onPressed: () => Navigator.of(context).pop(),
+                          child: const Text('OK'),
+                        ),
+                      ],
+                    );
+                  },
+                );
+
+                // Log the error
+                print('Account deletion error: $e');
+              }
             },
             isDestructive: true,
           ),
@@ -254,7 +354,7 @@ class SettingsPage extends StatelessWidget {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => BlockedUsersPage(title: title),
+        builder: (context) => IHaveToCreate(title: title),
       ),
     );
   }
@@ -997,6 +1097,26 @@ class _NotificationState extends State<Notification> {
           ),
         ),
       ),
+    );
+  }
+}
+
+class IHaveToCreate extends StatefulWidget {
+  String title;
+  IHaveToCreate({super.key, required this.title});
+
+  @override
+  State<IHaveToCreate> createState() => _IHaveToCreateState();
+}
+
+class _IHaveToCreateState extends State<IHaveToCreate> {
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(widget.title),
+      ),
+      body: const Center(child: Text("I Have to Create")),
     );
   }
 }

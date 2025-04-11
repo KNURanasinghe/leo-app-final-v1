@@ -10,12 +10,14 @@ class CallButtons extends StatefulWidget {
   final String currentUserId;
   final String targetUserId;
   final String name;
+  final String image;
 
   const CallButtons({
     super.key,
     required this.currentUserId,
     required this.targetUserId,
     required this.name,
+    required this.image,
   });
 
   @override
@@ -170,6 +172,10 @@ class _CallButtonsState extends State<CallButtons> {
       TUICallMediaType mediaType =
           isVideoCall ? TUICallMediaType.video : TUICallMediaType.audio;
 
+      await TUICallKit.instance.setSelfInfo(
+        widget.name, // Your display name
+        widget.image, // Your profile image URL
+      );
       // Make the call using Tencent UIKit
       TUIResult callResult =
           await TUICallKit.instance.call(widget.targetUserId, mediaType);

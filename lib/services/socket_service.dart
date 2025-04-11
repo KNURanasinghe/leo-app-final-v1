@@ -632,20 +632,18 @@ class SocketService {
         ),
       );
 
-      if (callEntry != null) {
-        // Update the entry (you'll need to implement this)
-        // For now we'll assume the list always has the most recent call first
-        callEntries[0] = CallHistoryEntry(
-          callId: callEntry.callId,
-          callerId: callEntry.callerId,
-          receiverId: callEntry.receiverId,
-          isOutgoing: callEntry.isOutgoing,
-          isVideoCall: callEntry.isVideoCall,
-          isMissed: false, // Call was accepted
-          timestamp: callEntry.timestamp,
-          roomId: callEntry.roomId,
-        );
-      }
+      // Update the entry (you'll need to implement this)
+      // For now we'll assume the list always has the most recent call first
+      callEntries[0] = CallHistoryEntry(
+        callId: callEntry.callId,
+        callerId: callEntry.callerId,
+        receiverId: callEntry.receiverId,
+        isOutgoing: callEntry.isOutgoing,
+        isVideoCall: callEntry.isVideoCall,
+        isMissed: false, // Call was accepted
+        timestamp: callEntry.timestamp,
+        roomId: callEntry.roomId,
+      );
       if (onCallAccepted != null) {
         onCallAccepted!(Map<String, dynamic>.from(data));
       }

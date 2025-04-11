@@ -24,6 +24,7 @@ class ChatScreen1State extends State<ChatScreen1>
   late TabController _tabController;
   final int tabCount = 3;
   String currentUserId = '';
+  bool isLoading = false;
 
   @override
   void initState() {

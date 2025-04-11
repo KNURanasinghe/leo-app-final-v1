@@ -5,20 +5,19 @@ import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'ProfileCreationScreen.dart';
 
-
-
 class OtpScreen extends StatefulWidget {
   final String phoneNumber;
   final String otp;
 
-  OtpScreen({required this.phoneNumber, required this.otp});
+  const OtpScreen({super.key, required this.phoneNumber, required this.otp});
 
   @override
   _OtpScreenState createState() => _OtpScreenState();
 }
 
 class _OtpScreenState extends State<OtpScreen> {
-  final List<TextEditingController> _controllers = List.generate(6, (index) => TextEditingController());
+  final List<TextEditingController> _controllers =
+      List.generate(6, (index) => TextEditingController());
   final List<FocusNode> _focusNodes = List.generate(6, (index) => FocusNode());
 
   @override
@@ -35,19 +34,25 @@ class _OtpScreenState extends State<OtpScreen> {
 
   @override
   void dispose() {
-    _controllers.forEach((controller) => controller.dispose());
-    _focusNodes.forEach((node) => node.dispose());
+    for (var controller in _controllers) {
+      controller.dispose();
+    }
+    for (var node in _focusNodes) {
+      node.dispose();
+    }
     super.dispose();
   }
 
   Future<void> updatePhoneNumber() async {
     try {
       // First, check if the phone number already exists
-      final checkUrl = Uri.parse('http://145.223.21.62:8090/api/collections/users/records');
+      final checkUrl =
+          Uri.parse('http://145.223.21.62:8090/api/collections/users/records');
       final phoneNumberInt = int.parse(widget.phoneNumber.replaceAll('+', ''));
 
       final checkResponse = await http.get(
-        Uri.parse('${checkUrl.toString()}?filter=(phonenumber=${phoneNumberInt})'),
+        Uri.parse(
+            '${checkUrl.toString()}?filter=(phonenumber=$phoneNumberInt)'),
         headers: {'Content-Type': 'application/json'},
       );
 
@@ -67,8 +72,8 @@ class _OtpScreenState extends State<OtpScreen> {
           Navigator.pushReplacement(
             context,
             MaterialPageRoute(
-                builder: (context) => ProfileCreationScreen(userId: existingUserId)
-            ),
+                builder: (context) =>
+                    ProfileCreationScreen(userId: existingUserId)),
           );
           return;
         }
@@ -95,8 +100,7 @@ class _OtpScreenState extends State<OtpScreen> {
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(
-              builder: (context) => ProfileCreationScreen(userId: userId)
-          ),
+              builder: (context) => ProfileCreationScreen(userId: userId)),
         );
       } else {
         throw Exception('Failed to create user');
@@ -104,7 +108,7 @@ class _OtpScreenState extends State<OtpScreen> {
     } catch (e) {
       print('Error updating phone number: $e');
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
+        const SnackBar(
           content: Text('Failed to update phone number. Please try again.'),
           backgroundColor: Colors.red,
         ),
@@ -147,7 +151,7 @@ class _OtpScreenState extends State<OtpScreen> {
                             ),
                           ),
                         ),
-                        SizedBox(height: 20),
+                        const SizedBox(height: 20),
                         Text(
                           'Enter verification code',
                           style: TextStyle(
@@ -156,7 +160,7 @@ class _OtpScreenState extends State<OtpScreen> {
                             color: Colors.blue[700],
                           ),
                         ),
-                        SizedBox(height: 8),
+                        const SizedBox(height: 8),
                         Text(
                           'We\'ve sent a code to ${widget.phoneNumber}',
                           style: TextStyle(
@@ -164,41 +168,66 @@ class _OtpScreenState extends State<OtpScreen> {
                             color: Colors.blue[600],
                           ),
                         ),
-                        SizedBox(height: 32),
+                        const SizedBox(height: 32),
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                           children: List.generate(
                             6,
-                                (index) => SizedBox(
+                            (index) => SizedBox(
                               width: 50,
-                              child: TextField(
-                                controller: _controllers[index],
-                                focusNode: _focusNodes[index],
-                                keyboardType: TextInputType.number,
-                                textAlign: TextAlign.center,
-                                style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-                                decoration: InputDecoration(
-                                  filled: true,
-                                  fillColor: Colors.grey[200],
-                                  border: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(12),
-                                    borderSide: BorderSide.none,
-                                  ),
-                                ),
-                                inputFormatters: [
-                                  LengthLimitingTextInputFormatter(1),
-                                  FilteringTextInputFormatter.digitsOnly,
-                                ],
-                                onChanged: (value) {
-                                  if (value.length == 1 && index < 5) {
-                                    FocusScope.of(context).requestFocus(_focusNodes[index + 1]);
+                              child: RawKeyboardListener(
+                                focusNode: FocusNode(),
+                                onKey: (RawKeyEvent event) {
+                                  if (event is RawKeyDownEvent) {
+                                    if (event.logicalKey ==
+                                        LogicalKeyboardKey.backspace) {
+                                      if (_controllers[index].text.isEmpty &&
+                                          index > 0) {
+                                        // Clear the previous field and move focus back
+                                        _controllers[index - 1].clear();
+                                        FocusScope.of(context).requestFocus(
+                                            _focusNodes[index - 1]);
+                                      }
+                                    }
                                   }
                                 },
+                                child: TextField(
+                                  controller: _controllers[index],
+                                  focusNode: _focusNodes[index],
+                                  keyboardType: TextInputType.number,
+                                  textAlign: TextAlign.center,
+                                  style: const TextStyle(
+                                      fontSize: 24,
+                                      fontWeight: FontWeight.bold),
+                                  decoration: InputDecoration(
+                                    filled: true,
+                                    fillColor: Colors.grey[200],
+                                    border: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                      borderSide: BorderSide.none,
+                                    ),
+                                  ),
+                                  inputFormatters: [
+                                    LengthLimitingTextInputFormatter(1),
+                                    FilteringTextInputFormatter.digitsOnly,
+                                  ],
+                                  onChanged: (value) {
+                                    if (value.length == 1 && index < 5) {
+                                      FocusScope.of(context)
+                                          .requestFocus(_focusNodes[index + 1]);
+                                    }
+                                    // If field is cleared and not the first field, move focus back
+                                    if (value.isEmpty && index > 0) {
+                                      FocusScope.of(context)
+                                          .requestFocus(_focusNodes[index - 1]);
+                                    }
+                                  },
+                                ),
                               ),
                             ),
                           ),
                         ),
-                        SizedBox(height: 32),
+                        const SizedBox(height: 32),
                         Center(
                           child: TextButton(
                             onPressed: () {
@@ -211,29 +240,35 @@ class _OtpScreenState extends State<OtpScreen> {
                             ),
                           ),
                         ),
-                        Spacer(),
+                        const Spacer(),
                         Center(
                           child: ElevatedButton(
                             style: ElevatedButton.styleFrom(
                               backgroundColor: Colors.blue[700],
-                              padding: EdgeInsets.symmetric(horizontal: 48, vertical: 16),
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 48, vertical: 16),
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(12),
                               ),
                             ),
                             onPressed: () {
-                              String enteredOtp = _controllers.map((controller) => controller.text).join();
+                              String enteredOtp = _controllers
+                                  .map((controller) => controller.text)
+                                  .join();
                               if (enteredOtp == widget.otp) {
                                 updatePhoneNumber();
                               } else {
                                 ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(content: Text('Invalid OTP. Please try again.')),
+                                  const SnackBar(
+                                      content: Text(
+                                          'Invalid OTP. Please try again.')),
                                 );
                               }
                             },
-                            child: Text(
+                            child: const Text(
                               'Verify',
-                              style: TextStyle(fontSize: 18, color: Colors.white),
+                              style:
+                                  TextStyle(fontSize: 18, color: Colors.white),
                             ),
                           ),
                         ),

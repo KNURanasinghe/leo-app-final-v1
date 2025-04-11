@@ -63,7 +63,9 @@ class _ProfileCreationScreenState extends State<ProfileCreationScreen> {
           _isLoading = false;
         });
       }
-
+      setState(() {
+        _isLoading = false;
+      });
       print("OneSignal Player ID: $_oneSignalPlayerId");
     } catch (e) {
       print("Error initializing OneSignal: $e");

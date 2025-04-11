@@ -54,6 +54,12 @@ class _StatusViewScreenState extends State<StatusViewScreen> {
     _loadStatuses();
   }
 
+  void _showStatusLikesDialog() {
+    final currentStatus = _statuses[_currentIndex];
+
+    _socketService.getStatusLikes(currentStatus.statusId);
+  }
+
   void _setupSocketListeners() {
     _socketService.onUserStatuses = (userId, statuses) {
       if (userId == widget.statusUserId) {
@@ -98,23 +104,56 @@ class _StatusViewScreenState extends State<StatusViewScreen> {
         _likesCounts[statusId] = likeCount;
       });
     };
+    _socketService.onStatusLikes = (statusId, likedBy, likeCount) {
+      showDialog(
+        context: context,
+        builder: (BuildContext context) {
+          return AlertDialog(
+            title: Text('Likes ($likeCount)'),
+            content: likedBy.isEmpty
+                ? const Text('No likes yet')
+                : SizedBox(
+                    height: 300,
+                    width: 300,
+                    child: ListView.builder(
+                      itemCount: likedBy.length,
+                      itemBuilder: (context, index) {
+                        return ListTile(
+                          title: Text('User ${likedBy[index]}'),
+                        );
+                      },
+                    ),
+                  ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('Close'),
+              ),
+            ],
+          );
+        },
+      );
+    };
   }
 
   void _checkStatusLike(String statusId) {
     _socketService.checkStatusLike(widget.currentUserId, statusId);
   }
 
-  void _handleLikeStatus(bool isActive) {
+  void _handleLikeStatus(bool isCurrentlyLiked) {
     final currentStatus = _statuses[_currentIndex];
     _socketService.likeStatus(widget.currentUserId, currentStatus.statusId);
 
-    if (isActive) {
+    // Show message based on what the NEW state will be (opposite of current)
+    if (!isCurrentlyLiked) {
+      // If it wasn't liked and we're liking it now
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Liked status')),
       );
     } else {
+      // If it was liked and we're unliking it now
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('UNLiked status')),
+        const SnackBar(content: Text('Unliked status')),
       );
     }
   }
@@ -543,7 +582,31 @@ class _StatusViewScreenState extends State<StatusViewScreen> {
             ],
           ),
         ),
-
+        if (status.userId == widget.currentUserId)
+          Positioned(
+            top: kToolbarHeight,
+            right: 10,
+            child: PopupMenuButton<String>(
+              icon: const Icon(Icons.more_vert, color: Colors.white),
+              onSelected: (String value) {
+                if (value == 'likes') {
+                  _showStatusLikesDialog();
+                }
+              },
+              itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
+                PopupMenuItem<String>(
+                  value: 'likes',
+                  child: Row(
+                    children: [
+                      const Icon(Icons.favorite, color: Colors.red),
+                      const SizedBox(width: 10),
+                      Text('Likes ($likeCount)'),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
         // Caption text (if any)
         if (status.content.isNotEmpty)
           Positioned(
@@ -581,7 +644,7 @@ class _StatusViewScreenState extends State<StatusViewScreen> {
                   icon: Icons.favorite,
                   label: 'Like',
                   onTap: () => _handleLikeStatus(isLiked),
-                  isActive: isLiked,
+                  isActive: isLiked == true ? true : false,
                   count: likeCount,
                 ),
                 const SizedBox(height: 20),

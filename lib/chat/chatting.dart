@@ -1144,6 +1144,7 @@ class _DemoChattingPageState extends State<DemoChattingMessageListPage> {
                   currentUserId: widget.currentUserId,
                   targetUserId: widget.receiverId,
                   name: widget.receiverName,
+                  image: widget.receiverProfileUrl!,
                 ),
                 // Enhanced block status handling in the menu
                 _buildBlockMenu(),
