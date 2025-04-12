@@ -18,6 +18,8 @@ class _UserListItem {
   });
 }
 
+// Update your showDefaultNewPeerChatDialog function to use the chat request flow
+
 void showDefaultNewPeerChatDialog(BuildContext context) {
   showDialog(
     context: context,
@@ -169,6 +171,7 @@ void showDefaultNewPeerChatDialog(BuildContext context) {
 
         print('Filtered users count: ${filteredUsers.length}');
         Navigator.of(context, rootNavigator: true).pop();
+
         // Show dialog with filtered users or all users if filter is empty
         if (context.mounted) {
           if (filteredUsers.isEmpty) {
@@ -200,43 +203,6 @@ void showDefaultNewPeerChatDialog(BuildContext context) {
               builder: (BuildContext context) {
                 return _UserSelectionDialog(users: allUsers);
               },
-            ).then(
-              (selectedUserId) {
-                if (selectedUserId != null && selectedUserId.isNotEmpty) {
-                  if (selectedUserId.isNotEmpty) {
-                    // Find the selected user to get their name and avatar
-                    final selectedUser = allUsers.firstWhere(
-                      (user) => user.id == selectedUserId,
-                      orElse: () =>
-                          _UserListItem(id: selectedUserId, name: "User"),
-                    );
-
-                    // Build the avatar URL
-                    String? avatarUrl;
-                    if (selectedUser.avatar != null &&
-                        selectedUser.avatar!.isNotEmpty) {
-                      avatarUrl =
-                          'http://145.223.21.62:8090/api/files/users/${selectedUser.id}/${selectedUser.avatar}';
-                    }
-                    HomeScreen.setBottomBarVisibility(false);
-
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => DemoChattingMessageListPage(
-                          receiverId: selectedUserId,
-                          currentUserId: currentUserId!,
-                          receiverName: selectedUser.name,
-                          receiverProfileUrl: avatarUrl,
-                        ),
-                      ),
-                    ).then((_) {
-                      // Show bottom bar again when returning
-                      HomeScreen.setBottomBarVisibility(true);
-                    });
-                  }
-                }
-              },
             );
           } else {
             // Show filtered users if matches found
@@ -246,42 +212,7 @@ void showDefaultNewPeerChatDialog(BuildContext context) {
               builder: (BuildContext context) {
                 return _UserSelectionDialog(users: filteredUsers);
               },
-            ).then((selectedUserId) {
-              if (selectedUserId != null && selectedUserId.isNotEmpty) {
-                if (selectedUserId.isNotEmpty) {
-                  // Find the selected user to get their name and avatar
-                  final selectedUser = filteredUsers.firstWhere(
-                    (user) => user.id == selectedUserId,
-                    orElse: () =>
-                        _UserListItem(id: selectedUserId, name: "User"),
-                  );
-
-                  // Build the avatar URL
-                  String? avatarUrl;
-                  if (selectedUser.avatar != null &&
-                      selectedUser.avatar!.isNotEmpty) {
-                    avatarUrl =
-                        'http://145.223.21.62:8090/api/files/users/${selectedUser.id}/${selectedUser.avatar}';
-                  }
-                  HomeScreen.setBottomBarVisibility(false);
-
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => DemoChattingMessageListPage(
-                        receiverId: selectedUserId,
-                        currentUserId: currentUserId!,
-                        receiverName: selectedUser.name,
-                        receiverProfileUrl: avatarUrl,
-                      ),
-                    ),
-                  ).then((_) {
-                    // Show bottom bar again when returning
-                    HomeScreen.setBottomBarVisibility(true);
-                  });
-                }
-              }
-            });
+            );
           }
         }
       }
@@ -294,11 +225,13 @@ void showDefaultNewPeerChatDialog(BuildContext context) {
             backgroundColor: Colors.red,
           ),
         );
+        Navigator.of(context, rootNavigator: true).pop();
       }
     }
   });
 }
 
+// Complete _UserSelectionDialog implementation
 class _UserSelectionDialog extends StatefulWidget {
   final List<_UserListItem> users;
   final bool showingAllUsers;
@@ -315,15 +248,48 @@ class _UserSelectionDialog extends StatefulWidget {
 class _UserSelectionDialogState extends State<_UserSelectionDialog> {
   late List<_UserListItem> filteredUsers;
   final TextEditingController searchController = TextEditingController();
+  final SocketService _socketService = SocketService();
   bool isLoading = false;
+  String _currentUserId = '';
+  String _currentUserName = '';
 
   @override
   void initState() {
     super.initState();
     filteredUsers = widget.users;
+    _loadCurrentUserData();
+    _setupSocketListeners();
   }
 
-// Helper method to normalize phone numbers
+  void _setupSocketListeners() {
+    _socketService.onChatRequestUpdated = (request) {
+      setState(() {
+        isLoading = false;
+      });
+
+      if (request.status == 'pending') {
+        // Show success dialog
+        _showRequestSentDialog(request.receiverId, request.senderName);
+      } else if (request.status == 'approved') {
+        // Request was already approved or auto-approved
+        final user = widget.users.firstWhere(
+          (u) => u.id == request.receiverId,
+          orElse: () => _UserListItem(id: request.receiverId, name: "User"),
+        );
+        _navigateToChat(user);
+      }
+    };
+  }
+
+  Future<void> _loadCurrentUserData() async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      _currentUserId = prefs.getString('userId') ?? '';
+      _currentUserName = prefs.getString('name') ?? '';
+    });
+  }
+
+  // Helper method to normalize phone numbers
   String _normalizePhoneNumber(String phoneNumber) {
     // Remove all non-digit characters except '+'
     return phoneNumber.replaceAll(RegExp(r'[^\d+]'), '');
@@ -341,9 +307,6 @@ class _UserSelectionDialogState extends State<_UserSelectionDialog> {
     setState(() {
       isLoading = true;
     });
-    // Normalize the query for phone number search
-    final normalizedQuery = _normalizePhoneNumber(query);
-
     // First, filter by name as before
     List<_UserListItem> nameFilteredUsers = widget.users
         .where((user) => user.name.toLowerCase().contains(query.toLowerCase()))
@@ -369,6 +332,9 @@ class _UserSelectionDialogState extends State<_UserSelectionDialog> {
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         final List<dynamic> userItems = data['items'] as List;
+
+        // Normalize the query for phone number search
+        final normalizedQuery = _normalizePhoneNumber(query);
 
         // Filter users by phone number
         final phoneFilteredUsers = userItems
@@ -397,6 +363,11 @@ class _UserSelectionDialogState extends State<_UserSelectionDialog> {
 
         setState(() {
           filteredUsers = phoneFilteredUsers;
+          isLoading = false;
+        });
+      } else {
+        setState(() {
+          isLoading = false;
         });
       }
     } catch (e) {
@@ -408,7 +379,88 @@ class _UserSelectionDialogState extends State<_UserSelectionDialog> {
           backgroundColor: Colors.red,
         ),
       );
+      setState(() {
+        isLoading = false;
+      });
     }
+  }
+
+  void _sendChatRequest(_UserListItem user) async {
+    // Check if we have current user data
+    if (_currentUserId.isEmpty) {
+      await _loadCurrentUserData();
+    }
+
+    // Show sending indicator
+    setState(() {
+      isLoading = true;
+    });
+
+    // Get user avatar URL
+    String? currentUserAvatar;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final avatar = prefs.getString('avatar');
+      if (avatar != null && avatar.isNotEmpty) {
+        currentUserAvatar =
+            'http://145.223.21.62:8090/api/files/users/$_currentUserId/$avatar';
+      }
+    } catch (e) {
+      print('Error getting avatar: $e');
+    }
+
+    // Send the chat request
+    _socketService.sendChatRequest(
+      _currentUserId,
+      user.id,
+      _currentUserName.isEmpty ? "User" : _currentUserName,
+      currentUserAvatar,
+    );
+  }
+
+  void _showRequestSentDialog(String receiverId, String userName) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Request Sent'),
+          content: Text(
+              'Chat request sent to $userName. You\'ll be able to chat when they accept your request.'),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+                Navigator.of(context, rootNavigator: true).pop();
+              },
+              child: const Text('OK'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _navigateToChat(_UserListItem user) {
+    // Navigate to chat screen
+    HomeScreen.setBottomBarVisibility(false);
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => DemoChattingMessageListPage(
+          receiverId: user.id,
+          currentUserId: _currentUserId,
+          receiverName: user.name,
+          receiverProfileUrl: user.avatar,
+        ),
+      ),
+    ).then((_) {
+      // Show bottom bar again when returning
+      HomeScreen.setBottomBarVisibility(true);
+    });
+
+    // Close dialog
+    Navigator.of(context, rootNavigator: true).pop();
   }
 
   @override
@@ -490,132 +542,135 @@ class _UserSelectionDialogState extends State<_UserSelectionDialog> {
                 constraints: BoxConstraints(
                   maxHeight: MediaQuery.of(context).size.height * 0.5,
                 ),
-                child: filteredUsers.isEmpty && widget.showingAllUsers
-                    ? Center(
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              Icons.search_off,
-                              size: 48,
-                              color: Colors.blue[200],
-                            ),
-                            const SizedBox(height: 10),
-                            Text(
-                              'No users found',
-                              style: TextStyle(
-                                color: Colors.blue[300],
-                                fontSize: 16,
-                              ),
-                            ),
-                          ],
-                        ),
-                      )
-                    : ListView.builder(
-                        shrinkWrap: true,
-                        itemCount: filteredUsers.length,
-                        itemBuilder: (context, index) {
-                          final user = filteredUsers[index];
-                          return Container(
-                            margin: const EdgeInsets.only(bottom: 8),
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              borderRadius: BorderRadius.circular(15),
-                              border: Border.all(
-                                color: Colors.blue[100]!,
-                                width: 1,
-                              ),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.blue.withOpacity(0.05),
-                                  blurRadius: 10,
-                                  offset: const Offset(0, 5),
+                child: isLoading
+                    ? const Center(child: CircularProgressIndicator())
+                    : filteredUsers.isEmpty
+                        ? Center(
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.search_off,
+                                  size: 48,
+                                  color: Colors.blue[200],
+                                ),
+                                const SizedBox(height: 10),
+                                Text(
+                                  'No users found',
+                                  style: TextStyle(
+                                    color: Colors.blue[300],
+                                    fontSize: 16,
+                                  ),
                                 ),
                               ],
                             ),
-                            child: ListTile(
-                              contentPadding: const EdgeInsets.symmetric(
-                                horizontal: 20,
-                                vertical: 8,
-                              ),
-                              leading: Container(
+                          )
+                        : ListView.builder(
+                            shrinkWrap: true,
+                            itemCount: filteredUsers.length,
+                            itemBuilder: (context, index) {
+                              final user = filteredUsers[index];
+                              return Container(
+                                margin: const EdgeInsets.only(bottom: 8),
                                 decoration: BoxDecoration(
-                                  shape: BoxShape.circle,
+                                  color: Colors.white,
+                                  borderRadius: BorderRadius.circular(15),
+                                  border: Border.all(
+                                    color: Colors.blue[100]!,
+                                    width: 1,
+                                  ),
                                   boxShadow: [
                                     BoxShadow(
-                                      color: Colors.blue.withOpacity(0.1),
-                                      blurRadius: 8,
-                                      offset: const Offset(0, 3),
+                                      color: Colors.blue.withOpacity(0.05),
+                                      blurRadius: 10,
+                                      offset: const Offset(0, 5),
                                     ),
                                   ],
                                 ),
-                                child: user.avatar != null
-                                    ? CachedNetworkImage(
-                                        imageUrl:
-                                            'http://145.223.21.62:8090/api/files/users/${user.id}/${user.avatar}',
-                                        imageBuilder:
-                                            (context, imageProvider) =>
+                                child: ListTile(
+                                  contentPadding: const EdgeInsets.symmetric(
+                                    horizontal: 20,
+                                    vertical: 8,
+                                  ),
+                                  leading: Container(
+                                    decoration: BoxDecoration(
+                                      shape: BoxShape.circle,
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: Colors.blue.withOpacity(0.1),
+                                          blurRadius: 8,
+                                          offset: const Offset(0, 3),
+                                        ),
+                                      ],
+                                    ),
+                                    child: user.avatar != null
+                                        ? CachedNetworkImage(
+                                            imageUrl:
+                                                'http://145.223.21.62:8090/api/files/users/${user.id}/${user.avatar}',
+                                            imageBuilder:
+                                                (context, imageProvider) =>
+                                                    CircleAvatar(
+                                              backgroundImage: imageProvider,
+                                              radius: 25,
+                                            ),
+                                            placeholder: (context, url) =>
                                                 CircleAvatar(
-                                          backgroundImage: imageProvider,
-                                          radius: 25,
-                                        ),
-                                        placeholder: (context, url) =>
-                                            CircleAvatar(
-                                          radius: 25,
-                                          backgroundColor: Colors.blue[50],
-                                          child: CircularProgressIndicator(
-                                            strokeWidth: 2,
-                                            color: Colors.blue[300],
+                                              radius: 25,
+                                              backgroundColor: Colors.blue[50],
+                                              child: CircularProgressIndicator(
+                                                strokeWidth: 2,
+                                                color: Colors.blue[300],
+                                              ),
+                                            ),
+                                            errorWidget:
+                                                (context, url, error) =>
+                                                    CircleAvatar(
+                                              radius: 25,
+                                              backgroundColor: Colors.blue[50],
+                                              child: Icon(
+                                                Icons.person,
+                                                color: Colors.blue[300],
+                                              ),
+                                            ),
+                                          )
+                                        : CircleAvatar(
+                                            radius: 25,
+                                            backgroundColor: Colors.blue[50],
+                                            child: Icon(
+                                              Icons.person,
+                                              color: Colors.blue[300],
+                                            ),
                                           ),
-                                        ),
-                                        errorWidget: (context, url, error) =>
-                                            CircleAvatar(
-                                          radius: 25,
-                                          backgroundColor: Colors.blue[50],
-                                          child: Icon(
-                                            Icons.person,
-                                            color: Colors.blue[300],
-                                          ),
-                                        ),
-                                      )
-                                    : CircleAvatar(
-                                        radius: 25,
-                                        backgroundColor: Colors.blue[50],
-                                        child: Icon(
-                                          Icons.person,
-                                          color: Colors.blue[300],
-                                        ),
-                                      ),
-                              ),
-                              title: Text(
-                                user.name,
-                                style: TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 16,
-                                  color: Colors.blue[900],
+                                  ),
+                                  title: Text(
+                                    user.name,
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 16,
+                                      color: Colors.blue[900],
+                                    ),
+                                  ),
+                                  subtitle: Text(
+                                    user.bio?.isNotEmpty == true
+                                        ? user.bio!
+                                        : "Hey I'm using Leo Chat",
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(
+                                      color: Colors.blue[300],
+                                      fontSize: 14,
+                                    ),
+                                  ),
+                                  trailing: Icon(
+                                    Icons.arrow_forward_ios,
+                                    size: 16,
+                                    color: Colors.blue[200],
+                                  ),
+                                  onTap: () => _sendChatRequest(user),
                                 ),
-                              ),
-                              subtitle: Text(
-                                user.bio?.isNotEmpty == true
-                                    ? user.bio!
-                                    : "Hey I'm using Leo Chat",
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(
-                                  color: Colors.blue[300],
-                                  fontSize: 14,
-                                ),
-                              ),
-                              trailing: Icon(
-                                Icons.arrow_forward_ios,
-                                size: 16,
-                                color: Colors.blue[200],
-                              ),
-                              onTap: () => Navigator.of(context).pop(user.id),
-                            ),
-                          );
-                        },
-                      ),
+                              );
+                            },
+                          ),
               ),
               const SizedBox(height: 20),
 

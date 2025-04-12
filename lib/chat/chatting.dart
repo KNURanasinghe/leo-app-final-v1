@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:http_parser/http_parser.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:leo_app_01/widgets/chat_request_status.dart';
 import 'package:path/path.dart' as path_lib;
 import 'package:path_provider/path_provider.dart';
 import 'package:video_thumbnail/video_thumbnail.dart';
@@ -58,11 +59,17 @@ class _DemoChattingPageState extends State<DemoChattingMessageListPage> {
   bool _isInSelectionMode = false;
   FilePreview? _filePreview;
   bool _hasInitializedBlockStatus = false;
+
+  // Add this to track chat request status
+  bool _canChat = false;
+  bool _isCheckingChatPermission = true;
+
   @override
   void initState() {
     super.initState();
     _setupSocketListeners();
     _setupBlockListeners();
+    _checkChatPermission();
     _loadChatHistory();
     _checkBlockStatus();
     _forceBlockStatusCheck();
@@ -74,6 +81,58 @@ class _DemoChattingPageState extends State<DemoChattingMessageListPage> {
         _forceScrollToBottom();
       });
     });
+  }
+
+  void _checkChatPermission() {
+    _socketService.checkChatRequestStatus(
+      widget.currentUserId,
+      widget.receiverId,
+    );
+
+    // Add a listener for the response
+    _socketService.socket.on('chatRequestStatus', (data) {
+      if ((data['senderId'] == widget.currentUserId &&
+              data['receiverId'] == widget.receiverId) ||
+          (data['senderId'] == widget.receiverId &&
+              data['receiverId'] == widget.currentUserId)) {
+        setState(() {
+          // Can chat if request is approved or either user is admin
+          _canChat = data['status'] == 'approved' ||
+              AppConstants.adminUsers.contains(widget.currentUserId) ||
+              AppConstants.adminUsers.contains(widget.receiverId);
+          _isCheckingChatPermission = false;
+        });
+
+        // If can chat, load chat history
+        if (_canChat) {
+          _loadChatHistory();
+        }
+      }
+    });
+
+    // Fallback in case we don't get a response
+    Future.delayed(const Duration(seconds: 3), () {
+      if (mounted && _isCheckingChatPermission) {
+        // Default to allowing chat for admins
+        setState(() {
+          _canChat = AppConstants.adminUsers.contains(widget.currentUserId) ||
+              AppConstants.adminUsers.contains(widget.receiverId);
+          _isCheckingChatPermission = false;
+        });
+
+        if (_canChat) {
+          _loadChatHistory();
+        }
+      }
+    });
+  }
+
+  // Called when a chat request is approved
+  void _onChatRequestApproved() {
+    setState(() {
+      _canChat = true;
+    });
+    _loadChatHistory();
   }
 
   void _forceBlockStatusCheck() {
@@ -1150,172 +1209,190 @@ class _DemoChattingPageState extends State<DemoChattingMessageListPage> {
                 _buildBlockMenu(),
               ],
       ),
-      body: Column(
-        children: [
-          // Messages
-          Expanded(
-            child: Container(
-              decoration: const BoxDecoration(
-                color: Colors.white,
-                image: DecorationImage(
-                  image: AssetImage('assets/chat_background.jpg'),
-                  fit: BoxFit.cover,
-                  opacity: 0.2,
+      body: _isCheckingChatPermission
+          ? const Center(child: CircularProgressIndicator())
+          : !_canChat
+              ? ChatRequestStatusWidget(
+                  currentUserId: widget.currentUserId,
+                  receiverId: widget.receiverId,
+                  receiverName: widget.receiverName,
+                  receiverProfileUrl: widget.receiverProfileUrl,
+                  onRequestApproved: _onChatRequestApproved,
+                )
+              : Column(
+                  children: [
+                    // Messages
+                    Expanded(
+                      child: Container(
+                        decoration: const BoxDecoration(
+                          color: Colors.white,
+                          image: DecorationImage(
+                            image: AssetImage('assets/chat_background.jpg'),
+                            fit: BoxFit.cover,
+                            opacity: 0.2,
+                          ),
+                        ),
+                        child: _messages.isEmpty
+                            ? const Center(
+                                child: Text(
+                                  'No messages yet. Send a message to start chatting!',
+                                  style: TextStyle(color: Colors.grey),
+                                ),
+                              )
+                            : ListView.builder(
+                                key: ValueKey<int>(_messages.length),
+                                controller: _scrollController,
+                                padding: const EdgeInsets.all(10),
+                                itemCount: _messages.length,
+                                itemBuilder: (context, index) {
+                                  final message = _messages[index];
+                                  final isMe =
+                                      message.senderId == widget.currentUserId;
+
+                                  return MessageBubble(
+                                    message: message,
+                                    isMe: isMe,
+                                    currentUserId: widget.currentUserId,
+                                    isSelected:
+                                        _selectionManager.isSelected(message),
+                                    onLongPress: () =>
+                                        _onMessageSelected(message),
+                                  );
+                                },
+                              ),
+                      ),
+                    ),
+
+                    if (_filePreview != null) _buildFilePreview(),
+                    // Attachment menu
+                    if (_isAttachmentMenuOpen && _filePreview == null)
+                      Container(
+                        color: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 10),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                          children: [
+                            _buildAttachmentButton(
+                              icon: Icons.camera_alt,
+                              color: Colors.purple,
+                              label: 'Camera',
+                              onTap: () => _pickImage(ImageSource.camera),
+                            ),
+                            _buildAttachmentButton(
+                              icon: Icons.photo,
+                              color: Colors.purple,
+                              label: 'Gallery',
+                              onTap: () => _pickImage(ImageSource.gallery),
+                            ),
+                            _buildAttachmentButton(
+                              icon: Icons.videocam,
+                              color: Colors.red,
+                              label: 'Video',
+                              onTap: _pickVideo,
+                            ),
+                            _buildAttachmentButton(
+                              icon: Icons.insert_drive_file,
+                              color: Colors.blue,
+                              label: 'Document',
+                              onTap: _pickDocument,
+                            ),
+                            _buildAttachmentButton(
+                              icon: Icons.mic,
+                              color: Colors.orange,
+                              label: 'Audio',
+                              onTap: () {
+                                setState(() {
+                                  _isShowingRecorder = true;
+                                  _isAttachmentMenuOpen = false;
+                                });
+                              },
+                            ),
+                          ],
+                        ),
+                      ),
+
+                    // Audio recorder
+                    if (_isShowingRecorder && _filePreview == null)
+                      Padding(
+                        padding: const EdgeInsets.all(8.0),
+                        child: AudioRecorderWidget(
+                          onRecordingComplete: _onRecordingComplete,
+                          onRecordingCancelled: _onRecordingCancelled,
+                        ),
+                      ),
+
+                    // Input field
+                    if (!_isShowingRecorder && _filePreview == null)
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.05),
+                              offset: const Offset(0, -1),
+                              blurRadius: 5,
+                            ),
+                          ],
+                        ),
+                        child: Row(
+                          children: [
+                            IconButton(
+                              icon: Icon(
+                                _isAttachmentMenuOpen
+                                    ? Icons.close
+                                    : Icons.attach_file,
+                                color: Colors.grey[600],
+                              ),
+                              onPressed: () {
+                                setState(() {
+                                  _isAttachmentMenuOpen =
+                                      !_isAttachmentMenuOpen;
+                                });
+                              },
+                            ),
+                            Expanded(
+                              child: TextField(
+                                controller: _messageController,
+                                decoration: const InputDecoration(
+                                  hintText: 'Type a message',
+                                  border: InputBorder.none,
+                                  contentPadding: EdgeInsets.symmetric(
+                                      horizontal: 16, vertical: 8),
+                                ),
+                                maxLines: null,
+                                textCapitalization:
+                                    TextCapitalization.sentences,
+                                onChanged: (text) {
+                                  // Send typing status
+                                  _socketService.sendTypingStatus(
+                                    widget.currentUserId,
+                                    widget.receiverId,
+                                    text.isNotEmpty,
+                                  );
+                                },
+                              ),
+                            ),
+                            IconButton(
+                              icon: const Icon(
+                                Icons.send,
+                                color: Color(0xFF128C7E),
+                              ),
+                              onPressed: () {
+                                if (_messageController.text.trim().isNotEmpty) {
+                                  _sendMessage(
+                                    text: _messageController.text.trim(),
+                                    messageType: AppConstants.messageTypeText,
+                                  );
+                                }
+                              },
+                            ),
+                          ],
+                        ),
+                      ),
+                  ],
                 ),
-              ),
-              child: _messages.isEmpty
-                  ? const Center(
-                      child: Text(
-                        'No messages yet. Send a message to start chatting!',
-                        style: TextStyle(color: Colors.grey),
-                      ),
-                    )
-                  : ListView.builder(
-                      key: ValueKey<int>(_messages.length),
-                      controller: _scrollController,
-                      padding: const EdgeInsets.all(10),
-                      itemCount: _messages.length,
-                      itemBuilder: (context, index) {
-                        final message = _messages[index];
-                        final isMe = message.senderId == widget.currentUserId;
-
-                        return MessageBubble(
-                          message: message,
-                          isMe: isMe,
-                          currentUserId: widget.currentUserId,
-                          isSelected: _selectionManager.isSelected(message),
-                          onLongPress: () => _onMessageSelected(message),
-                        );
-                      },
-                    ),
-            ),
-          ),
-
-          if (_filePreview != null) _buildFilePreview(),
-          // Attachment menu
-          if (_isAttachmentMenuOpen && _filePreview == null)
-            Container(
-              color: Colors.white,
-              padding: const EdgeInsets.symmetric(vertical: 10),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                children: [
-                  _buildAttachmentButton(
-                    icon: Icons.camera_alt,
-                    color: Colors.purple,
-                    label: 'Camera',
-                    onTap: () => _pickImage(ImageSource.camera),
-                  ),
-                  _buildAttachmentButton(
-                    icon: Icons.photo,
-                    color: Colors.purple,
-                    label: 'Gallery',
-                    onTap: () => _pickImage(ImageSource.gallery),
-                  ),
-                  _buildAttachmentButton(
-                    icon: Icons.videocam,
-                    color: Colors.red,
-                    label: 'Video',
-                    onTap: _pickVideo,
-                  ),
-                  _buildAttachmentButton(
-                    icon: Icons.insert_drive_file,
-                    color: Colors.blue,
-                    label: 'Document',
-                    onTap: _pickDocument,
-                  ),
-                  _buildAttachmentButton(
-                    icon: Icons.mic,
-                    color: Colors.orange,
-                    label: 'Audio',
-                    onTap: () {
-                      setState(() {
-                        _isShowingRecorder = true;
-                        _isAttachmentMenuOpen = false;
-                      });
-                    },
-                  ),
-                ],
-              ),
-            ),
-
-          // Audio recorder
-          if (_isShowingRecorder && _filePreview == null)
-            Padding(
-              padding: const EdgeInsets.all(8.0),
-              child: AudioRecorderWidget(
-                onRecordingComplete: _onRecordingComplete,
-                onRecordingCancelled: _onRecordingCancelled,
-              ),
-            ),
-
-          // Input field
-          if (!_isShowingRecorder && _filePreview == null)
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.05),
-                    offset: const Offset(0, -1),
-                    blurRadius: 5,
-                  ),
-                ],
-              ),
-              child: Row(
-                children: [
-                  IconButton(
-                    icon: Icon(
-                      _isAttachmentMenuOpen ? Icons.close : Icons.attach_file,
-                      color: Colors.grey[600],
-                    ),
-                    onPressed: () {
-                      setState(() {
-                        _isAttachmentMenuOpen = !_isAttachmentMenuOpen;
-                      });
-                    },
-                  ),
-                  Expanded(
-                    child: TextField(
-                      controller: _messageController,
-                      decoration: const InputDecoration(
-                        hintText: 'Type a message',
-                        border: InputBorder.none,
-                        contentPadding:
-                            EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                      ),
-                      maxLines: null,
-                      textCapitalization: TextCapitalization.sentences,
-                      onChanged: (text) {
-                        // Send typing status
-                        _socketService.sendTypingStatus(
-                          widget.currentUserId,
-                          widget.receiverId,
-                          text.isNotEmpty,
-                        );
-                      },
-                    ),
-                  ),
-                  IconButton(
-                    icon: const Icon(
-                      Icons.send,
-                      color: Color(0xFF128C7E),
-                    ),
-                    onPressed: () {
-                      if (_messageController.text.trim().isNotEmpty) {
-                        _sendMessage(
-                          text: _messageController.text.trim(),
-                          messageType: AppConstants.messageTypeText,
-                        );
-                      }
-                    },
-                  ),
-                ],
-              ),
-            ),
-        ],
-      ),
     );
   }
 

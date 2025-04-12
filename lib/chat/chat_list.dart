@@ -8,6 +8,8 @@ import '../models/message.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 
+import '../widgets/chat_request_screen.dart';
+
 class ChatListScreenUser extends StatefulWidget {
   final String currentUserId;
   final Function onNavigation;
@@ -452,6 +454,15 @@ class _ChatListScreenState extends State<ChatListScreenUser>
         //   onPressed: () => _showNewChatDialog(),
         //   child: const Icon(Icons.chat),
         // ),
+        appBar: AppBar(
+          title: const Text('Chats'),
+          actions: [
+            ChatRequestIndicator(userId: widget.currentUserId),
+            const SizedBox(width: 12),
+            // Your other actions like search
+          ],
+          // rest of the AppBar properties
+        ),
       ),
     );
   }
@@ -691,5 +702,128 @@ class _ChatListScreenState extends State<ChatListScreenUser>
     } else {
       return '${date.day}/${date.month}';
     }
+  }
+}
+
+class ChatRequestIndicator extends StatefulWidget {
+  final String userId;
+
+  const ChatRequestIndicator({
+    super.key,
+    required this.userId,
+  });
+
+  @override
+  _ChatRequestIndicatorState createState() => _ChatRequestIndicatorState();
+}
+
+class _ChatRequestIndicatorState extends State<ChatRequestIndicator> {
+  final SocketService _socketService = SocketService();
+  int _pendingRequests = 0;
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _setupSocketListeners();
+    _loadPendingRequests();
+  }
+
+  void _setupSocketListeners() {
+    _socketService.onChatRequestsList = (requests) {
+      setState(() {
+        _pendingRequests = requests.length;
+        _isLoading = false;
+      });
+    };
+
+    _socketService.onChatRequestReceived = (request) {
+      if (request.receiverId == widget.userId && request.status == 'pending') {
+        setState(() {
+          _pendingRequests++;
+        });
+
+        // Show a notification
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('New chat request from ${request.senderName}'),
+            action: SnackBarAction(
+              label: 'View',
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => ChatRequestScreen(
+                      currentUserId: widget.userId,
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+        );
+      }
+    };
+
+    _socketService.onChatRequestUpdated = (request) {
+      if (request.status != 'pending' && request.receiverId == widget.userId) {
+        // Refresh the count when a request is approved/rejected
+        _loadPendingRequests();
+      }
+    };
+  }
+
+  void _loadPendingRequests() {
+    _socketService.getPendingChatRequests(widget.userId);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => ChatRequestScreen(
+              currentUserId: widget.userId,
+            ),
+          ),
+        ).then((_) {
+          // Refresh count when returning from the requests screen
+          _loadPendingRequests();
+        });
+      },
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          const Icon(Icons.person_add),
+          if (_pendingRequests > 0)
+            Positioned(
+              right: -8,
+              top: -8,
+              child: Container(
+                padding: const EdgeInsets.all(4),
+                decoration: const BoxDecoration(
+                  color: Colors.red,
+                  shape: BoxShape.circle,
+                ),
+                constraints: const BoxConstraints(
+                  minWidth: 16,
+                  minHeight: 16,
+                ),
+                child: Text(
+                  _pendingRequests > 9 ? '9+' : _pendingRequests.toString(),
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
   }
 }

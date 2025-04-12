@@ -1,5 +1,6 @@
 import 'package:leo_app_01/Provider/call_history_provider.dart';
 import 'package:leo_app_01/models/call_istory_model.dart';
+import 'package:leo_app_01/models/request_model.dart';
 import 'package:socket_io_client/socket_io_client.dart' as IO;
 import '../constants/app_constants.dart';
 import '../models/message.dart';
@@ -47,6 +48,10 @@ typedef StatusLikesCallback = void Function(
     String statusId, List<String> likedBy, int likeCount);
 typedef StatusLikeStatusCallback = void Function(
     String statusId, bool hasLiked, int likeCount);
+
+typedef ChatRequestReceivedCallback = void Function(ChatRequest request);
+typedef ChatRequestUpdatedCallback = void Function(ChatRequest request);
+typedef ChatRequestsListCallback = void Function(List<ChatRequest> requests);
 
 class SocketService {
   static SocketService? _instance;
@@ -103,6 +108,12 @@ class SocketService {
   Function(Map<String, dynamic>)? onUnreadCountUpdate;
   Function(Map<String, int>)? onUnreadCounts;
   AdminUsersCallback? onAdminUsersList;
+
+  // Add these new properties to your SocketService class
+  ChatRequestReceivedCallback? onChatRequestReceived;
+  ChatRequestUpdatedCallback? onChatRequestUpdated;
+  ChatRequestsListCallback? onChatRequestsList;
+  IO.Socket get socket => _socket;
   bool isAdmin(String userId) {
     return AppConstants.adminUsers.contains(userId);
   }
@@ -117,6 +128,8 @@ class SocketService {
     _initSocket();
     _setupBlockListeners();
     _setupBroadcastListeners();
+    _setupStatusLikeListeners();
+    _setupChatRequestListeners();
   }
   void _setupStatusLikeListeners() {
     _socket.on('statusLiked', (data) {
@@ -146,6 +159,33 @@ class SocketService {
       if (onStatusLikeStatus != null) {
         onStatusLikeStatus!(
             data['statusId'], data['hasLiked'], data['likeCount']);
+      }
+    });
+  }
+
+  // Add this to your _setupSocketListeners() method
+  void _setupChatRequestListeners() {
+    _socket.on('chatRequestReceived', (data) {
+      print('📩 Received chat request: $data');
+      if (onChatRequestReceived != null) {
+        onChatRequestReceived!(ChatRequest.fromJson(data));
+      }
+    });
+
+    _socket.on('chatRequestUpdated', (data) {
+      print('🔄 Chat request updated: $data');
+      if (onChatRequestUpdated != null) {
+        onChatRequestUpdated!(ChatRequest.fromJson(data));
+      }
+    });
+
+    _socket.on('chatRequestsList', (data) {
+      print('📋 Received chat requests list');
+      if (onChatRequestsList != null && data['requests'] != null) {
+        final List<dynamic> requestsJson = data['requests'];
+        final List<ChatRequest> requests =
+            requestsJson.map((req) => ChatRequest.fromJson(req)).toList();
+        onChatRequestsList!(requests);
       }
     });
   }
@@ -283,7 +323,6 @@ class SocketService {
   }
 
   void _setupSocketListeners() {
-    _setupStatusLikeListeners();
     _socket.on('statusShareMessage', (data) {
       print("RECEIVED: Status share message: $data");
 
@@ -1277,5 +1316,45 @@ class SocketService {
 
     // Also send as regular message for compatibility
     _socket.emit('sendMessage', json);
+  }
+
+  void sendChatRequest(String senderId, String receiverId, String senderName,
+      String? senderAvatar) {
+    print('📤 Sending chat request from $senderId to $receiverId');
+    _socket.emit('sendChatRequest', {
+      'senderId': senderId,
+      'receiverId': receiverId,
+      'senderName': senderName,
+      'senderAvatar': senderAvatar,
+      'timestamp': DateTime.now().millisecondsSinceEpoch,
+    });
+  }
+
+  void respondToChatRequest(
+      String requestId, String receiverId, String senderId, bool approved) {
+    print(
+        '📤 Responding to chat request $requestId: ${approved ? 'Approved' : 'Rejected'}');
+    _socket.emit('respondToChatRequest', {
+      'requestId': requestId,
+      'receiverId': receiverId,
+      'senderId': senderId,
+      'approved': approved,
+      'timestamp': DateTime.now().millisecondsSinceEpoch,
+    });
+  }
+
+  void getPendingChatRequests(String userId) {
+    print('🔍 Fetching pending chat requests for user: $userId');
+    _socket.emit('getPendingChatRequests', {
+      'userId': userId,
+    });
+  }
+
+  void checkChatRequestStatus(String senderId, String receiverId) {
+    print('🔍 Checking chat request status between $senderId and $receiverId');
+    _socket.emit('checkChatRequestStatus', {
+      'senderId': senderId,
+      'receiverId': receiverId,
+    });
   }
 }
