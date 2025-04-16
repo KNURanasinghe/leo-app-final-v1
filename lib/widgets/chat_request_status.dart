@@ -1,6 +1,4 @@
-// Add this widget to your DemoChattingMessageListPage class
-// This will be shown before users can chat, showing the request status
-
+// chat_request_status.dart
 import 'package:flutter/material.dart';
 import 'package:leo_app_01/constants/app_constants.dart';
 import 'package:leo_app_01/models/request_model.dart';
@@ -14,13 +12,13 @@ class ChatRequestStatusWidget extends StatefulWidget {
   final Function onRequestApproved;
 
   const ChatRequestStatusWidget({
-    Key? key,
+    super.key,
     required this.currentUserId,
     required this.receiverId,
     required this.receiverName,
     this.receiverProfileUrl,
     required this.onRequestApproved,
-  }) : super(key: key);
+  });
 
   @override
   _ChatRequestStatusWidgetState createState() =>
@@ -33,28 +31,70 @@ class _ChatRequestStatusWidgetState extends State<ChatRequestStatusWidget> {
       'checking'; // 'checking', 'none', 'pending', 'approved', 'rejected'
   ChatRequest? _requestData;
   bool _isSender = false;
+  bool _isSending = false;
+  int _retryCount = 0;
+  final int _maxRetries = 3;
 
   @override
   void initState() {
     super.initState();
     _setupSocketListeners();
-    _checkRequestStatus();
+
+    // Add a short delay to ensure socket is connected
+    Future.delayed(const Duration(milliseconds: 500), () {
+      _checkRequestStatus();
+    });
   }
 
   void _setupSocketListeners() {
+    print('⚙️ Setting up chat request status listeners');
+    // Clear any existing listeners to avoid duplicates
+    _socketService.onChatRequestUpdated = null;
+    _socketService.onChatRequestReceived = null;
+    _socketService.onError = null;
+
     _socketService.onChatRequestUpdated = (request) {
+      print('🔄 Chat request status updated: ${request.status}');
       if ((request.senderId == widget.currentUserId &&
               request.receiverId == widget.receiverId) ||
           (request.receiverId == widget.currentUserId &&
               request.senderId == widget.receiverId)) {
-        setState(() {
-          _requestStatus = request.status;
-          _requestData = request;
+        if (mounted) {
+          setState(() {
+            _requestStatus = request.status;
+            _requestData = request;
+            _isSender = request.senderId == widget.currentUserId;
 
-          if (request.status == 'approved') {
-            // Notify parent widget that request is approved
-            widget.onRequestApproved();
-          }
+            if (request.status == 'approved') {
+              // Notify parent widget that request is approved
+              widget.onRequestApproved();
+            }
+          });
+        }
+      }
+    };
+
+    // Listen for chat request received to handle user receiving a request while on this screen
+    _socketService.onChatRequestReceived = (request) {
+      if (request.receiverId == widget.currentUserId &&
+          request.senderId == widget.receiverId) {
+        if (mounted) {
+          setState(() {
+            _requestStatus = 'pending';
+            _requestData = request;
+            _isSender = false;
+          });
+        }
+      }
+    };
+
+    // Add error handler
+    _socketService.onError = (errorData) {
+      print('❌ Error in chat request status: $errorData');
+      if (mounted && _requestStatus == 'checking') {
+        // Only update if still in checking state
+        setState(() {
+          _requestStatus = 'none'; // Default to no request on error
         });
       }
     };
@@ -71,47 +111,79 @@ class _ChatRequestStatusWidgetState extends State<ChatRequestStatusWidget> {
       return;
     }
 
-    // Set up listener for the response
-    _socketService.onChatRequestUpdated = (request) {
-      if ((request.senderId == widget.currentUserId &&
-              request.receiverId == widget.receiverId) ||
-          (request.receiverId == widget.currentUserId &&
-              request.senderId == widget.receiverId)) {
-        setState(() {
-          _requestStatus = request.status;
-          _requestData = request;
-          _isSender = request.senderId == widget.currentUserId;
+    // Check socket connection first
+    if (!_socketService.isConnected) {
+      print(
+          '⚠️ Socket not connected, connecting for chat request status check...');
+      _socketService.connect(widget.currentUserId);
 
-          if (request.status == 'approved') {
-            widget.onRequestApproved();
-          }
+      // Retry after a delay to allow connection
+      Future.delayed(const Duration(seconds: 1), () {
+        if (_socketService.isConnected) {
+          print('✅ Socket connected, now checking chat request status');
+          _emitRequestStatusCheck();
+        } else {
+          print('❌ Failed to connect socket');
+          _retryOrFallback();
+        }
+      });
+    } else {
+      // Socket is connected, proceed with request
+      _emitRequestStatusCheck();
+    }
+  }
+
+  void _retryOrFallback() {
+    if (_retryCount < _maxRetries) {
+      _retryCount++;
+      print('🔄 Retry attempt $_retryCount of $_maxRetries');
+      Future.delayed(Duration(seconds: 1 * _retryCount), () {
+        _checkRequestStatus();
+      });
+    } else {
+      // Fall back to default state
+      if (mounted) {
+        setState(() {
+          _requestStatus = 'none';
         });
       }
-    };
+    }
+  }
 
+  void _emitRequestStatusCheck() {
     // Check request status
+    print(
+        '🔍 Checking chat request status between ${widget.currentUserId} and ${widget.receiverId}');
     _socketService.checkChatRequestStatus(
       widget.currentUserId,
       widget.receiverId,
     );
 
+    // Also try a direct request for all pending requests
+    _socketService.getPendingChatRequests(widget.currentUserId);
+
     // Fallback timeout in case we don't get a response
     Future.delayed(const Duration(seconds: 3), () {
       if (mounted && _requestStatus == 'checking') {
-        setState(() {
-          _requestStatus = 'none';
-        });
+        print('⚠️ No response received for chat request status check');
+        _retryOrFallback();
       }
     });
   }
 
   void _sendChatRequest() {
+    if (_isSending) return; // Prevent multiple sends
+
     setState(() {
+      _isSending = true;
       _requestStatus = 'sending';
     });
 
     // Get current user name - in a real app you'd store this with the user
     final currentUserName = widget.currentUserId; // replace with actual name
+
+    print(
+        '📤 Sending chat request from ${widget.currentUserId} to ${widget.receiverId}');
 
     _socketService.sendChatRequest(
       widget.currentUserId,
@@ -119,21 +191,53 @@ class _ChatRequestStatusWidgetState extends State<ChatRequestStatusWidget> {
       currentUserName, // Replace with actual name
       null, // Replace with avatar URL if available
     );
+
+    // Update UI after short delay assuming request was sent successfully
+    Future.delayed(const Duration(seconds: 1), () {
+      if (mounted) {
+        setState(() {
+          _isSending = false;
+          _requestStatus = 'pending';
+          _isSender = true; // Set as sender since we just sent a request
+
+          // Create a temporary request object until we get server confirmation
+          _requestData = ChatRequest(
+            requestId: 'pending_${DateTime.now().millisecondsSinceEpoch}',
+            senderId: widget.currentUserId,
+            receiverId: widget.receiverId,
+            senderName: currentUserName,
+            senderAvatar: null,
+            status: 'pending',
+            timestamp: DateTime.now().millisecondsSinceEpoch,
+          );
+        });
+      }
+    });
   }
 
   void _approveRequest() {
     if (_requestData != null) {
+      print('✓ Approving chat request: ${_requestData!.requestId}');
       _socketService.respondToChatRequest(
         _requestData!.requestId,
         widget.currentUserId,
         _requestData!.senderId,
         true,
       );
+
+      // Optimistically update status
+      setState(() {
+        _requestStatus = 'approved';
+      });
+
+      // Notify parent that request is approved
+      widget.onRequestApproved();
     }
   }
 
   void _rejectRequest() {
     if (_requestData != null) {
+      print('✗ Rejecting chat request: ${_requestData!.requestId}');
       _socketService.respondToChatRequest(
         _requestData!.requestId,
         widget.currentUserId,
@@ -141,8 +245,17 @@ class _ChatRequestStatusWidgetState extends State<ChatRequestStatusWidget> {
         false,
       );
 
+      // Optimistically update status
+      setState(() {
+        _requestStatus = 'rejected';
+      });
+
       // Navigate back after rejection
-      Navigator.of(context).pop();
+      Future.delayed(const Duration(seconds: 1), () {
+        if (mounted) {
+          Navigator.of(context).pop();
+        }
+      });
     }
   }
 
@@ -193,7 +306,7 @@ class _ChatRequestStatusWidgetState extends State<ChatRequestStatusWidget> {
             ),
             const SizedBox(height: 24),
             ElevatedButton(
-              onPressed: _sendChatRequest,
+              onPressed: _isSending ? null : _sendChatRequest,
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.blue,
                 foregroundColor: Colors.white,
@@ -203,7 +316,22 @@ class _ChatRequestStatusWidgetState extends State<ChatRequestStatusWidget> {
                   borderRadius: BorderRadius.circular(20),
                 ),
               ),
-              child: const Text('Send Chat Request'),
+              child: _isSending
+                  ? const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(
+                              color: Colors.white,
+                              strokeWidth: 2,
+                            )),
+                        SizedBox(width: 8),
+                        Text('Sending...'),
+                      ],
+                    )
+                  : const Text('Send Chat Request'),
             ),
           ],
         ),
@@ -211,7 +339,7 @@ class _ChatRequestStatusWidgetState extends State<ChatRequestStatusWidget> {
     }
 
     // Request is pending
-    if (_requestStatus == 'pending') {
+    if (_requestStatus == 'pending' || _requestStatus == 'sending') {
       // If current user is the sender
       if (_isSender ||
           (_requestData != null &&
@@ -354,9 +482,7 @@ class _ChatRequestStatusWidgetState extends State<ChatRequestStatusWidget> {
                     ? NetworkImage(widget.receiverProfileUrl!)
                     : null,
                 child: widget.receiverProfileUrl == null
-                    ? widget.receiverProfileUrl == null
-                        ? Icon(Icons.person, size: 40, color: Colors.grey[400])
-                        : null
+                    ? Icon(Icons.person, size: 40, color: Colors.grey[400])
                     : null),
             const SizedBox(height: 16),
             Text(
@@ -413,5 +539,14 @@ class _ChatRequestStatusWidgetState extends State<ChatRequestStatusWidget> {
 
     // Request was approved - this should call onRequestApproved and not be seen
     return const SizedBox();
+  }
+
+  @override
+  void dispose() {
+    // Clean up listeners to avoid memory leaks
+    _socketService.onChatRequestUpdated = null;
+    _socketService.onChatRequestReceived = null;
+    _socketService.onError = null;
+    super.dispose();
   }
 }

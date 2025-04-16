@@ -252,6 +252,8 @@ class _UserSelectionDialogState extends State<_UserSelectionDialog> {
   bool isLoading = false;
   String _currentUserId = '';
   String _currentUserName = '';
+  // Add a map to track request status per user
+  final Map<String, bool> _requestInProgress = {};
 
   @override
   void initState() {
@@ -262,9 +264,19 @@ class _UserSelectionDialogState extends State<_UserSelectionDialog> {
   }
 
   void _setupSocketListeners() {
+    // Clear any existing listeners first
+    _socketService.onChatRequestUpdated = null;
+    _socketService.onChatRequestReceived = null;
+
+    // Set up new listener
     _socketService.onChatRequestUpdated = (request) {
+      print('📋 Chat request updated in dialog: ${request.status}');
+
+      // Update the request status and loading state
       setState(() {
         isLoading = false;
+        // Clear the in-progress flag for this user
+        _requestInProgress[request.receiverId] = false;
       });
 
       if (request.status == 'pending') {
@@ -277,16 +289,55 @@ class _UserSelectionDialogState extends State<_UserSelectionDialog> {
           orElse: () => _UserListItem(id: request.receiverId, name: "User"),
         );
         _navigateToChat(user);
+      } else if (request.status == 'rejected') {
+        // Show rejection message
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Chat request was rejected'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    };
+
+    // Also listen for errors
+    _socketService.onError = (errorData) {
+      print('❌ Socket error in chat request: $errorData');
+      setState(() {
+        isLoading = false;
+        // Clear all in-progress flags
+        _requestInProgress.clear();
+      });
+
+      // Show error message
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+                'Error: ${errorData['message'] ?? 'Failed to send chat request'}'),
+            backgroundColor: Colors.red,
+          ),
+        );
       }
     };
   }
 
   Future<void> _loadCurrentUserData() async {
-    final prefs = await SharedPreferences.getInstance();
-    setState(() {
-      _currentUserId = prefs.getString('userId') ?? '';
-      _currentUserName = prefs.getString('name') ?? '';
-    });
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      setState(() {
+        _currentUserId = prefs.getString('userId') ?? '';
+        _currentUserName = prefs.getString('name') ?? '';
+      });
+
+      // Make sure socket is connected
+      if (!_socketService.isConnected) {
+        print('⚠️ Socket not connected in user dialog, connecting...');
+        _socketService.connect(_currentUserId);
+      }
+    } catch (e) {
+      print('Error loading user data: $e');
+    }
   }
 
   // Helper method to normalize phone numbers
@@ -386,6 +437,12 @@ class _UserSelectionDialogState extends State<_UserSelectionDialog> {
   }
 
   void _sendChatRequest(_UserListItem user) async {
+    // Prevent multiple requests for the same user
+    if (_requestInProgress[user.id] == true) {
+      print('Request already in progress for user: ${user.id}');
+      return;
+    }
+
     // Check if we have current user data
     if (_currentUserId.isEmpty) {
       await _loadCurrentUserData();
@@ -394,7 +451,35 @@ class _UserSelectionDialogState extends State<_UserSelectionDialog> {
     // Show sending indicator
     setState(() {
       isLoading = true;
+      _requestInProgress[user.id] = true;
     });
+
+    // Ensure socket is connected
+    if (!_socketService.isConnected) {
+      print('⚠️ Socket not connected, attempting to connect...');
+      _socketService.connect(_currentUserId);
+
+      // Wait a moment for connection to establish
+      await Future.delayed(const Duration(milliseconds: 1000));
+
+      if (!_socketService.isConnected) {
+        print('❌ Failed to connect socket');
+        setState(() {
+          isLoading = false;
+          _requestInProgress[user.id] = false;
+        });
+
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Failed to connect to server. Please try again.'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+        return;
+      }
+    }
 
     // Get user avatar URL
     String? currentUserAvatar;
@@ -410,12 +495,35 @@ class _UserSelectionDialogState extends State<_UserSelectionDialog> {
     }
 
     // Send the chat request
+    print('📤 Sending chat request to user: ${user.id}');
     _socketService.sendChatRequest(
       _currentUserId,
       user.id,
       _currentUserName.isEmpty ? "User" : _currentUserName,
       currentUserAvatar,
     );
+
+    // Set a timeout to update UI if no response is received
+    Future.delayed(const Duration(seconds: 5), () {
+      if (mounted && _requestInProgress[user.id] == true) {
+        print('⚠️ Request timeout for user: ${user.id}');
+        setState(() {
+          isLoading = false;
+          _requestInProgress[user.id] = false;
+        });
+
+        // Show timeout message
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                  'Request is taking longer than expected. It may still be processing.'),
+              backgroundColor: Colors.orange,
+            ),
+          );
+        }
+      }
+    });
   }
 
   void _showRequestSentDialog(String receiverId, String userName) {
@@ -430,7 +538,6 @@ class _UserSelectionDialogState extends State<_UserSelectionDialog> {
             TextButton(
               onPressed: () {
                 Navigator.of(context).pop();
-                Navigator.of(context, rootNavigator: true).pop();
               },
               child: const Text('OK'),
             ),
@@ -570,6 +677,9 @@ class _UserSelectionDialogState extends State<_UserSelectionDialog> {
                             itemCount: filteredUsers.length,
                             itemBuilder: (context, index) {
                               final user = filteredUsers[index];
+                              final isRequesting =
+                                  _requestInProgress[user.id] == true;
+
                               return Container(
                                 margin: const EdgeInsets.only(bottom: 8),
                                 decoration: BoxDecoration(
@@ -661,11 +771,20 @@ class _UserSelectionDialogState extends State<_UserSelectionDialog> {
                                       fontSize: 14,
                                     ),
                                   ),
-                                  trailing: Icon(
-                                    Icons.arrow_forward_ios,
-                                    size: 16,
-                                    color: Colors.blue[200],
-                                  ),
+                                  trailing: isRequesting
+                                      ? SizedBox(
+                                          width: 20,
+                                          height: 20,
+                                          child: CircularProgressIndicator(
+                                            strokeWidth: 2,
+                                            color: Colors.blue[300],
+                                          ),
+                                        )
+                                      : Icon(
+                                          Icons.arrow_forward_ios,
+                                          size: 16,
+                                          color: Colors.blue[200],
+                                        ),
                                   onTap: () => _sendChatRequest(user),
                                 ),
                               );
@@ -706,6 +825,10 @@ class _UserSelectionDialogState extends State<_UserSelectionDialog> {
   @override
   void dispose() {
     searchController.dispose();
+    // Clean up socket listeners to avoid memory leaks
+    _socketService.onChatRequestUpdated = null;
+    _socketService.onChatRequestReceived = null;
+    _socketService.onError = null;
     super.dispose();
   }
 }

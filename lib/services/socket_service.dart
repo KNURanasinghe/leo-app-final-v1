@@ -164,31 +164,419 @@ class SocketService {
   }
 
   // Add this to your _setupSocketListeners() method
+  // These are the methods from SocketService that handle chat requests
+// Add these fixes to your SocketService class
+
+  // Add or update these methods in your SocketService class
+
   void _setupChatRequestListeners() {
+    // Direct event listener for chatRequestReceived
     _socket.on('chatRequestReceived', (data) {
       print('📩 Received chat request: $data');
-      if (onChatRequestReceived != null) {
-        onChatRequestReceived!(ChatRequest.fromJson(data));
+      try {
+        if (data != null) {
+          // Make sure the data has the required fields
+          if (data['requestId'] == null ||
+              data['senderId'] == null ||
+              data['receiverId'] == null) {
+            print('⚠️ Received incomplete chat request data: $data');
+            return;
+          }
+
+          // Add default status if missing (should be 'pending' for new requests)
+          if (data['status'] == null) {
+            data['status'] = 'pending';
+          }
+
+          if (onChatRequestReceived != null) {
+            onChatRequestReceived!(ChatRequest.fromJson(data));
+          }
+        } else {
+          print('⚠️ Received null data for chatRequestReceived event');
+        }
+      } catch (e) {
+        print('❌ Error processing chat request received: $e');
       }
     });
 
+    // Direct event listener for chatRequestUpdated
     _socket.on('chatRequestUpdated', (data) {
       print('🔄 Chat request updated: $data');
-      if (onChatRequestUpdated != null) {
-        onChatRequestUpdated!(ChatRequest.fromJson(data));
+      try {
+        if (data != null) {
+          if (onChatRequestUpdated != null) {
+            onChatRequestUpdated!(ChatRequest.fromJson(data));
+          }
+        } else {
+          print('⚠️ Received null data for chatRequestUpdated event');
+        }
+      } catch (e) {
+        print('❌ Error processing chat request update: $e');
       }
     });
 
+    // Direct event listener for chatRequestStatus
+    _socket.on('chatRequestStatus', (data) {
+      print('📋 Received chat request status: $data');
+      try {
+        if (data != null && onChatRequestUpdated != null) {
+          // If there's a request object included, use that
+          if (data['request'] != null) {
+            onChatRequestUpdated!(ChatRequest.fromJson(data['request']));
+            return;
+          }
+
+          // Otherwise convert status response to full ChatRequest object
+          final ChatRequest request = ChatRequest(
+            requestId: data['requestId'] ??
+                'status_${DateTime.now().millisecondsSinceEpoch}',
+            senderId: data['senderId'] ?? '',
+            receiverId: data['receiverId'] ?? '',
+            senderName: data['senderName'] ?? 'Unknown',
+            senderAvatar: data['senderAvatar'],
+            status: data['status'] ?? 'none',
+            timestamp:
+                data['timestamp'] ?? DateTime.now().millisecondsSinceEpoch,
+          );
+          onChatRequestUpdated!(request);
+        }
+      } catch (e) {
+        print('❌ Error processing chat request status: $e');
+      }
+    });
+
+    // Direct event listener for chatRequestsList
     _socket.on('chatRequestsList', (data) {
-      print('📋 Received chat requests list');
-      if (onChatRequestsList != null && data['requests'] != null) {
-        final List<dynamic> requestsJson = data['requests'];
-        final List<ChatRequest> requests =
-            requestsJson.map((req) => ChatRequest.fromJson(req)).toList();
-        onChatRequestsList!(requests);
+      print('📋 Received chat requests list data: $data');
+      try {
+        if (onChatRequestsList != null && data != null) {
+          List<ChatRequest> requests = [];
+
+          // Case 1: The server sends {requests: [...]}
+          if (data is Map && data['requests'] != null) {
+            final List<dynamic> requestsJson = data['requests'];
+            print('Found ${requestsJson.length} requests in data[requests]');
+
+            for (var req in requestsJson) {
+              try {
+                requests.add(ChatRequest.fromJson(req));
+                print(
+                    '✓ Parsed request: ${req['requestId']} - status: ${req['status']}');
+              } catch (e) {
+                print('⚠️ Error parsing chat request: $e');
+                print('Request data that failed: $req');
+              }
+            }
+          }
+          // Case 2: The server sends a direct array of requests
+          else if (data is List) {
+            final List<dynamic> requestsJson = data;
+            print('Found ${requestsJson.length} requests in direct array');
+
+            for (var req in requestsJson) {
+              try {
+                requests.add(ChatRequest.fromJson(req));
+              } catch (e) {
+                print('⚠️ Error parsing chat request from array: $e');
+              }
+            }
+          }
+
+          print('✅ Processed ${requests.length} chat requests');
+          onChatRequestsList!(requests);
+        } else {
+          print('⚠️ Missing callback or data for chatRequestsList');
+          // If no data but callback exists, provide empty list
+          if (onChatRequestsList != null) {
+            onChatRequestsList!([]);
+          }
+        }
+      } catch (e) {
+        print('❌ Error processing chat requests list: $e');
+        // Provide an empty list on error
+        if (onChatRequestsList != null) {
+          onChatRequestsList!([]);
+        }
       }
     });
   }
+
+// Enhanced method for getting pending chat requests
+  void getPendingChatRequests(String userId) {
+    print('🔍 Fetching pending chat requests for user: $userId');
+
+    if (!_socket.connected) {
+      print(
+          "⚠️ Socket not connected for fetching requests. Attempting to connect...");
+      connect(userId);
+
+      // Try again after connection is established
+      Future.delayed(const Duration(milliseconds: 1000), () {
+        if (_socket.connected) {
+          print("✅ Socket reconnected, now fetching chat requests");
+          _emitChatRequestQueries(userId);
+        } else {
+          print("❌ Failed to reconnect for pending chat requests");
+          // Notify with empty list in case of connection failure
+          if (onChatRequestsList != null) {
+            onChatRequestsList!([]);
+          }
+        }
+      });
+      return;
+    }
+
+    _emitChatRequestQueries(userId);
+  }
+
+// Helper method to try multiple event formats
+  void _emitChatRequestQueries(String userId) {
+    // Try the standard event
+    _socket.emit('getPendingChatRequests', {
+      'userId': userId,
+    });
+
+    // Try alternate event name the server might be using
+    _socket.emit('getChatRequests', {'userId': userId, 'status': 'pending'});
+
+    // Try a third possible format
+    _socket.emit(
+        'fetchChatRequests', {'userId': userId, 'statusFilter': 'pending'});
+
+    // Send a debug ping to verify communication
+    _socket.emit('ping_test', {
+      'action': 'Requested pending chat requests',
+      'userId': userId,
+      'timestamp': DateTime.now().millisecondsSinceEpoch
+    });
+  }
+
+// Enhanced method for checking chat request status
+  void checkChatRequestStatus(String senderId, String receiverId) {
+    print('🔍 Checking chat request status between $senderId and $receiverId');
+
+    if (!_socket.connected) {
+      print(
+          "⚠️ Socket not connected for checking status. Attempting to connect...");
+      connect(senderId);
+
+      // Try again after connection is established
+      Future.delayed(const Duration(milliseconds: 1000), () {
+        if (_socket.connected) {
+          print("✅ Socket reconnected, now checking chat request status");
+          _emitStatusCheckQueries(senderId, receiverId);
+        } else {
+          print("❌ Failed to reconnect for chat request status");
+        }
+      });
+      return;
+    }
+
+    _emitStatusCheckQueries(senderId, receiverId);
+  }
+
+// Helper method to try multiple status check formats
+  void _emitStatusCheckQueries(String senderId, String receiverId) {
+    // Try the standard event
+    _socket.emit('checkChatRequestStatus', {
+      'senderId': senderId,
+      'receiverId': receiverId,
+    });
+
+    // Try an alternate format
+    _socket.emit('getChatRequestStatus', {
+      'senderId': senderId,
+      'receiverId': receiverId,
+    });
+
+    // Also try just getting all pending requests (server might filter there)
+    _socket.emit('getPendingChatRequests', {
+      'userId': receiverId,
+    });
+  }
+
+// Enhanced method for sending chat requests with better error handling
+  void sendChatRequest(String senderId, String receiverId, String senderName,
+      String? senderAvatar) {
+    print('📤 Sending chat request from $senderId to $receiverId');
+
+    // Check connection first
+    if (!_socket.connected) {
+      print(
+          "⚠️ Socket not connected for sending chat request. Attempting to connect...");
+      connect(senderId);
+
+      // Try again after connection is established
+      Future.delayed(const Duration(milliseconds: 1000), () {
+        if (_socket.connected) {
+          print("✅ Socket reconnected, now sending chat request");
+          _emitChatRequest(senderId, receiverId, senderName, senderAvatar);
+        } else {
+          print("❌ Failed to reconnect for chat request");
+          if (onError != null) {
+            onError!({
+              "message": "Failed to connect to server for sending chat request"
+            });
+          }
+        }
+      });
+      return;
+    }
+
+    _emitChatRequest(senderId, receiverId, senderName, senderAvatar);
+  }
+
+// Helper method to emit chat request with proper data format
+  void _emitChatRequest(String senderId, String receiverId, String senderName,
+      String? senderAvatar) {
+    try {
+      final timestamp = DateTime.now().millisecondsSinceEpoch;
+      final requestId = 'req_${senderId}_${receiverId}_$timestamp';
+
+      // Debug connection status
+      print(
+          '🔌 Socket connected: ${_socket.connected}, Socket ID: ${_socket.id}');
+
+      // Create request payload with all required fields
+      final requestPayload = {
+        'requestId': requestId,
+        'senderId': senderId,
+        'receiverId': receiverId,
+        'senderName': senderName,
+        'senderAvatar': senderAvatar,
+        'timestamp': timestamp,
+        'status': 'pending', // Explicitly set status
+      };
+
+      // Send the request using the standard event name
+      _socket.emit('sendChatRequest', requestPayload);
+
+      // Also try alternative event name that the server might be using
+      _socket.emit('createChatRequest', requestPayload);
+
+      print('📤 Emitted chat request: $requestId');
+
+      // Add a ping to make sure server connection is alive
+      _socket.emit('ping_test', {
+        'action': 'Sent chat request',
+        'timestamp': timestamp,
+        'requestId': requestId
+      });
+
+      // Create a local ChatRequest object to help update UI immediately
+      final newRequest = ChatRequest(
+        requestId: requestId,
+        senderId: senderId,
+        receiverId: receiverId,
+        senderName: senderName,
+        senderAvatar: senderAvatar,
+        status: 'pending',
+        timestamp: timestamp,
+      );
+
+      // If we have a callback for chat request updates, notify it
+      if (onChatRequestUpdated != null) {
+        onChatRequestUpdated!(newRequest);
+      }
+    } catch (e) {
+      print('❌ Error sending chat request: $e');
+      if (onError != null) {
+        onError!({"message": "Error sending chat request: $e"});
+      }
+    }
+  }
+
+// Enhanced method for responding to chat requests with better error handling
+  void respondToChatRequest(
+      String requestId, String receiverId, String senderId, bool approved) {
+    print(
+        '📤 Responding to chat request $requestId: ${approved ? 'Approved' : 'Rejected'}');
+
+    if (!_socket.connected) {
+      print(
+          "⚠️ Socket not connected for chat request response. Attempting to connect...");
+      connect(receiverId);
+
+      // Try again after connection is established
+      Future.delayed(const Duration(milliseconds: 1000), () {
+        if (_socket.connected) {
+          print("✅ Socket reconnected, now sending chat request response");
+          _emitChatRequestResponse(requestId, receiverId, senderId, approved);
+        } else {
+          print("❌ Failed to reconnect for chat request response");
+          if (onError != null) {
+            onError!({
+              "message":
+                  "Failed to connect to server for sending chat request response"
+            });
+          }
+        }
+      });
+      return;
+    }
+
+    _emitChatRequestResponse(requestId, receiverId, senderId, approved);
+  }
+
+// Helper method for sending chat request responses
+  void _emitChatRequestResponse(
+      String requestId, String receiverId, String senderId, bool approved) {
+    try {
+      final timestamp = DateTime.now().millisecondsSinceEpoch;
+
+      // Create the request payload
+      final responsePayload = {
+        'requestId': requestId,
+        'receiverId': receiverId,
+        'senderId': senderId,
+        'approved': approved,
+        'timestamp': timestamp,
+      };
+
+      // Send using the standard event name
+      _socket.emit('respondToChatRequest', responsePayload);
+
+      // Also try alternative event name
+      _socket.emit('updateChatRequest', {
+        ...responsePayload,
+        'status': approved ? 'approved' : 'rejected',
+      });
+
+      print(
+          '📤 Emitted chat request response: $requestId, approved: $approved');
+
+      // Add a ping to make sure server connection is alive
+      _socket.emit('ping_test', {
+        'action': 'Responded to chat request',
+        'requestId': requestId,
+        'approved': approved,
+        'timestamp': timestamp
+      });
+
+      // Create local ChatRequest for immediate UI update
+      final updatedRequest = ChatRequest(
+        requestId: requestId,
+        senderId: senderId,
+        receiverId: receiverId,
+        senderName: '', // We might not have this info
+        senderAvatar: null,
+        status: approved ? 'approved' : 'rejected',
+        timestamp: timestamp,
+      );
+
+      // If we have a callback for chat request updates, notify it
+      if (onChatRequestUpdated != null) {
+        onChatRequestUpdated!(updatedRequest);
+      }
+    } catch (e) {
+      print('❌ Error responding to chat request: $e');
+      if (onError != null) {
+        onError!({"message": "Error responding to chat request: $e"});
+      }
+    }
+  }
+
+// Improved implementations of chat request methods
 
   void _setupBroadcastListeners() {
     _socket.on('broadcastSent', (data) {
@@ -1316,45 +1704,5 @@ class SocketService {
 
     // Also send as regular message for compatibility
     _socket.emit('sendMessage', json);
-  }
-
-  void sendChatRequest(String senderId, String receiverId, String senderName,
-      String? senderAvatar) {
-    print('📤 Sending chat request from $senderId to $receiverId');
-    _socket.emit('sendChatRequest', {
-      'senderId': senderId,
-      'receiverId': receiverId,
-      'senderName': senderName,
-      'senderAvatar': senderAvatar,
-      'timestamp': DateTime.now().millisecondsSinceEpoch,
-    });
-  }
-
-  void respondToChatRequest(
-      String requestId, String receiverId, String senderId, bool approved) {
-    print(
-        '📤 Responding to chat request $requestId: ${approved ? 'Approved' : 'Rejected'}');
-    _socket.emit('respondToChatRequest', {
-      'requestId': requestId,
-      'receiverId': receiverId,
-      'senderId': senderId,
-      'approved': approved,
-      'timestamp': DateTime.now().millisecondsSinceEpoch,
-    });
-  }
-
-  void getPendingChatRequests(String userId) {
-    print('🔍 Fetching pending chat requests for user: $userId');
-    _socket.emit('getPendingChatRequests', {
-      'userId': userId,
-    });
-  }
-
-  void checkChatRequestStatus(String senderId, String receiverId) {
-    print('🔍 Checking chat request status between $senderId and $receiverId');
-    _socket.emit('checkChatRequestStatus', {
-      'senderId': senderId,
-      'receiverId': receiverId,
-    });
   }
 }
