@@ -26,9 +26,9 @@ class CallButtons extends StatefulWidget {
 
 class _CallButtonsState extends State<CallButtons> {
   // Replace with your SDKAppID and SecretKey from Tencent Cloud console
-  final int sdkAppID = 20021237; // TODO: Replace with your SDK App ID
+  final int sdkAppID = 20021921;
   final String secretKey =
-      "d4e7ab430a4755b8f58cf636a065b2aba9567a77a9db916689f811a87d418c23"; // TODO: Replace with your Secret Key
+      "6c7a11557df307edb7aa2bfdf7e1fa620670b17b0b461d5e6c26a6ecb7395bf0";
 
   bool isInitialized = false;
 
@@ -41,24 +41,23 @@ class _CallButtonsState extends State<CallButtons> {
   // Initialize TUICallKit with the current user
   Future<void> _initializeTUICallKit() async {
     if (!isInitialized) {
-      // Import this if not already imported
+      try {
+        String userSig = GenerateTestUserSig.genTestSig(
+            widget.currentUserId, sdkAppID, secretKey);
 
-      // Generate UserSig
-      String userSig = GenerateTestUserSig.genTestSig(
-          widget.currentUserId, sdkAppID, secretKey);
-
-      // Login to TUICallKit
-      TUIResult result = await TUICallKit.instance
-          .login(sdkAppID, widget.currentUserId, userSig);
-
-      if (result.code.isEmpty) {
-        setState(() {
-          isInitialized = true;
-        });
-        print('TUICallKit initialized for user: ${widget.currentUserId}');
-      } else {
-        print(
-            'TUICallKit initialization failed: ${result.code} ${result.message}');
+        print("Initializing TUICallKit...");
+        TUIResult result = await TUICallKit.instance
+            .login(sdkAppID, widget.currentUserId, userSig);
+        print("Login result: ${result.code} - ${result.message}");
+        if (result.code.isEmpty) {
+          print("Setting self info after initialization...");
+          await TUICallKit.instance.setSelfInfo(widget.name, widget.image);
+          setState(() => isInitialized = true);
+        } else {
+          print("Initialization failed: ${result.code} - ${result.message}");
+        }
+      } catch (e) {
+        print("Initialization error: $e");
       }
     }
   }
@@ -149,39 +148,33 @@ class _CallButtonsState extends State<CallButtons> {
   // Make a call using Tencent UIKit
   void _makeTencentCall(bool isVideoCall) async {
     try {
-      // Check if we're initialized and logged in
-      print("Checking TUICallKit initialization and login state");
-
-      // Re-login to ensure we're logged in
+      // Generate fresh UserSig
       String userSig = GenerateTestUserSig.genTestSig(
           widget.currentUserId, sdkAppID, secretKey);
 
-      print("Re-logging in before making the call...");
+      print("Attempting login with fresh UserSig...");
       TUIResult loginResult = await TUICallKit.instance
           .login(sdkAppID, widget.currentUserId, userSig);
-
+      print('Login result: ${loginResult.code} - ${loginResult.message}');
       if (loginResult.code.isNotEmpty) {
-        print(
-            "Login failed with code: ${loginResult.code}, message: ${loginResult.message}");
-        return; // Don't proceed with the call if login fails
+        print("Login failed: ${loginResult.code} - ${loginResult.message}");
+        return;
       }
 
-      print("Successfully logged in, now making the call");
+      print("Login successful, setting self info...");
+      // Now set self info after successful login
+      await TUICallKit.instance.setSelfInfo(
+        widget.name,
+        widget.image,
+      );
 
-      // Determine media type based on isVideoCall
+      print("Making the call...");
       TUICallMediaType mediaType =
           isVideoCall ? TUICallMediaType.video : TUICallMediaType.audio;
-
-      await TUICallKit.instance.setSelfInfo(
-        widget.name, // Your display name
-        widget.image, // Your profile image URL
-      );
-      // Make the call using Tencent UIKit
       TUIResult callResult =
           await TUICallKit.instance.call(widget.targetUserId, mediaType);
 
-      print(
-          "Call result: code=${callResult.code}, message=${callResult.message}");
+      print("Call result: ${callResult.code} - ${callResult.message}");
     } catch (e) {
       print("Exception in _makeTencentCall: $e");
     }
