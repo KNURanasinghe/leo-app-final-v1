@@ -8,6 +8,9 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 
+import 'widgets/feedback_screen.dart';
+import 'widgets/helpcenter.dart';
+
 class SettingsPage extends StatelessWidget {
   const SettingsPage({super.key});
 
@@ -126,13 +129,13 @@ class SettingsPage extends StatelessWidget {
             context,
             icon: Icons.help_outline,
             title: 'Help Center',
-            onTap: () => _navigateToPage(context, 'Help Center'),
+            onTap: () => _navigateToHelpCenterPage(context, 'Help Center'),
           ),
           _buildSettingTile(
             context,
             icon: Icons.feedback_outlined,
             title: 'Send Feedback',
-            onTap: () => _navigateToPage(context, 'Feedback'),
+            onTap: () => _navigateToFeedBackPage(context, 'Feedback'),
           ),
 
           const Divider(color: dividerColor),
@@ -355,6 +358,24 @@ class SettingsPage extends StatelessWidget {
       context,
       MaterialPageRoute(
         builder: (context) => IHaveToCreate(title: title),
+      ),
+    );
+  } //_navigateToFeedBackPage HelpCenterScreen
+
+  void _navigateToHelpCenterPage(BuildContext context, String title) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => const HelpCenterScreen(),
+      ),
+    );
+  }
+
+  void _navigateToFeedBackPage(BuildContext context, String title) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => const FeedbackScreen(),
       ),
     );
   }

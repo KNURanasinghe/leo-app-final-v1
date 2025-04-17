@@ -5,6 +5,7 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../settings.dart';
+import '../widgets/feedback_screen.dart';
 import 'constants.dart';
 import 'edit profile/theme.dart';
 import 'edit profile/widgets/account_edit_tile.dart';
@@ -417,6 +418,10 @@ class _AccountScreen1State extends State<AccountScreen1> {
 
   void _navigateToFeedback(BuildContext context) {
     // Implement feedback navigation
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const FeedbackScreen()),
+    );
   }
 
   void _navigateToSettings(BuildContext context) {

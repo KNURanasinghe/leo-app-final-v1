@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:leo_app_01/services/api_service.dart';
 import 'package:leo_app_01/widgets/status_share_dialog.dart';
 import 'dart:async';
 import 'dart:io';
@@ -27,6 +28,8 @@ class StatusViewScreen extends StatefulWidget {
 
 class _StatusViewScreenState extends State<StatusViewScreen> {
   final SocketService _socketService = SocketService();
+  final UserApiService _userApiService =
+      UserApiService(baseUrl: 'http://145.223.21.62:8090');
   final TextEditingController _replyController = TextEditingController();
   List<Status> _statuses = [];
   int _currentIndex = 0;
@@ -104,35 +107,99 @@ class _StatusViewScreenState extends State<StatusViewScreen> {
         _likesCounts[statusId] = likeCount;
       });
     };
-    _socketService.onStatusLikes = (statusId, likedBy, likeCount) {
-      showDialog(
-        context: context,
-        builder: (BuildContext context) {
-          return AlertDialog(
-            title: Text('Likes ($likeCount)'),
-            content: likedBy.isEmpty
-                ? const Text('No likes yet')
-                : SizedBox(
-                    height: 300,
-                    width: 300,
-                    child: ListView.builder(
-                      itemCount: likedBy.length,
-                      itemBuilder: (context, index) {
-                        return ListTile(
-                          title: Text('User ${likedBy[index]}'),
-                        );
-                      },
-                    ),
+    _socketService.onStatusLikes = (statusId, likedBy, likeCount) async {
+      // Show dialog immediately with loading indicators
+      if (mounted) {
+        showDialog(
+          context: context,
+          builder: (BuildContext dialogContext) {
+            // We'll use this map to store user info as it's loaded
+            Map<String, User> usersMap = {};
+
+            return StatefulBuilder(
+                builder: (BuildContext context, StateSetter setDialogState) {
+              // Fetch user data for each ID
+              for (String userId in likedBy) {
+                // Only fetch if we haven't already
+                if (!usersMap.containsKey(userId)) {
+                  // Set a placeholder while loading
+                  setDialogState(() {});
+
+                  // Fetch the actual data
+                  _userApiService.getUserById(userId).then((user) {
+                    setDialogState(() {
+                      usersMap[userId] = user;
+                    });
+                  }).catchError((error) {
+                    print('Error fetching user $userId: $error');
+                    setDialogState(() {
+                      // Create a placeholder user
+                      usersMap[userId] = User(
+                        id: userId,
+                        firstname: 'User',
+                        lastname: userId.substring(0, 4),
+                        phonenumber: 0,
+                        moto: '',
+                        bio: '',
+                        wallet: 0,
+                        country: '',
+                        gender: '',
+                        is_notification_off: false,
+                        player_id: '',
+                        is_admin: false,
+                      );
+                    });
+                  });
+                }
+              }
+
+              return AlertDialog(
+                title: Text('Likes ($likeCount)'),
+                content: likedBy.isEmpty
+                    ? const Text('No likes yet')
+                    : SizedBox(
+                        height: 300,
+                        width: 300,
+                        child: ListView.builder(
+                          itemCount: likedBy.length,
+                          itemBuilder: (context, index) {
+                            final userId = likedBy[index];
+                            final user = usersMap[userId];
+                            final bool isLoading = user == null;
+                            print('profileImage: ${user?.profileImage}');
+                            return ListTile(
+                              leading: user?.profileImage != null &&
+                                      user!.profileImage.isNotEmpty
+                                  ? CircleAvatar(
+                                      backgroundImage: NetworkImage(
+                                          'http://145.223.21.62:8090/api/files/users/$userId/${user.profileImage}'),
+                                      onBackgroundImageError: (_, __) =>
+                                          const Icon(Icons.person),
+                                    )
+                                  : const CircleAvatar(
+                                      child: Icon(Icons.person),
+                                    ),
+                              title: Text(isLoading
+                                  ? 'Loading...'
+                                  : '${user.firstname} ${user.lastname}'),
+                              subtitle: isLoading
+                                  ? const LinearProgressIndicator()
+                                  : null,
+                            );
+                          },
+                        ),
+                      ),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    child: const Text('Close'),
                   ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(context).pop(),
-                child: const Text('Close'),
-              ),
-            ],
-          );
-        },
-      );
+                ],
+              );
+            });
+          },
+        );
+      }
     };
   }
 
@@ -530,8 +597,11 @@ class _StatusViewScreenState extends State<StatusViewScreen> {
 
   Widget _buildStatusPage(int index) {
     final status = _statuses[index];
+    print('Status ID: ${status.statusId}');
+
     final bool isLiked = _likedStatuses[status.statusId] ?? false;
     final int likeCount = _likesCounts[status.statusId] ?? 0;
+    print('likecount: ${_likesCounts[status.statusId]}');
     return Stack(
       children: [
         // Status Content (takes full screen)
@@ -594,13 +664,13 @@ class _StatusViewScreenState extends State<StatusViewScreen> {
                 }
               },
               itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
-                PopupMenuItem<String>(
+                const PopupMenuItem<String>(
                   value: 'likes',
                   child: Row(
                     children: [
-                      const Icon(Icons.favorite, color: Colors.red),
-                      const SizedBox(width: 10),
-                      Text('Likes ($likeCount)'),
+                      Icon(Icons.favorite, color: Colors.red),
+                      SizedBox(width: 10),
+                      Text('Likes '),
                     ],
                   ),
                 ),

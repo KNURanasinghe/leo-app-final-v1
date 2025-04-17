@@ -11,10 +11,11 @@ class User {
   final int wallet;
   final String country;
   final String gender;
-  final DateTime birthday;
+  final DateTime? birthday;
   final bool is_notification_off;
   final String player_id;
   final bool is_admin;
+  final String profileImage;
 
   User({
     required this.id,
@@ -26,13 +27,41 @@ class User {
     required this.wallet,
     required this.country,
     required this.gender,
-    required this.birthday,
+    this.birthday,
     required this.is_notification_off,
     required this.player_id,
     required this.is_admin,
+    this.profileImage = '',
   });
 
   factory User.fromJson(Map<String, dynamic> json) {
+    // Safe date parsing function
+    DateTime? parseBirthday(dynamic dateValue) {
+      if (dateValue == null) return null;
+
+      // If it's already a DateTime
+      if (dateValue is DateTime) return dateValue;
+
+      // If it's a string, try to parse it
+      if (dateValue is String) {
+        try {
+          return DateTime.parse(dateValue);
+        } catch (e) {
+          print('Error parsing birthday date: $dateValue. Error: $e');
+          return null;
+        }
+      }
+
+      // If it's a timestamp (int)
+      if (dateValue is int) {
+        return DateTime.fromMillisecondsSinceEpoch(dateValue);
+      }
+
+      print(
+          'Unexpected birthday format: $dateValue (${dateValue.runtimeType})');
+      return null;
+    }
+
     return User(
       id: json['id'],
       firstname: json['firstname'],
@@ -43,10 +72,11 @@ class User {
       wallet: json['wallet'],
       country: json['country'],
       gender: json['gender'],
-      birthday: DateTime.parse(json['birthday']),
+      birthday: parseBirthday(json['birthday']),
       is_notification_off: json['is_notification_off'],
       player_id: json['player_id'],
       is_admin: json['is_admin'],
+      profileImage: json['avatar'] ?? '',
     );
   }
 }
