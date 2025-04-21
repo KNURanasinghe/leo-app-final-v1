@@ -2,7 +2,8 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-
+import 'package:rive/rive.dart' as rive;
+import '../services/rive_service.dart';
 import './gift/gift.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
@@ -43,8 +44,8 @@ class EmojiLayoutDelegate extends MultiChildLayoutDelegate {
   @override
   void performLayout(Size size) {
     final double centerX = size.width / 2;
-    final double centerY = size.height / 3;  // Show in upper third of screen
-    final double radius = 100.0;  // Radius of the circular arrangement
+    final double centerY = size.height / 3; // Show in upper third of screen
+    const double radius = 100.0; // Radius of the circular arrangement
 
     for (int i = 0; i < users.length; i++) {
       if (hasChild(users[i])) {
@@ -53,7 +54,8 @@ class EmojiLayoutDelegate extends MultiChildLayoutDelegate {
         final double y = centerY + radius * sin(angle);
 
         // Position each emoji
-        final Size childSize = layoutChild(users[i], BoxConstraints.loose(size));
+        final Size childSize =
+            layoutChild(users[i], BoxConstraints.loose(size));
         positionChild(
           users[i],
           Offset(
@@ -89,7 +91,6 @@ class OnlineUser {
   });
 }
 
-
 class LivePage extends StatefulWidget {
   final String roomID;
   final bool isHost;
@@ -97,17 +98,18 @@ class LivePage extends StatefulWidget {
   final String username1;
   final String userId;
 
-  const LivePage({
-    Key? key,
-    required this.roomID,
-    this.layoutMode = LayoutMode.defaultLayout,
-    this.isHost = false,
-    required this.username1, required this.userId
-  }) : super(key: key);
+  const LivePage(
+      {super.key,
+      required this.roomID,
+      this.layoutMode = LayoutMode.defaultLayout,
+      this.isHost = false,
+      required this.username1,
+      required this.userId});
 
   static void handleLogout(BuildContext context) {
     print('Attempting to find LivePageState...'); // Debug log
-    final LivePageState? state = context.findAncestorStateOfType<LivePageState>();
+    final LivePageState? state =
+        context.findAncestorStateOfType<LivePageState>();
     if (state != null) {
       print('LivePageState found, calling _handleLogout'); // Debug log
       state._handleLogout();
@@ -120,23 +122,29 @@ class LivePage extends StatefulWidget {
 
   @override
   State<StatefulWidget> createState() => LivePageState();
-
-
-
 }
 
-class LivePageState extends State<LivePage> with SingleTickerProviderStateMixin {
-
+class LivePageState extends State<LivePage>
+    with SingleTickerProviderStateMixin {
   final pb = PocketBase('http://145.223.21.62:8090');
   late UnsubscribeFunc? _unsubscribe;
   int userCount = 0; // Add this to track user count
-  Map<String, Timer> _emojiTimers = {};
-  Map<String, String> _currentEmojis = {};
+  final Map<String, Timer> _emojiTimers = {};
+  final Map<String, String> _currentEmojis = {};
   final Map<String, Offset> _seatPositions = {};
-  bool _showEmoji = false;
+  final bool _showEmoji = false;
   Offset? _emojiPosition;
   String? _currentEmoji;
-  Map<String, Widget> _activeEmojis = {};
+  final Map<String, Widget> _activeEmojis = {};
+
+  String? _announcement;
+  bool _showWelcomeMessage = true;
+  final String _welcomeMessage =
+      "Welcome to Hapi! Please respect each other and talk politely. Abusing, third-party advertising, fake official information and politically sensitive topics are strictly prohibited. please report if you find these situations";
+
+// Add this to your LivePageState class variables
+  final Map<String, String> _userRiveFiles = {};
+  bool _loadingRiveFiles = false;
 
   late IO.Socket socket;
   bool isConnecting = true;
@@ -160,21 +168,36 @@ class LivePageState extends State<LivePage> with SingleTickerProviderStateMixin 
   String? _voiceRoomName;
   String? _backgroundImageUrl;
   String? _language;
-  int?  _voiceroomid;
-  static const String POCKETBASE_URL = 'http://145.223.21.62:8090'; // Replace with your actual PocketBase URL
+  int? _voiceroomid;
+  static const String POCKETBASE_URL =
+      'http://145.223.21.62:8090'; // Replace with your actual PocketBase URL
   bool _isLoading = false;
+  Timer? _riveRefreshTimer;
   @override
   void initState() {
     super.initState();
     _initializeSocket();
     _fetchInitialUsers();
+    _loadUserRiveFiles();
+    _riveRefreshTimer = Timer.periodic(const Duration(seconds: 30), (_) {
+      if (mounted) {
+        _loadUserRiveFiles();
+      }
+    });
+    Future.delayed(const Duration(seconds: 5), () {
+      if (mounted) {
+        setState(() {
+          _showWelcomeMessage = false;
+        });
+      }
+    });
 
     socket.on('gifReaction', (data) {
       print('Received emoji data: $data'); // Debug log
 
       if (mounted) {
         setState(() {
-          _activeEmojis[data['userId']] = Container(
+          _activeEmojis[data['userId']] = SizedBox(
             width: 50,
             height: 50,
             child: Image.asset(
@@ -185,7 +208,7 @@ class LivePageState extends State<LivePage> with SingleTickerProviderStateMixin 
         });
         // Remove after 2 seconds
         _emojiTimers[data['userId']]?.cancel();
-        _emojiTimers[data['userId']] = Timer(Duration(seconds: 2), () {
+        _emojiTimers[data['userId']] = Timer(const Duration(seconds: 2), () {
           if (mounted) {
             setState(() {
               _activeEmojis.remove(data['userId']);
@@ -203,11 +226,11 @@ class LivePageState extends State<LivePage> with SingleTickerProviderStateMixin 
 
     WidgetsBinding.instance.addPostFrameCallback((timeStamp) {
       ZegoGiftManager().service.init(
-        appID: 2069292420,
-        liveID: widget.roomID,
-        localUserID: localUserID,
-        localUserName: widget.username1,
-      );
+            appID: 2069292420,
+            liveID: widget.roomID,
+            localUserID: localUserID,
+            localUserName: widget.username1,
+          );
 
       print("------------------------------------------");
       print(localUserID);
@@ -243,10 +266,341 @@ class LivePageState extends State<LivePage> with SingleTickerProviderStateMixin 
     // });
   }
 
+// 2. Add a method to fetch the announcement from PocketBase
+  // Fix 2: Properly implement the _fetchAnnouncement method
+  Future<void> _fetchAnnouncement(String roomId) async {
+    try {
+      // Use a direct and specific API endpoint for fetching
+      final response = await http.get(
+        Uri.parse('$POCKETBASE_URL/api/collections/voiceRooms/records/$roomId'),
+        headers: {'Content-Type': 'application/json'},
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        if (mounted) {
+          setState(() {
+            // Set the announcement state variable
+            _announcement = data['announcement'];
+            print('Fetched announcement: $_announcement'); // Debug log
+          });
+        }
+      } else {
+        print('Failed to fetch announcement: ${response.statusCode}');
+        print('Response body: ${response.body}');
+      }
+    } catch (e) {
+      print('Error fetching announcement: $e');
+    }
+  }
+
+  Future<void> _loadUserRiveFiles() async {
+    if (_loadingRiveFiles) return;
+
+    setState(() {
+      _loadingRiveFiles = true;
+    });
+
+    try {
+      final riveFiles = await HttpService.fetchUsersRiveFiles(widget.roomID);
+
+      setState(() {
+        _userRiveFiles.clear();
+        _userRiveFiles.addAll(riveFiles);
+        _loadingRiveFiles = false;
+      });
+
+      logDebug('Loaded rive files for ${_userRiveFiles.length} users');
+    } catch (e) {
+      setState(() {
+        _loadingRiveFiles = false;
+      });
+      print('Error loading user rive files: $e');
+    }
+  }
+
+// Helper method for logging
+  void logDebug(String message) {
+    print('[RIVE DEBUG] $message');
+  }
+
+  // 3. Add a method to update the announcement
+  Future<void> _updateAnnouncement(String roomId, String announcement) async {
+    try {
+      setState(() {
+        _isLoading = true;
+      });
+
+      final response = await http.patch(
+        Uri.parse('$POCKETBASE_URL/api/collections/voiceRooms/records/$roomId'),
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode({
+          'announcement': announcement,
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        setState(() {
+          _announcement = announcement;
+        });
+
+        // Show success message
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Announcement updated successfully')),
+          );
+        }
+      } else {
+        print('Failed to update announcement: ${response.statusCode}');
+        // Show error message
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Failed to update announcement')),
+          );
+        }
+      }
+
+      setState(() {
+        _isLoading = false;
+      });
+    } catch (e) {
+      print('Error updating announcement: $e');
+      setState(() {
+        _isLoading = false;
+      });
+
+      // Show error message
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e')),
+        );
+      }
+    }
+  }
+
+// 4. Add a method to show announcement edit dialog
+  void _showAnnouncementDialog(BuildContext context) {
+    final TextEditingController announcementController =
+        TextEditingController(text: _announcement ?? '');
+
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return Dialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          backgroundColor: Colors.black.withOpacity(0.9),
+          child: Padding(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text(
+                  'Room Announcement',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  ),
+                ),
+                const SizedBox(height: 20),
+                TextField(
+                  controller: announcementController,
+                  decoration: InputDecoration(
+                    hintText: 'Enter room announcement',
+                    hintStyle: TextStyle(color: Colors.grey[400]),
+                    filled: true,
+                    fillColor: Colors.white.withOpacity(0.1),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                      borderSide: BorderSide.none,
+                    ),
+                    contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 16, vertical: 12),
+                  ),
+                  style: const TextStyle(color: Colors.white),
+                  maxLines: 5,
+                ),
+                const SizedBox(height: 20),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(context),
+                      child: const Text(
+                        'Cancel',
+                        style: TextStyle(color: Colors.white70),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    ElevatedButton(
+                      onPressed: () {
+                        Navigator.pop(context);
+                        _updateAnnouncement(
+                            widget.roomID, announcementController.text);
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.blue,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                      ),
+                      child: const Text('Save'),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+// 5. Add welcome and announcement widgets to the build method
+  Widget _buildWelcomeAndAnnouncement() {
+    // Calculate the position based on welcome message visibility
+    double bottomPosition = _showWelcomeMessage
+        ? MediaQuery.of(context).size.height *
+            0.3 // Original position when welcome is visible
+        : MediaQuery.of(context).size.height * 0.3 +
+            16; // Move up when welcome is hidden
+
+    return Positioned(
+      bottom: bottomPosition,
+      left: 16,
+      right: 16,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Welcome message (visible for 5 seconds)
+          if (_showWelcomeMessage)
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.black.withOpacity(0.3),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      const Icon(
+                        Icons.waving_hand,
+                        color: Colors.lightGreen,
+                        size: 18,
+                      ),
+                      const SizedBox(width: 8),
+                      const Text(
+                        'Welcome!',
+                        style: TextStyle(
+                          color: Colors.lightGreen,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14,
+                          decoration: TextDecoration.none,
+                        ),
+                      ),
+                      const Spacer(),
+                      GestureDetector(
+                        onTap: () {
+                          setState(() {
+                            _showWelcomeMessage = false;
+                          });
+                        },
+                        child: const Icon(
+                          Icons.close,
+                          color: Colors.white70,
+                          size: 16,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    _welcomeMessage,
+                    style: const TextStyle(
+                      color: Colors.lightGreen,
+                      fontSize: 12,
+                      decoration: TextDecoration.none,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+          // Only add spacing if welcome message is visible
+          if (_showWelcomeMessage) const SizedBox(height: 16),
+
+          // Announcement - always shown but position depends on welcome message visibility
+          if (_announcement != null && _announcement!.isNotEmpty)
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.black.withOpacity(0.3),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: Colors.amber.withOpacity(0.4),
+                  width: 1,
+                ),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      const Icon(
+                        Icons.campaign,
+                        color: Colors.amber,
+                        size: 18,
+                      ),
+                      const SizedBox(width: 8),
+                      const Text(
+                        'Announcement',
+                        style: TextStyle(
+                          color: Colors.amber,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14,
+                          decoration: TextDecoration.none,
+                        ),
+                      ),
+                      const Spacer(),
+                      if (isAdmin)
+                        GestureDetector(
+                          onTap: () {
+                            _showAnnouncementDialog(context);
+                          },
+                          child: const Icon(
+                            Icons.edit,
+                            color: Colors.white70,
+                            size: 16,
+                          ),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    _announcement!,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 12,
+                      decoration: TextDecoration.none,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
   Future<void> _checkAdminStatus() async {
     try {
       final response = await http.get(
-        Uri.parse('$POCKETBASE_URL/api/collections/voiceRooms/records/${widget.roomID}'),
+        Uri.parse(
+            '$POCKETBASE_URL/api/collections/voiceRooms/records/${widget.roomID}'),
       );
 
       if (response.statusCode == 200) {
@@ -264,16 +618,19 @@ class LivePageState extends State<LivePage> with SingleTickerProviderStateMixin 
     try {
       // First, remove all joined users
       final joinedUsersResponse = await http.get(
-        Uri.parse('$POCKETBASE_URL/api/collections/joined_users/records?filter=(voice_room_id="${widget.roomID}")'),
+        Uri.parse(
+            '$POCKETBASE_URL/api/collections/joined_users/records?filter=(voice_room_id="${widget.roomID}")'),
       );
 
       if (joinedUsersResponse.statusCode == 200) {
-        final joinedUsers = json.decode(joinedUsersResponse.body)['items'] as List;
+        final joinedUsers =
+            json.decode(joinedUsersResponse.body)['items'] as List;
 
         // Delete all joined user records
         for (var user in joinedUsers) {
           await http.delete(
-            Uri.parse('$POCKETBASE_URL/api/collections/joined_users/records/${user['id']}'),
+            Uri.parse(
+                '$POCKETBASE_URL/api/collections/joined_users/records/${user['id']}'),
           );
         }
       }
@@ -299,7 +656,8 @@ class LivePageState extends State<LivePage> with SingleTickerProviderStateMixin 
 
       // Then, delete the voice room
       final deleteResponse = await http.delete(
-        Uri.parse('$POCKETBASE_URL/api/collections/voiceRooms/records/${widget.roomID}'),
+        Uri.parse(
+            '$POCKETBASE_URL/api/collections/voiceRooms/records/${widget.roomID}'),
       );
 
       _handleLogout();
@@ -319,13 +677,11 @@ class LivePageState extends State<LivePage> with SingleTickerProviderStateMixin 
       //       ),
       //     );
       //   }
-
-
     } catch (e) {
       print('Error disbanding group: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to disband group')),
+          const SnackBar(content: Text('Failed to disband group')),
         );
       }
     }
@@ -363,18 +719,32 @@ class LivePageState extends State<LivePage> with SingleTickerProviderStateMixin 
         'userMotto': '' // Add any other user details you want to track
       });
     });
+    socket.on('riveAnimationChanged', (data) {
+      if (!mounted) return;
+
+      final userId = data['userId'];
+      final riveFileUrl = data['riveFileUrl'];
+
+      if (userId != null && riveFileUrl != null) {
+        setState(() {
+          _userRiveFiles[userId] = riveFileUrl;
+        });
+      }
+    });
 
     socket.on('roomUpdate', (data) {
       if (!mounted) return;
 
       try {
         final List<dynamic> usersList = data['users'] as List;
-        final users = usersList.map((userData) => OnlineUser(
-          id: userData['id'] as String,
-          name: userData['name'] as String,
-          avatarUrl: userData['avatarUrl'] as String,
-          motto: userData['motto'] as String? ?? '',
-        )).toList();
+        final users = usersList
+            .map((userData) => OnlineUser(
+                  id: userData['id'] as String,
+                  name: userData['name'] as String,
+                  avatarUrl: userData['avatarUrl'] as String,
+                  motto: userData['motto'] as String? ?? '',
+                ))
+            .toList();
 
         setState(() {
           onlineUsers = users;
@@ -403,6 +773,9 @@ class LivePageState extends State<LivePage> with SingleTickerProviderStateMixin 
           if (!onlineUsers.any((user) => user.id == newUser.id)) {
             onlineUsers.add(newUser);
             userCount = onlineUsers.length;
+
+            // Load this user's Rive animation if they have one
+            _fetchUserRiveFile(newUser.id);
           }
         });
       } catch (e) {
@@ -422,6 +795,14 @@ class LivePageState extends State<LivePage> with SingleTickerProviderStateMixin 
     socket.connect();
   }
 
+  void _notifyRiveAnimationChange(String riveFileUrl) {
+    socket.emit('riveAnimationChange', {
+      'roomId': widget.roomID,
+      'userId': widget.userId,
+      'riveFileUrl': riveFileUrl
+    });
+  }
+
   void _handleReconnection() {
     reconnectionTimer?.cancel();
 
@@ -429,8 +810,9 @@ class LivePageState extends State<LivePage> with SingleTickerProviderStateMixin 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Unable to reconnect. Please check your connection.'),
-            duration: Duration(seconds: 5),
+            content: const Text(
+                'Unable to reconnect. Please check your connection.'),
+            duration: const Duration(seconds: 5),
             action: SnackBarAction(
               label: 'Retry',
               onPressed: () {
@@ -444,7 +826,7 @@ class LivePageState extends State<LivePage> with SingleTickerProviderStateMixin 
       return;
     }
 
-    reconnectionTimer = Timer(Duration(seconds: 2), () {
+    reconnectionTimer = Timer(const Duration(seconds: 2), () {
       reconnectAttempts++;
       if (!socket.connected) {
         socket.connect();
@@ -455,12 +837,14 @@ class LivePageState extends State<LivePage> with SingleTickerProviderStateMixin 
   void _updateUserList(Map<String, dynamic> data) {
     if (data['users'] != null) {
       final List<dynamic> usersList = data['users'] as List;
-      final users = usersList.map((userData) => OnlineUser(
-        id: userData['id'] as String,
-        name: userData['name'] as String,
-        avatarUrl: userData['avatarUrl'] as String,
-        motto: userData['motto'] as String? ?? '',
-      )).toList();
+      final users = usersList
+          .map((userData) => OnlineUser(
+                id: userData['id'] as String,
+                name: userData['name'] as String,
+                avatarUrl: userData['avatarUrl'] as String,
+                motto: userData['motto'] as String? ?? '',
+              ))
+          .toList();
 
       setState(() {
         onlineUsers = users;
@@ -469,8 +853,74 @@ class LivePageState extends State<LivePage> with SingleTickerProviderStateMixin 
     }
   }
 
+  Future<void> markAsUsed(String itemId) async {
+    try {
+      // Original code
+      await HttpService.markItemAsUsed(itemId);
 
-  Future<bool> checkAndRecordProfileView(String viewerUserId, String viewedUserId) async {
+      // Get the item details to find the Rive file URL
+      final response = await http.get(
+        Uri.parse('$POCKETBASE_URL/api/collections/myItems/records/$itemId'),
+        headers: {'Content-Type': 'application/json'},
+      );
+
+      if (response.statusCode == 200) {
+        final item = json.decode(response.body);
+        if (item['riveFile'] != null) {
+          final riveFileUrl =
+              '$POCKETBASE_URL/api/files/${item['collectionId']}/${item['id']}/${item['riveFile']}';
+
+          // Update local state
+          setState(() {
+            _userRiveFiles[widget.userId] = riveFileUrl;
+          });
+
+          // Notify others
+          _notifyRiveAnimationChange(riveFileUrl);
+        }
+      }
+
+      // Don't call loadMyItems() here as it doesn't exist
+      // Instead, refresh the room data
+      _fetchOnlineUsers();
+    } catch (e) {
+      print('Error marking item as used: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to mark item as used: $e')),
+        );
+      }
+    }
+  }
+
+// Add a method to fetch a single user's rive file
+  Future<void> _fetchUserRiveFile(String userId) async {
+    try {
+      final itemsResponse = await http.get(
+        Uri.parse(
+            '$POCKETBASE_URL/api/collections/myItems/records?filter=(userId="$userId" && is_used=true)'),
+        headers: {'Content-Type': 'application/json'},
+      );
+
+      if (itemsResponse.statusCode == 200) {
+        final itemsData = json.decode(itemsResponse.body);
+        final items = itemsData['items'] as List;
+
+        if (items.isNotEmpty && items[0]['riveFile'] != null) {
+          final item = items[0];
+          setState(() {
+            _userRiveFiles[userId] =
+                '$POCKETBASE_URL/api/files/${item['collectionId']}/${item['id']}/${item['riveFile']}';
+          });
+        }
+      }
+    } catch (e) {
+      print('Error fetching user rive file: $e');
+    }
+  }
+
+  Future<bool> checkAndRecordProfileView(
+      String viewerUserId, String viewedUserId) async {
     const String baseUrl = 'http://145.223.21.62:8090';
 
     try {
@@ -480,11 +930,11 @@ class LivePageState extends State<LivePage> with SingleTickerProviderStateMixin 
       }
 
       // 2. Check for existing view with proper URL encoding
-      final queryFilter = '(viewer_user_id="${Uri.encodeComponent(viewerUserId)}" && viewed_users_id="${Uri.encodeComponent(viewedUserId)}")';
+      final queryFilter =
+          '(viewer_user_id="${Uri.encodeComponent(viewerUserId)}" && viewed_users_id="${Uri.encodeComponent(viewedUserId)}")';
       final checkResponse = await http.get(
-        Uri.parse('$baseUrl/api/collections/profileView/records').replace(
-            queryParameters: {'filter': queryFilter}
-        ),
+        Uri.parse('$baseUrl/api/collections/profileView/records')
+            .replace(queryParameters: {'filter': queryFilter}),
       );
 
       if (checkResponse.statusCode != 200) {
@@ -512,7 +962,8 @@ class LivePageState extends State<LivePage> with SingleTickerProviderStateMixin 
       );
 
       // 4. Detailed error logging
-      print('Create profile view response status: ${createResponse.statusCode}');
+      print(
+          'Create profile view response status: ${createResponse.statusCode}');
       print('Create profile view response body: ${createResponse.body}');
 
       if (createResponse.statusCode != 200) {
@@ -528,7 +979,6 @@ class LivePageState extends State<LivePage> with SingleTickerProviderStateMixin 
       return false;
     }
   }
-
 
   Future<void> _fetchInitialUsers() async {
     if (!mounted) return;
@@ -548,7 +998,8 @@ class LivePageState extends State<LivePage> with SingleTickerProviderStateMixin 
       // Fallback to HTTP if socket isn't connected
       if (!socket.connected) {
         final response = await http.get(
-          Uri.parse('http://145.223.21.62:3000/api/rooms/${widget.roomID}/users'),
+          Uri.parse(
+              'http://145.223.21.62:3000/api/rooms/${widget.roomID}/users'),
         );
 
         if (response.statusCode == 200) {
@@ -567,14 +1018,13 @@ class LivePageState extends State<LivePage> with SingleTickerProviderStateMixin 
     }
   }
 
-
-
   Future<void> _handleNewOnlineUser(Map<String, dynamic> record) async {
     if (record['userId'] == widget.userId) return; // Skip current user
 
     try {
       final userResponse = await http.get(
-        Uri.parse('$POCKETBASE_URL/api/collections/users/records/${record['userId']}'),
+        Uri.parse(
+            '$POCKETBASE_URL/api/collections/users/records/${record['userId']}'),
       );
 
       if (userResponse.statusCode == 200) {
@@ -582,7 +1032,8 @@ class LivePageState extends State<LivePage> with SingleTickerProviderStateMixin 
         final newUser = OnlineUser(
           id: userData['id'],
           name: '${userData['firstname']} ${userData['lastname']}'.trim(),
-          avatarUrl: '$POCKETBASE_URL/api/files/${userData['collectionId']}/${userData['id']}/${userData['avatar']}',
+          avatarUrl:
+              '$POCKETBASE_URL/api/files/${userData['collectionId']}/${userData['id']}/${userData['avatar']}',
           motto: userData['moto'] ?? '',
           firstName: userData['firstname'] ?? '',
           lastName: userData['lastname'] ?? '',
@@ -607,9 +1058,6 @@ class LivePageState extends State<LivePage> with SingleTickerProviderStateMixin 
     }
   }
 
-
-
-
   Future<void> _fetchOnlineUsers() async {
     if (mounted) {
       setState(() => isLoadingUsers = true);
@@ -623,7 +1071,8 @@ class LivePageState extends State<LivePage> with SingleTickerProviderStateMixin 
         }),
       );
 
-      if (onlineUsersResponse.statusCode != 200) throw Exception('Failed to fetch online users');
+      if (onlineUsersResponse.statusCode != 200)
+        throw Exception('Failed to fetch online users');
 
       final onlineUsersData = json.decode(onlineUsersResponse.body);
       List<OnlineUser> users = [];
@@ -633,7 +1082,8 @@ class LivePageState extends State<LivePage> with SingleTickerProviderStateMixin 
 
         try {
           final userDetailsResponse = await http.get(
-            Uri.parse('$POCKETBASE_URL/api/collections/users/records/${onlineUser['userId']}'),
+            Uri.parse(
+                '$POCKETBASE_URL/api/collections/users/records/${onlineUser['userId']}'),
           );
 
           if (userDetailsResponse.statusCode == 200) {
@@ -641,7 +1091,8 @@ class LivePageState extends State<LivePage> with SingleTickerProviderStateMixin 
             users.add(OnlineUser(
               id: userData['id'],
               name: '${userData['firstname']} ${userData['lastname']}'.trim(),
-              avatarUrl: '$POCKETBASE_URL/api/files/${userData['collectionId']}/${userData['id']}/${userData['avatar']}',
+              avatarUrl:
+                  '$POCKETBASE_URL/api/files/${userData['collectionId']}/${userData['id']}/${userData['avatar']}',
               motto: userData['moto'] ?? '',
               firstName: userData['firstname'] ?? '',
               lastName: userData['lastname'] ?? '',
@@ -667,16 +1118,16 @@ class LivePageState extends State<LivePage> with SingleTickerProviderStateMixin 
     }
   }
 
-
-
   Future<bool> _isUserJoined(String roomId, String userId) async {
     try {
       // Check both conditions in parallel using Future.wait
       final responses = await Future.wait([
         // Check joined_users
-        http.get(Uri.parse('$POCKETBASE_URL/api/collections/joined_users/records')),
+        http.get(
+            Uri.parse('$POCKETBASE_URL/api/collections/joined_users/records')),
         // Check if user is owner
-        http.get(Uri.parse('$POCKETBASE_URL/api/collections/voiceRooms/records/$roomId')),
+        http.get(Uri.parse(
+            '$POCKETBASE_URL/api/collections/voiceRooms/records/$roomId')),
       ]);
 
       final joinedResponse = responses[0];
@@ -688,9 +1139,8 @@ class LivePageState extends State<LivePage> with SingleTickerProviderStateMixin 
         if (joinedData['items'] != null) {
           final records = joinedData['items'] as List;
           if (records.any((record) =>
-          record['userid'] == userId &&
-              record['voice_room_id'] == roomId
-          )) {
+              record['userid'] == userId &&
+              record['voice_room_id'] == roomId)) {
             return true;
           }
         }
@@ -712,11 +1162,13 @@ class LivePageState extends State<LivePage> with SingleTickerProviderStateMixin 
   }
 
   Future<void> updateStartTime(String userId, String voiceRoomId) async {
-    final String baseUrl = 'http://145.223.21.62:8090/api/collections/level_Timer/records';
+    const String baseUrl =
+        'http://145.223.21.62:8090/api/collections/level_Timer/records';
 
     try {
       // Step 1: Fetch existing records for the user and voice room
-      final filter = Uri.encodeComponent('UserID="$userId" && voiceRoom_id="$voiceRoomId"');
+      final filter = Uri.encodeComponent(
+          'UserID="$userId" && voiceRoom_id="$voiceRoomId"');
       final response = await http.get(Uri.parse('$baseUrl?filter=$filter'));
 
       print('GET Response status: ${response.statusCode}');
@@ -732,7 +1184,8 @@ class LivePageState extends State<LivePage> with SingleTickerProviderStateMixin 
 
           if (record['Start_Time'] != null && record['End_Time'] == null) {
             // Delete the existing record
-            final deleteResponse = await http.delete(Uri.parse('$baseUrl/${record['id']}'));
+            final deleteResponse =
+                await http.delete(Uri.parse('$baseUrl/${record['id']}'));
             print('DELETE Response status: ${deleteResponse.statusCode}');
             print('DELETE Response body: ${deleteResponse.body}');
 
@@ -772,8 +1225,6 @@ class LivePageState extends State<LivePage> with SingleTickerProviderStateMixin 
     }
   }
 
-
-
   Future<void> _createOnlineUserRecord() async {
     try {
       final response = await http.post(
@@ -789,7 +1240,8 @@ class LivePageState extends State<LivePage> with SingleTickerProviderStateMixin 
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        _onlineUserRecordId = data['id']; // Store the record ID for later deletion
+        _onlineUserRecordId =
+            data['id']; // Store the record ID for later deletion
         print('Created online user record: $_onlineUserRecordId');
       } else {
         print('Failed to create online user record: ${response.statusCode}');
@@ -798,8 +1250,6 @@ class LivePageState extends State<LivePage> with SingleTickerProviderStateMixin 
       print('Error creating online user record: $e');
     }
   }
-
-
 
   Future<void> _fetchAndSetUserAvatar() async {
     try {
@@ -824,7 +1274,8 @@ class LivePageState extends State<LivePage> with SingleTickerProviderStateMixin 
           final userData = data['items'][0];
           if (userData['avatar'] != null) {
             setState(() {
-              _userAvatarUrl = '$POCKETBASE_URL/api/files/${userData['collectionId']}/${userData['id']}/${userData['avatar']}';
+              _userAvatarUrl =
+                  '$POCKETBASE_URL/api/files/${userData['collectionId']}/${userData['id']}/${userData['avatar']}';
               print('------------------------');
               print(_userAvatarUrl);
             });
@@ -841,7 +1292,8 @@ class LivePageState extends State<LivePage> with SingleTickerProviderStateMixin 
   Future<void> _joinRoom(String roomId, String userId) async {
     try {
       final response = await http.post(
-        Uri.parse('http://145.223.21.62:8090/api/collections/joined_users/records'),
+        Uri.parse(
+            'http://145.223.21.62:8090/api/collections/joined_users/records'),
         headers: {'Content-Type': 'application/json'},
         body: json.encode({
           'voice_room_id': roomId,
@@ -853,23 +1305,26 @@ class LivePageState extends State<LivePage> with SingleTickerProviderStateMixin 
       if (response.statusCode == 200) {
         Navigator.pop(context);
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Successfully joined the room')),
+          const SnackBar(content: Text('Successfully joined the room')),
         );
       }
     } catch (e) {
       print('Error joining room: $e');
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to join room')),
+        const SnackBar(content: Text('Failed to join room')),
       );
     }
   }
 
-  Future<void> _deleteDuplicateOnlineUserRecords(String userId, String roomId) async {
-    const String baseUrl = 'http://145.223.21.62:8090/api/collections/online_users/records';
+  Future<void> _deleteDuplicateOnlineUserRecords(
+      String userId, String roomId) async {
+    const String baseUrl =
+        'http://145.223.21.62:8090/api/collections/online_users/records';
 
     try {
       // Step 1: Fetch all records for this user and room
-      final filter = Uri.encodeComponent('userId="$userId" && voiceRoomId="$roomId"');
+      final filter =
+          Uri.encodeComponent('userId="$userId" && voiceRoomId="$roomId"');
       final response = await http.get(
         Uri.parse('$baseUrl?filter=$filter'),
         headers: {'Content-Type': 'application/json'},
@@ -894,10 +1349,12 @@ class LivePageState extends State<LivePage> with SingleTickerProviderStateMixin 
             headers: {'Content-Type': 'application/json'},
           );
 
-          if (deleteResponse.statusCode == 204 || deleteResponse.statusCode == 200) {
+          if (deleteResponse.statusCode == 204 ||
+              deleteResponse.statusCode == 200) {
             print('Successfully deleted record: $recordId');
           } else {
-            print('Failed to delete record $recordId: ${deleteResponse.statusCode}');
+            print(
+                'Failed to delete record $recordId: ${deleteResponse.statusCode}');
           }
         }
       } else {
@@ -947,13 +1404,13 @@ class LivePageState extends State<LivePage> with SingleTickerProviderStateMixin 
     }
   }
 
-
-
   Future<void> _fetchVoiceRoomDetails() async {
     try {
-      final uri = Uri.parse('$POCKETBASE_URL/api/collections/voiceRooms/records/${widget.roomID}')
+      final uri = Uri.parse(
+              '$POCKETBASE_URL/api/collections/voiceRooms/records/${widget.roomID}')
           .replace(queryParameters: {
-        'fields': 'voice_room_name,background_images,group_photo,voiceRoom_id'
+        'fields':
+            'voice_room_name,background_images,group_photo,voiceRoom_id,announcement'
       });
 
       final response = await http.get(
@@ -966,16 +1423,17 @@ class LivePageState extends State<LivePage> with SingleTickerProviderStateMixin 
         setState(() {
           _voiceRoomName = data['voice_room_name'];
           _voiceroomid = data['voiceRoom_id'];
+          _announcement = data['announcement'];
           if (data['background_images'] != null) {
-            _backgroundImageUrl = '$POCKETBASE_URL/api/files/voiceRooms/${widget.roomID}/${data['background_images']}';
-            _groupPhotoUrl = '$POCKETBASE_URL/api/files/voiceRooms/${widget.roomID}/${data['group_photo']}';
-
+            _backgroundImageUrl =
+                '$POCKETBASE_URL/api/files/voiceRooms/${widget.roomID}/${data['background_images']}';
+            _groupPhotoUrl =
+                '$POCKETBASE_URL/api/files/voiceRooms/${widget.roomID}/${data['group_photo']}';
           }
 
-          if (data['group_photo'] != null) {
-
-          }
-          print("-----------------------------------------------------------------");
+          if (data['group_photo'] != null) {}
+          print(
+              "-----------------------------------------------------------------");
           print(_groupPhotoUrl);
         });
       }
@@ -983,47 +1441,54 @@ class LivePageState extends State<LivePage> with SingleTickerProviderStateMixin 
       print('Error fetching voice room details: $e');
     }
   }
+
   Future<void> _shareToWhatsApp() async {
-    final String shareText = 'Join our voice room!\nRoom Name: ${_voiceRoomName ?? "Voice Room"}\nRoom ID: ${_voiceroomid}\nCome join us for an amazing conversation!';
-    final Uri whatsappUrl = Uri.parse("whatsapp://send?text=${Uri.encodeComponent(shareText)}");
+    final String shareText =
+        'Join our voice room!\nRoom Name: ${_voiceRoomName ?? "Voice Room"}\nRoom ID: $_voiceroomid\nCome join us for an amazing conversation!';
+    final Uri whatsappUrl =
+        Uri.parse("whatsapp://send?text=${Uri.encodeComponent(shareText)}");
 
     try {
       await launchUrl(whatsappUrl);
       Navigator.pop(context);
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('WhatsApp is not installed')),
+        const SnackBar(content: Text('WhatsApp is not installed')),
       );
     }
   }
 
   Future<void> _shareToFacebook() async {
-    final String shareText = 'Join our voice room!\nRoom Name: ${_voiceRoomName ?? "Voice Room"}\nRoom ID: ${_voiceroomid}\nCome join us for an amazing conversation!';
-    final Uri fbUrl = Uri.parse("https://www.facebook.com/sharer/sharer.php?u=${Uri.encodeComponent(shareText)}");
+    final String shareText =
+        'Join our voice room!\nRoom Name: ${_voiceRoomName ?? "Voice Room"}\nRoom ID: $_voiceroomid\nCome join us for an amazing conversation!';
+    final Uri fbUrl = Uri.parse(
+        "https://www.facebook.com/sharer/sharer.php?u=${Uri.encodeComponent(shareText)}");
 
     try {
       await launchUrl(fbUrl, mode: LaunchMode.externalApplication);
       Navigator.pop(context);
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Could not open Facebook')),
+        const SnackBar(content: Text('Could not open Facebook')),
       );
     }
   }
 
   void _copyRoomLink() {
-    final String shareText = 'Join our voice room!\nRoom Name: ${_voiceRoomName ?? "Voice Room"}\nRoom ID: ${_voiceroomid}\nCome join us for an amazing conversation!';
+    final String shareText =
+        'Join our voice room!\nRoom Name: ${_voiceRoomName ?? "Voice Room"}\nRoom ID: $_voiceroomid\nCome join us for an amazing conversation!';
     Clipboard.setData(ClipboardData(text: shareText)).then((_) {
       Navigator.pop(context);
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Room link copied to clipboard')),
+        const SnackBar(content: Text('Room link copied to clipboard')),
       );
     });
   }
 
   Future<void> _fetchLanguageDetails(String roomId) async {
     try {
-      final uri = Uri.parse('$POCKETBASE_URL/api/collections/voiceRooms/records/$roomId')
+      final uri = Uri.parse(
+              '$POCKETBASE_URL/api/collections/voiceRooms/records/$roomId')
           .replace(queryParameters: {
         'fields': 'language', // Specify the fields you want to fetch
       });
@@ -1047,14 +1512,14 @@ class LivePageState extends State<LivePage> with SingleTickerProviderStateMixin 
     }
   }
 
-
-
   Future<void> updateEndTime(String userId, String voiceRoomId) async {
-    final String baseUrl = 'http://145.223.21.62:8090/api/collections/level_Timer/records';
+    const String baseUrl =
+        'http://145.223.21.62:8090/api/collections/level_Timer/records';
 
     try {
       // Step 1: Fetch existing records for the given userId and voiceRoomId
-      final filter = Uri.encodeComponent('UserID="$userId" && voiceRoom_id="$voiceRoomId"');
+      final filter = Uri.encodeComponent(
+          'UserID="$userId" && voiceRoom_id="$voiceRoomId"');
       final response = await http.get(Uri.parse('$baseUrl?filter=$filter'));
 
       print('GET Response status: ${response.statusCode}');
@@ -1066,7 +1531,7 @@ class LivePageState extends State<LivePage> with SingleTickerProviderStateMixin 
 
         // Step 2: Find the record with an empty End_Time
         final record = records.firstWhere(
-              (r) => r['End_Time'] == null || r['End_Time'] == "",
+          (r) => r['End_Time'] == null || r['End_Time'] == "",
           orElse: () => null,
         );
 
@@ -1101,10 +1566,8 @@ class LivePageState extends State<LivePage> with SingleTickerProviderStateMixin 
     }
   }
 
-
   @override
   void dispose() {
-
     reconnectionTimer?.cancel();
     socket.emit('leaveRoom', {
       'roomId': widget.roomID,
@@ -1119,7 +1582,8 @@ class LivePageState extends State<LivePage> with SingleTickerProviderStateMixin 
 
       if (_onlineUserRecordId != null) {
         http.delete(
-          Uri.parse('$POCKETBASE_URL/api/collections/online_users/records/$_onlineUserRecordId'),
+          Uri.parse(
+              '$POCKETBASE_URL/api/collections/online_users/records/$_onlineUserRecordId'),
           headers: {'Content-Type': 'application/json'},
         ).catchError((e) => print('Error cleaning up online user record: $e'));
 
@@ -1130,20 +1594,22 @@ class LivePageState extends State<LivePage> with SingleTickerProviderStateMixin 
       }
 
       updateEndTime(widget.userId, widget.roomID);
-
     }
 
     _emojiTimers.forEach((userId, timer) => timer.cancel());
     _emojiTimers.clear();
     socket.disconnect();
+    _riveRefreshTimer?.cancel();
     super.dispose();
   }
 
   bool isAttributeHost(Map<String, String>? userInRoomAttributes) {
-    return (userInRoomAttributes?['role'] ?? "") == ZegoLiveAudioRoomRole.host.index.toString();
+    return (userInRoomAttributes?['role'] ?? "") ==
+        ZegoLiveAudioRoomRole.host.index.toString();
   }
 
-  Widget backgroundBuilder(BuildContext context, Size size, ZegoUIKitUser? user, Map extraInfo) {
+  Widget backgroundBuilder(
+      BuildContext context, Size size, ZegoUIKitUser? user, Map extraInfo) {
     if (!isAttributeHost(user?.inRoomAttributes.value)) {
       return Container();
     }
@@ -1152,7 +1618,6 @@ class LivePageState extends State<LivePage> with SingleTickerProviderStateMixin 
       top: -6,
       left: 0,
       child: Container(
-
         width: size.width,
         height: size.height,
         decoration: const BoxDecoration(
@@ -1165,9 +1630,23 @@ class LivePageState extends State<LivePage> with SingleTickerProviderStateMixin 
     );
   }
 
-  Widget foregroundBuilder(BuildContext context, Size size, ZegoUIKitUser? user, Map extraInfo) {
+  Widget foregroundBuilder(
+      BuildContext context, Size size, ZegoUIKitUser? user, Map extraInfo) {
     return Stack(
       children: [
+        // If the user has a Rive animation, show it
+        // If the user has a Rive animation, show it
+        if (user?.id != null && _userRiveFiles.containsKey(user!.id))
+          Positioned.fill(
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(size.width / 2),
+              child: rive.RiveAnimation.network(
+                _userRiveFiles[user.id]!,
+                fit: BoxFit.cover,
+                // Remove the onError parameter
+              ),
+            ),
+          ),
         // Username text
         if (user?.name != null && user!.name.isNotEmpty)
           Positioned(
@@ -1175,7 +1654,6 @@ class LivePageState extends State<LivePage> with SingleTickerProviderStateMixin 
             left: 0,
             right: 0,
             child: Container(
-
               color: Colors.blueAccent,
               padding: const EdgeInsets.symmetric(vertical: 2),
               child: Text(
@@ -1199,7 +1677,8 @@ class LivePageState extends State<LivePage> with SingleTickerProviderStateMixin 
   Future<int> _fetchJoinedUsersCount(String roomId) async {
     try {
       final response = await http.get(
-        Uri.parse('http://145.223.21.62:8090/api/collections/joined_users/records?filter=(voice_room_id="$roomId")'),
+        Uri.parse(
+            'http://145.223.21.62:8090/api/collections/joined_users/records?filter=(voice_room_id="$roomId")'),
       );
 
       if (response.statusCode == 200) {
@@ -1215,6 +1694,7 @@ class LivePageState extends State<LivePage> with SingleTickerProviderStateMixin 
     }
   }
 
+  // 6. Modify the _showSettingsDialog() method to include announcement editing option
   void _showSettingsDialog() {
     showDialog(
       context: context,
@@ -1225,7 +1705,7 @@ class LivePageState extends State<LivePage> with SingleTickerProviderStateMixin 
         backgroundColor: Colors.black.withOpacity(0.95),
         child: Container(
           width: MediaQuery.of(context).size.width * 0.85,
-          padding: EdgeInsets.all(20),
+          padding: const EdgeInsets.all(20),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -1233,7 +1713,7 @@ class LivePageState extends State<LivePage> with SingleTickerProviderStateMixin 
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text(
+                  const Text(
                     'Room Settings',
                     style: TextStyle(
                       fontSize: 22,
@@ -1242,89 +1722,122 @@ class LivePageState extends State<LivePage> with SingleTickerProviderStateMixin 
                     ),
                   ),
                   IconButton(
-                    icon: Icon(Icons.close, color: Colors.white70),
+                    icon: const Icon(Icons.close, color: Colors.white70),
                     onPressed: () => Navigator.pop(context),
                   ),
                 ],
               ),
 
-              Divider(color: Colors.white24, height: 32),
+              const Divider(color: Colors.white24, height: 32),
 
               // Room Photo Setting
               ListTile(
                 leading: Container(
-                  padding: EdgeInsets.all(8),
+                  padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
                     color: Colors.blue.withOpacity(0.1),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Icon(Icons.photo_camera, color: Colors.blue[300]),
                 ),
-                title: Text(
+                title: const Text(
                   'Change Room Photo',
                   style: TextStyle(color: Colors.white, fontSize: 16),
                 ),
-                subtitle: Text(
+                subtitle: const Text(
                   'Update room profile picture',
                   style: TextStyle(color: Colors.white70, fontSize: 12),
                 ),
-                trailing: Icon(Icons.chevron_right, color: Colors.white54),
+                trailing:
+                    const Icon(Icons.chevron_right, color: Colors.white54),
                 onTap: () => Navigator.pop(context),
               ),
 
-              Divider(color: Colors.white12, indent: 56),
+              const Divider(color: Colors.white12, indent: 56),
 
               // Room Name Setting
               ListTile(
                 leading: Container(
-                  padding: EdgeInsets.all(8),
+                  padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
                     color: Colors.green.withOpacity(0.1),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Icon(Icons.edit, color: Colors.green[300]),
                 ),
-                title: Text(
+                title: const Text(
                   'Edit Room Name',
                   style: TextStyle(color: Colors.white, fontSize: 16),
                 ),
-                subtitle: Text(
+                subtitle: const Text(
                   'Change room display name',
                   style: TextStyle(color: Colors.white70, fontSize: 12),
                 ),
-                trailing: Icon(Icons.chevron_right, color: Colors.white54),
+                trailing:
+                    const Icon(Icons.chevron_right, color: Colors.white54),
                 onTap: () => Navigator.pop(context),
               ),
 
-              Divider(color: Colors.white12, indent: 56),
+              const Divider(color: Colors.white12, indent: 56),
 
               // Background Setting
               ListTile(
                 leading: Container(
-                  padding: EdgeInsets.all(8),
+                  padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
                     color: Colors.purple.withOpacity(0.1),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Icon(Icons.wallpaper, color: Colors.purple[300]),
                 ),
-                title: Text(
+                title: const Text(
                   'Change Background',
                   style: TextStyle(color: Colors.white, fontSize: 16),
                 ),
-                subtitle: Text(
+                subtitle: const Text(
                   'Customize room background',
                   style: TextStyle(color: Colors.white70, fontSize: 12),
                 ),
-                trailing: Icon(Icons.chevron_right, color: Colors.white54),
+                trailing:
+                    const Icon(Icons.chevron_right, color: Colors.white54),
                 onTap: () => Navigator.pop(context),
               ),
 
-              SizedBox(height: 20),
+              const Divider(color: Colors.white12, indent: 56),
+
+              // NEW: Announcement Setting
+              ListTile(
+                leading: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.amber.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Icon(Icons.campaign, color: Colors.amber[300]),
+                ),
+                title: const Text(
+                  'Room Announcement',
+                  style: TextStyle(color: Colors.white, fontSize: 16),
+                ),
+                subtitle: Text(
+                  _announcement != null && _announcement!.isNotEmpty
+                      ? 'Edit room announcement'
+                      : 'Add room announcement',
+                  style: const TextStyle(color: Colors.white70, fontSize: 12),
+                ),
+                trailing:
+                    const Icon(Icons.chevron_right, color: Colors.white54),
+                onTap: () {
+                  Navigator.pop(context);
+                  _showAnnouncementDialog(context);
+                },
+              ),
+
+              const SizedBox(height: 20),
 
               // Danger Zone
               Container(
-                padding: EdgeInsets.all(16),
+                padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
                   color: Colors.red.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(12),
@@ -1344,7 +1857,7 @@ class LivePageState extends State<LivePage> with SingleTickerProviderStateMixin 
                         fontWeight: FontWeight.bold,
                       ),
                     ),
-                    SizedBox(height: 12),
+                    const SizedBox(height: 12),
                     GestureDetector(
                       onTap: () {
                         Navigator.pop(context);
@@ -1353,7 +1866,7 @@ class LivePageState extends State<LivePage> with SingleTickerProviderStateMixin 
                       child: Row(
                         children: [
                           Icon(Icons.delete_forever, color: Colors.red[400]),
-                          SizedBox(width: 12),
+                          const SizedBox(width: 12),
                           Expanded(
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
@@ -1383,7 +1896,7 @@ class LivePageState extends State<LivePage> with SingleTickerProviderStateMixin 
                 ),
               ),
 
-              SizedBox(height: 16),
+              const SizedBox(height: 16),
             ],
           ),
         ),
@@ -1402,17 +1915,17 @@ class LivePageState extends State<LivePage> with SingleTickerProviderStateMixin 
         ),
         backgroundColor: Colors.black.withOpacity(0.9),
         child: Padding(
-          padding: EdgeInsets.all(20),
+          padding: const EdgeInsets.all(20),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(
+              const Icon(
                 Icons.warning_amber_rounded,
                 color: Colors.red,
                 size: 48,
               ),
-              SizedBox(height: 16),
-              Text(
+              const SizedBox(height: 16),
+              const Text(
                 'Disband Group',
                 style: TextStyle(
                   fontSize: 20,
@@ -1420,7 +1933,7 @@ class LivePageState extends State<LivePage> with SingleTickerProviderStateMixin 
                   color: Colors.white,
                 ),
               ),
-              SizedBox(height: 16),
+              const SizedBox(height: 16),
               Text(
                 'Are you sure you want to disband this group? This action cannot be undone.',
                 textAlign: TextAlign.center,
@@ -1428,13 +1941,13 @@ class LivePageState extends State<LivePage> with SingleTickerProviderStateMixin 
                   color: Colors.white.withOpacity(0.8),
                 ),
               ),
-              SizedBox(height: 24),
+              const SizedBox(height: 24),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                 children: [
                   TextButton(
                     onPressed: () => Navigator.pop(context),
-                    child: Text(
+                    child: const Text(
                       'Cancel',
                       style: TextStyle(color: Colors.blue),
                     ),
@@ -1444,7 +1957,7 @@ class LivePageState extends State<LivePage> with SingleTickerProviderStateMixin 
                       Navigator.pop(context); // Close dialog
                       await _disbandGroup(); // This will handle the navigation and refresh
                     },
-                    child: Text(
+                    child: const Text(
                       'Disband',
                       style: TextStyle(color: Colors.red),
                     ),
@@ -1460,7 +1973,7 @@ class LivePageState extends State<LivePage> with SingleTickerProviderStateMixin 
 
   Widget _buildEmojiButton(String emoji) {
     return Container(
-      margin: EdgeInsets.all(4),
+      margin: const EdgeInsets.all(4),
       decoration: BoxDecoration(
         color: Colors.white.withOpacity(0.1),
         borderRadius: BorderRadius.circular(12),
@@ -1485,11 +1998,11 @@ class LivePageState extends State<LivePage> with SingleTickerProviderStateMixin 
           },
           borderRadius: BorderRadius.circular(12),
           child: Container(
-            padding: EdgeInsets.all(8),
+            padding: const EdgeInsets.all(8),
             child: Center(
               child: Text(
                 emoji,
-                style: TextStyle(fontSize: 24),
+                style: const TextStyle(fontSize: 24),
               ),
             ),
           ),
@@ -1506,7 +2019,7 @@ class LivePageState extends State<LivePage> with SingleTickerProviderStateMixin 
 
     setState(() {
       // Add new emoji widget to the map
-      _activeEmojis[userId] = Container(
+      _activeEmojis[userId] = SizedBox(
         width: 50,
         height: 50,
         child: Image.asset(
@@ -1517,7 +2030,7 @@ class LivePageState extends State<LivePage> with SingleTickerProviderStateMixin 
     });
 
     // Remove after 2 seconds
-    _emojiTimers[userId] = Timer(Duration(seconds: 2), () {
+    _emojiTimers[userId] = Timer(const Duration(seconds: 2), () {
       if (mounted) {
         setState(() {
           _activeEmojis.remove(userId);
@@ -1529,36 +2042,35 @@ class LivePageState extends State<LivePage> with SingleTickerProviderStateMixin 
   Widget _buildLoadingOverlay() {
     return _isLoading
         ? Container(
-      color: Colors.black.withOpacity(0.7),
-      child: Center(
-        child: Container(
-          padding: EdgeInsets.all(20),
-          decoration: BoxDecoration(
             color: Colors.black.withOpacity(0.7),
-            borderRadius: BorderRadius.circular(10),
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              CircularProgressIndicator(
-                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+            child: Center(
+              child: Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: Colors.black.withOpacity(0.7),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    CircularProgressIndicator(
+                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                    ),
+                    //SizedBox(height: 16),
+                    // Text(
+                    //   'Loading...',
+                    //   style: TextStyle(
+                    //     color: Colors.white,
+                    //     fontSize: 16,
+                    //   ),
+                    // ),
+                  ],
+                ),
               ),
-              //SizedBox(height: 16),
-              // Text(
-              //   'Loading...',
-              //   style: TextStyle(
-              //     color: Colors.white,
-              //     fontSize: 16,
-              //   ),
-              // ),
-            ],
-          ),
-        ),
-      ),
-    )
+            ),
+          )
         : const SizedBox.shrink();
   }
-
 
   @override
   Widget build(BuildContext context) {
@@ -1582,12 +2094,12 @@ class LivePageState extends State<LivePage> with SingleTickerProviderStateMixin 
             ),
             backgroundColor: Colors.black.withOpacity(0.9),
             child: Padding(
-              padding: EdgeInsets.symmetric(vertical: 8),
+              padding: const EdgeInsets.symmetric(vertical: 8),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   // Title
-                  Padding(
+                  const Padding(
                     padding: EdgeInsets.only(top: 16, bottom: 8),
                     child: Text(
                       'Leave Room',
@@ -1601,7 +2113,8 @@ class LivePageState extends State<LivePage> with SingleTickerProviderStateMixin 
 
                   // Message
                   Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
                     child: Text(
                       'Would you like to leave the room?',
                       textAlign: TextAlign.center,
@@ -1613,7 +2126,7 @@ class LivePageState extends State<LivePage> with SingleTickerProviderStateMixin 
                     ),
                   ),
 
-                  SizedBox(height: 16),
+                  const SizedBox(height: 16),
 
                   // Divider
                   Divider(
@@ -1631,14 +2144,14 @@ class LivePageState extends State<LivePage> with SingleTickerProviderStateMixin 
                             onPressed: () => Navigator.pop(context, false),
                             style: TextButton.styleFrom(
                               foregroundColor: Colors.white,
-                              padding: EdgeInsets.symmetric(vertical: 12),
-                              shape: RoundedRectangleBorder(
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              shape: const RoundedRectangleBorder(
                                 borderRadius: BorderRadius.only(
                                   bottomLeft: Radius.circular(15),
                                 ),
                               ),
                             ),
-                            child: Text(
+                            child: const Text(
                               'Cancel',
                               style: TextStyle(
                                 fontSize: 17,
@@ -1668,9 +2181,9 @@ class LivePageState extends State<LivePage> with SingleTickerProviderStateMixin 
                             },
                             style: TextButton.styleFrom(
                               foregroundColor: Colors.white,
-                              padding: EdgeInsets.symmetric(vertical: 12),
+                              padding: const EdgeInsets.symmetric(vertical: 12),
                             ),
-                            child: Text(
+                            child: const Text(
                               'Minimize',
                               style: TextStyle(
                                 fontSize: 17,
@@ -1696,14 +2209,14 @@ class LivePageState extends State<LivePage> with SingleTickerProviderStateMixin 
                             },
                             style: TextButton.styleFrom(
                               foregroundColor: Colors.white,
-                              padding: EdgeInsets.symmetric(vertical: 12),
-                              shape: RoundedRectangleBorder(
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              shape: const RoundedRectangleBorder(
                                 borderRadius: BorderRadius.only(
                                   bottomRight: Radius.circular(15),
                                 ),
                               ),
                             ),
-                            child: Text(
+                            child: const Text(
                               'Leave',
                               style: TextStyle(
                                 fontSize: 17,
@@ -1730,7 +2243,8 @@ class LivePageState extends State<LivePage> with SingleTickerProviderStateMixin 
             // Main Zego UIKit widget
             ZegoUIKitPrebuiltLiveAudioRoom(
               appID: 2069292420,
-              appSign: '3b8893143a13c24f6d82dd7260b70a9d29814b99130e7bcebfe3e09dac8c0731',
+              appSign:
+                  '3b8893143a13c24f6d82dd7260b70a9d29814b99130e7bcebfe3e09dac8c0731',
               userID: localUserID,
               userName: widget.username1,
               roomID: widget.roomID,
@@ -1761,9 +2275,9 @@ class LivePageState extends State<LivePage> with SingleTickerProviderStateMixin 
                 ),
               ),
             ),
-
+            _buildWelcomeAndAnnouncement(),
             if (_activeEmojis.isNotEmpty)
-              Container(
+              SizedBox(
                 width: double.infinity,
                 height: double.infinity,
                 child: CustomMultiChildLayout(
@@ -1823,7 +2337,8 @@ class LivePageState extends State<LivePage> with SingleTickerProviderStateMixin 
                   _showOnlineUsersBottomSheet(context);
                 },
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   decoration: BoxDecoration(
                     color: Colors.black.withOpacity(0.5),
                     borderRadius: BorderRadius.circular(15),
@@ -1831,25 +2346,26 @@ class LivePageState extends State<LivePage> with SingleTickerProviderStateMixin 
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(
+                      const Icon(
                         Icons.people,
                         color: Colors.white,
                         size: 16,
                       ),
                       const SizedBox(width: 4),
                       if (isLoadingUsers)
-                        SizedBox(
+                        const SizedBox(
                           width: 12,
                           height: 12,
                           child: CircularProgressIndicator(
                             strokeWidth: 1.5,
-                            valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                            valueColor:
+                                AlwaysStoppedAnimation<Color>(Colors.white),
                           ),
                         )
                       else
                         Text(
                           '${onlineUsers.length}',
-                          style: TextStyle(
+                          style: const TextStyle(
                             color: Colors.white,
                             fontSize: 12,
                             fontWeight: FontWeight.w600,
@@ -1863,7 +2379,8 @@ class LivePageState extends State<LivePage> with SingleTickerProviderStateMixin 
 
             // Emoji bottom sheet
             Positioned(
-              bottom: MediaQuery.of(context).size.height * 0.02, // 2% from bottom
+              bottom:
+                  MediaQuery.of(context).size.height * 0.02, // 2% from bottom
               left: MediaQuery.of(context).size.width * 0.32, // 35% from left
               child: Container(
                 width: 35, // Reduced from 30
@@ -1874,7 +2391,8 @@ class LivePageState extends State<LivePage> with SingleTickerProviderStateMixin 
                 ),
                 child: IconButton(
                   padding: EdgeInsets.zero, // Remove default padding
-                  constraints: BoxConstraints(), // Remove default constraints
+                  constraints:
+                      const BoxConstraints(), // Remove default constraints
                   onPressed: () {
                     showModalBottomSheet(
                       context: context,
@@ -1882,7 +2400,8 @@ class LivePageState extends State<LivePage> with SingleTickerProviderStateMixin 
                       isScrollControlled: true,
                       builder: (BuildContext context) {
                         return Container(
-                          height: MediaQuery.of(context).size.height * 0.4, // Reduced from 0.5
+                          height: MediaQuery.of(context).size.height *
+                              0.4, // Reduced from 0.5
                           decoration: BoxDecoration(
                             color: Colors.black.withOpacity(0.9),
                             borderRadius: const BorderRadius.only(
@@ -1896,7 +2415,8 @@ class LivePageState extends State<LivePage> with SingleTickerProviderStateMixin 
                               Container(
                                 width: 40, // Reduced from 40
                                 height: 4, // Reduced from 4
-                                margin: EdgeInsets.only(top: 8), // Reduced from 12
+                                margin: const EdgeInsets.only(
+                                    top: 8), // Reduced from 12
                                 decoration: BoxDecoration(
                                   color: Colors.white.withOpacity(0.3),
                                   borderRadius: BorderRadius.circular(1.5),
@@ -1907,8 +2427,9 @@ class LivePageState extends State<LivePage> with SingleTickerProviderStateMixin 
                               Align(
                                 alignment: Alignment.topRight,
                                 child: IconButton(
-                                  icon: Icon(Icons.close, color: Colors.white70, size: 20),
-                                  padding: EdgeInsets.all(12),
+                                  icon: const Icon(Icons.close,
+                                      color: Colors.white70, size: 20),
+                                  padding: const EdgeInsets.all(12),
                                   onPressed: () => Navigator.pop(context),
                                 ),
                               ),
@@ -1919,8 +2440,10 @@ class LivePageState extends State<LivePage> with SingleTickerProviderStateMixin 
                                   crossAxisCount: 5,
                                   mainAxisSpacing: 8, // Added spacing
                                   crossAxisSpacing: 8, // Added spacing
-                                  padding: EdgeInsets.symmetric(horizontal: 12),
-                                  childAspectRatio: 1.1, // Adjust aspect ratio for better fit
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 12),
+                                  childAspectRatio:
+                                      1.1, // Adjust aspect ratio for better fit
                                   children: [
                                     // Happy faces
                                     _buildEmojiButton('😊'),
@@ -1965,7 +2488,7 @@ class LivePageState extends State<LivePage> with SingleTickerProviderStateMixin 
                       },
                     );
                   },
-                  icon: Icon(
+                  icon: const Icon(
                     Icons.emoji_emotions,
                     color: Colors.white,
                     size: 20, // Reduced from 24
@@ -1977,7 +2500,8 @@ class LivePageState extends State<LivePage> with SingleTickerProviderStateMixin 
             if (isAdmin)
               Positioned(
                 top: MediaQuery.of(context).padding.top + 2,
-                right: MediaQuery.of(context).size.width * 0.132, // Responsive positioning
+                right: MediaQuery.of(context).size.width *
+                    0.132, // Responsive positioning
                 child: GestureDetector(
                   onTap: _showSettingsDialog,
                   child: Container(
@@ -2024,7 +2548,6 @@ class LivePageState extends State<LivePage> with SingleTickerProviderStateMixin 
 
             // Settings button (for admin)
 
-
             // Room Info Overlay
             Positioned(
               top: MediaQuery.of(context).padding.top - 15, // Moved higher up
@@ -2037,7 +2560,8 @@ class LivePageState extends State<LivePage> with SingleTickerProviderStateMixin 
                       minHeight: 60,
                       maxHeight: 60,
                     ),
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
                     decoration: BoxDecoration(
                       gradient: LinearGradient(
                         colors: [
@@ -2058,7 +2582,8 @@ class LivePageState extends State<LivePage> with SingleTickerProviderStateMixin 
 
                             final now = DateTime.now();
                             if (_lastTapTime != null &&
-                                now.difference(_lastTapTime!) < const Duration(milliseconds: 500)) {
+                                now.difference(_lastTapTime!) <
+                                    const Duration(milliseconds: 500)) {
                               return;
                             }
                             _lastTapTime = now;
@@ -2091,23 +2616,25 @@ class LivePageState extends State<LivePage> with SingleTickerProviderStateMixin 
                               borderRadius: BorderRadius.circular(10),
                               child: _groupPhotoUrl != null
                                   ? Image.network(
-                                _groupPhotoUrl!,
-                                fit: BoxFit.cover,
-                                errorBuilder: (context, error, stackTrace) => Center(
-                                  child: Icon(
-                                    Icons.image,
-                                    size: 24,
-                                    color: Colors.white70,
-                                  ),
-                                ),
-                              )
-                                  : Center(
-                                child: Icon(
-                                  Icons.image,
-                                  size: 24,
-                                  color: Colors.white70,
-                                ),
-                              ),
+                                      _groupPhotoUrl!,
+                                      fit: BoxFit.cover,
+                                      errorBuilder:
+                                          (context, error, stackTrace) =>
+                                              const Center(
+                                        child: Icon(
+                                          Icons.image,
+                                          size: 24,
+                                          color: Colors.white70,
+                                        ),
+                                      ),
+                                    )
+                                  : const Center(
+                                      child: Icon(
+                                        Icons.image,
+                                        size: 24,
+                                        color: Colors.white70,
+                                      ),
+                                    ),
                             ),
                           ),
                         ),
@@ -2123,7 +2650,7 @@ class LivePageState extends State<LivePage> with SingleTickerProviderStateMixin 
                               // Room Name
                               Text(
                                 _voiceRoomName ?? "Voice Room",
-                                style: TextStyle(
+                                style: const TextStyle(
                                   color: Colors.white,
                                   fontSize: 14,
                                   fontWeight: FontWeight.w600,
@@ -2148,7 +2675,7 @@ class LivePageState extends State<LivePage> with SingleTickerProviderStateMixin 
                                   ),
                                   Expanded(
                                     child: Text(
-                                      "${_voiceroomid}",
+                                      "$_voiceroomid",
                                       style: TextStyle(
                                         color: Colors.white.withOpacity(0.9),
                                         fontSize: 12,
@@ -2170,7 +2697,6 @@ class LivePageState extends State<LivePage> with SingleTickerProviderStateMixin 
               ),
             ),
 
-
             // Ranking Overlay
             Positioned(
               top: MediaQuery.of(context).padding.top + 65,
@@ -2181,7 +2707,8 @@ class LivePageState extends State<LivePage> with SingleTickerProviderStateMixin 
                     context: context,
                     backgroundColor: Colors.transparent,
                     isScrollControlled: true,
-                    builder: (context) => RankingBottomSheet(roomId: widget.roomID),
+                    builder: (context) =>
+                        RankingBottomSheet(roomId: widget.roomID),
                   );
                 },
                 child: Container(
@@ -2198,7 +2725,7 @@ class LivePageState extends State<LivePage> with SingleTickerProviderStateMixin 
                       begin: Alignment.centerLeft,
                       end: Alignment.centerRight,
                     ),
-                    borderRadius: BorderRadius.only(
+                    borderRadius: const BorderRadius.only(
                       topRight: Radius.circular(13),
                       bottomRight: Radius.circular(13),
                     ),
@@ -2207,16 +2734,17 @@ class LivePageState extends State<LivePage> with SingleTickerProviderStateMixin 
                         color: Colors.black.withOpacity(0.2),
                         spreadRadius: 1,
                         blurRadius: 3,
-                        offset: Offset(1, 1),
+                        offset: const Offset(1, 1),
                       )
                     ],
                   ),
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Flexible(
+                      const Flexible(
                         child: Text(
                           "Rank",
                           style: TextStyle(
@@ -2269,7 +2797,7 @@ class LivePageState extends State<LivePage> with SingleTickerProviderStateMixin 
         height: MediaQuery.of(context).size.height * 0.8,
         decoration: BoxDecoration(
           color: Colors.black.withOpacity(0.9),
-          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
         ),
         child: Column(
           children: [
@@ -2277,7 +2805,7 @@ class LivePageState extends State<LivePage> with SingleTickerProviderStateMixin 
             Container(
               width: 40,
               height: 4,
-              margin: EdgeInsets.only(top: 12),
+              margin: const EdgeInsets.only(top: 12),
               decoration: BoxDecoration(
                 color: Colors.white.withOpacity(0.3),
                 borderRadius: BorderRadius.circular(2),
@@ -2286,7 +2814,7 @@ class LivePageState extends State<LivePage> with SingleTickerProviderStateMixin 
 
             // Header with user count
             Padding(
-              padding: EdgeInsets.all(16),
+              padding: const EdgeInsets.all(16),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
@@ -2294,27 +2822,28 @@ class LivePageState extends State<LivePage> with SingleTickerProviderStateMixin 
                     children: [
                       Text(
                         'Online Users (${deduplicatedUsers.length + 1})',
-                        style: TextStyle(
+                        style: const TextStyle(
                           color: Colors.white,
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
                       if (isConnecting) ...[
-                        SizedBox(width: 8),
-                        SizedBox(
+                        const SizedBox(width: 8),
+                        const SizedBox(
                           width: 12,
                           height: 12,
                           child: CircularProgressIndicator(
                             strokeWidth: 2,
-                            valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                            valueColor:
+                                AlwaysStoppedAnimation<Color>(Colors.white),
                           ),
                         ),
                       ],
                     ],
                   ),
                   IconButton(
-                    icon: Icon(Icons.close, color: Colors.white),
+                    icon: const Icon(Icons.close, color: Colors.white),
                     onPressed: () => Navigator.pop(context),
                   ),
                 ],
@@ -2326,58 +2855,57 @@ class LivePageState extends State<LivePage> with SingleTickerProviderStateMixin 
               child: isLoadingUsers
                   ? _buildLoadingIndicator()
                   : RefreshIndicator(
-                onRefresh: _fetchOnlineUsers,
-                color: Colors.white,
-                backgroundColor: Colors.blue,
-                child: ListView(
-                  padding: EdgeInsets.symmetric(horizontal: 16),
-                  physics: AlwaysScrollableScrollPhysics(),
-                  children: [
-                    // Current user (always first)
-                    if (_userAvatarUrl != null) ...[
-                      _buildUserListItem(
-                        OnlineUser(
-                          id: widget.userId,
-                          name: widget.username1,
-                          avatarUrl: _userAvatarUrl!,
-                          motto: '',
-                        ),
-                        isCurrentUser: true,
-                        index: 1,
-                      ),
-                      Divider(
-                        color: Colors.white.withOpacity(0.1),
-                        height: 1,
-                      ),
-                    ],
-
-                    // Other users
-                    ...deduplicatedUsers.asMap().entries.map((entry) {
-                      final index = entry.key;
-                      final user = entry.value;
-                      return Column(
-                        mainAxisSize: MainAxisSize.min,
+                      onRefresh: _fetchOnlineUsers,
+                      color: Colors.white,
+                      backgroundColor: Colors.blue,
+                      child: ListView(
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        physics: const AlwaysScrollableScrollPhysics(),
                         children: [
-                          _buildUserListItem(
-                            user,
-                            isCurrentUser: false,
-                            index: index + 2,
-                          ),
-                          if (index < deduplicatedUsers.length - 1)
+                          // Current user (always first)
+                          if (_userAvatarUrl != null) ...[
+                            _buildUserListItem(
+                              OnlineUser(
+                                id: widget.userId,
+                                name: widget.username1,
+                                avatarUrl: _userAvatarUrl!,
+                                motto: '',
+                              ),
+                              isCurrentUser: true,
+                              index: 1,
+                            ),
                             Divider(
                               color: Colors.white.withOpacity(0.1),
                               height: 1,
                             ),
-                        ],
-                      );
-                    }).toList(),
+                          ],
 
-                    // Empty state
-                    if (deduplicatedUsers.isEmpty)
-                      _buildEmptyState(),
-                  ],
-                ),
-              ),
+                          // Other users
+                          ...deduplicatedUsers.asMap().entries.map((entry) {
+                            final index = entry.key;
+                            final user = entry.value;
+                            return Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                _buildUserListItem(
+                                  user,
+                                  isCurrentUser: false,
+                                  index: index + 2,
+                                ),
+                                if (index < deduplicatedUsers.length - 1)
+                                  Divider(
+                                    color: Colors.white.withOpacity(0.1),
+                                    height: 1,
+                                  ),
+                              ],
+                            );
+                          }),
+
+                          // Empty state
+                          if (deduplicatedUsers.isEmpty) _buildEmptyState(),
+                        ],
+                      ),
+                    ),
             ),
           ],
         ),
@@ -2386,7 +2914,7 @@ class LivePageState extends State<LivePage> with SingleTickerProviderStateMixin 
   }
 
   Widget _buildLoadingIndicator() {
-    return Center(
+    return const Center(
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -2407,7 +2935,7 @@ class LivePageState extends State<LivePage> with SingleTickerProviderStateMixin 
   }
 
   Widget _buildEmptyState() {
-    return Padding(
+    return const Padding(
       padding: EdgeInsets.symmetric(vertical: 32),
       child: Center(
         child: Column(
@@ -2431,22 +2959,23 @@ class LivePageState extends State<LivePage> with SingleTickerProviderStateMixin 
     );
   }
 
-  Widget _buildUserListItem(OnlineUser user, {required bool isCurrentUser, required int index}) {
+  Widget _buildUserListItem(OnlineUser user,
+      {required bool isCurrentUser, required int index}) {
     return GestureDetector(
       onTap: () => _handleUserTap(user, isCurrentUser),
       child: Container(
-        padding: EdgeInsets.symmetric(vertical: 12),
+        padding: const EdgeInsets.symmetric(vertical: 12),
         child: Row(
           children: [
             // Index/Star column
-            Container(
+            SizedBox(
               width: 30,
               child: isCurrentUser
-                  ? Icon(Icons.star, color: Colors.amber, size: 20)
+                  ? const Icon(Icons.star, color: Colors.amber, size: 20)
                   : Text(
-                '$index',
-                style: TextStyle(color: Colors.grey, fontSize: 16),
-              ),
+                      '$index',
+                      style: const TextStyle(color: Colors.grey, fontSize: 16),
+                    ),
             ),
             // Avatar
             GestureDetector(
@@ -2454,10 +2983,11 @@ class LivePageState extends State<LivePage> with SingleTickerProviderStateMixin 
               child: CircleAvatar(
                 radius: 24,
                 backgroundImage: NetworkImage(user.avatarUrl),
-                onBackgroundImageError: (e, s) => AssetImage('assets/default_avatar.png'),
+                onBackgroundImageError: (e, s) =>
+                    const AssetImage('assets/default_avatar.png'),
               ),
             ),
-            SizedBox(width: 12),
+            const SizedBox(width: 12),
             // User info
             Expanded(
               child: Column(
@@ -2467,21 +2997,22 @@ class LivePageState extends State<LivePage> with SingleTickerProviderStateMixin 
                     children: [
                       Text(
                         user.name,
-                        style: TextStyle(
+                        style: const TextStyle(
                           color: Colors.white,
                           fontSize: 16,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
                       if (isCurrentUser) ...[
-                        SizedBox(width: 8),
+                        const SizedBox(width: 8),
                         Container(
-                          padding: EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 2),
                           decoration: BoxDecoration(
                             color: Colors.blue,
                             borderRadius: BorderRadius.circular(10),
                           ),
-                          child: Text(
+                          child: const Text(
                             'You',
                             style: TextStyle(
                               color: Colors.white,
@@ -2495,7 +3026,7 @@ class LivePageState extends State<LivePage> with SingleTickerProviderStateMixin 
                   if (user.motto.isNotEmpty)
                     Text(
                       user.motto,
-                      style: TextStyle(
+                      style: const TextStyle(
                         color: Colors.grey,
                         fontSize: 14,
                       ),
@@ -2507,7 +3038,8 @@ class LivePageState extends State<LivePage> with SingleTickerProviderStateMixin 
             if (!isCurrentUser)
               GestureDetector(
                 onTap: () => _handleUserTap(user, isCurrentUser),
-                child: Icon(Icons.chevron_right, color: Colors.white54, size: 20),
+                child: const Icon(Icons.chevron_right,
+                    color: Colors.white54, size: 20),
               ),
           ],
         ),
@@ -2539,7 +3071,7 @@ class LivePageState extends State<LivePage> with SingleTickerProviderStateMixin 
         print('Error showing profile: $e');
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Unable to load profile')),
+            const SnackBar(content: Text('Unable to load profile')),
           );
         }
       }
@@ -2552,15 +3084,15 @@ class LivePageState extends State<LivePage> with SingleTickerProviderStateMixin 
       backgroundColor: Colors.transparent,
       builder: (BuildContext context) {
         return Container(
-          padding: EdgeInsets.all(20),
+          padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(
             color: Colors.black.withOpacity(0.9),
-            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text(
+              const Text(
                 'Share via',
                 style: TextStyle(
                   color: Colors.white,
@@ -2568,21 +3100,23 @@ class LivePageState extends State<LivePage> with SingleTickerProviderStateMixin 
                   fontWeight: FontWeight.bold,
                 ),
               ),
-              SizedBox(height: 30),
+              const SizedBox(height: 30),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                 children: [
                   _buildShareButton(
-                    imageUrl: 'https://logodownload.org/wp-content/uploads/2015/04/whatsapp-logo-1.png',
+                    imageUrl:
+                        'https://logodownload.org/wp-content/uploads/2015/04/whatsapp-logo-1.png',
                     label: 'WhatsApp',
                     onTap: () => _shareToWhatsApp(),
-                    color: Color(0xFF25D366),
+                    color: const Color(0xFF25D366),
                   ),
                   _buildShareButton(
-                    imageUrl: 'https://brandpalettes.com/wp-content/uploads/2018/05/Facebook-Logo-JPG.jpg',
+                    imageUrl:
+                        'https://brandpalettes.com/wp-content/uploads/2018/05/Facebook-Logo-JPG.jpg',
                     label: 'Facebook',
                     onTap: () => _shareToFacebook(),
-                    color: Color(0xFF1877F2),
+                    color: const Color(0xFF1877F2),
                   ),
                   _buildShareButton(
                     icon: Icons.copy,
@@ -2593,7 +3127,7 @@ class LivePageState extends State<LivePage> with SingleTickerProviderStateMixin 
                   ),
                 ],
               ),
-              SizedBox(height: 30),
+              const SizedBox(height: 30),
             ],
           ),
         );
@@ -2625,7 +3159,7 @@ class LivePageState extends State<LivePage> with SingleTickerProviderStateMixin 
                   color: color.withOpacity(0.3),
                   spreadRadius: 2,
                   blurRadius: 10,
-                  offset: Offset(0, 2),
+                  offset: const Offset(0, 2),
                 ),
               ],
             ),
@@ -2633,34 +3167,35 @@ class LivePageState extends State<LivePage> with SingleTickerProviderStateMixin 
               child: isIconButton
                   ? Icon(icon, color: Colors.white, size: 30)
                   : ClipRRect(
-                borderRadius: BorderRadius.circular(30),
-                child: Image.network(
-                  imageUrl!,
-                  width: 45,
-                  height: 45,
-                  fit: BoxFit.contain,
-                  errorBuilder: (context, error, stackTrace) => Icon(
-                    Icons.error,
-                    color: Colors.white,
-                    size: 30,
-                  ),
-                  loadingBuilder: (context, child, loadingProgress) {
-                    if (loadingProgress == null) return child;
-                    return Center(
-                      child: CircularProgressIndicator(
-                        color: Colors.white,
-                        strokeWidth: 2,
+                      borderRadius: BorderRadius.circular(30),
+                      child: Image.network(
+                        imageUrl!,
+                        width: 45,
+                        height: 45,
+                        fit: BoxFit.contain,
+                        errorBuilder: (context, error, stackTrace) =>
+                            const Icon(
+                          Icons.error,
+                          color: Colors.white,
+                          size: 30,
+                        ),
+                        loadingBuilder: (context, child, loadingProgress) {
+                          if (loadingProgress == null) return child;
+                          return const Center(
+                            child: CircularProgressIndicator(
+                              color: Colors.white,
+                              strokeWidth: 2,
+                            ),
+                          );
+                        },
                       ),
-                    );
-                  },
-                ),
-              ),
+                    ),
             ),
           ),
-          SizedBox(height: 8),
+          const SizedBox(height: 8),
           Text(
             label,
-            style: TextStyle(
+            style: const TextStyle(
               color: Colors.white,
               fontSize: 12,
             ),
@@ -2669,6 +3204,7 @@ class LivePageState extends State<LivePage> with SingleTickerProviderStateMixin 
       ),
     );
   }
+
   // screen eka kalu wela logout wena kalla
   void _showFullBlackLogoutContainer() {
     showDialog(
@@ -2697,11 +3233,8 @@ class LivePageState extends State<LivePage> with SingleTickerProviderStateMixin 
                         height: 80,
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
-                          gradient: LinearGradient(
-                            colors: [
-                              Colors.lightBlue,
-                              Colors.lightBlue
-                            ],
+                          gradient: const LinearGradient(
+                            colors: [Colors.lightBlue, Colors.lightBlue],
                             begin: Alignment.topLeft,
                             end: Alignment.bottomRight,
                           ),
@@ -2710,11 +3243,11 @@ class LivePageState extends State<LivePage> with SingleTickerProviderStateMixin 
                               color: Colors.black.withOpacity(0.3),
                               spreadRadius: 2,
                               blurRadius: 10,
-                              offset: Offset(0, 5),
+                              offset: const Offset(0, 5),
                             )
                           ],
                         ),
-                        child: Center(
+                        child: const Center(
                           child: Icon(
                             Icons.power_settings_new,
                             color: Colors.white,
@@ -2723,8 +3256,8 @@ class LivePageState extends State<LivePage> with SingleTickerProviderStateMixin 
                         ),
                       ),
                     ),
-                    SizedBox(height: 10),
-                    Text(
+                    const SizedBox(height: 10),
+                    const Text(
                       'Leave',
                       style: TextStyle(
                         color: Colors.white,
@@ -2735,7 +3268,7 @@ class LivePageState extends State<LivePage> with SingleTickerProviderStateMixin 
                   ],
                 ),
 
-                SizedBox(height: 30), // Space between buttons
+                const SizedBox(height: 30), // Space between buttons
 
                 // Keep Button
                 Column(
@@ -2749,7 +3282,7 @@ class LivePageState extends State<LivePage> with SingleTickerProviderStateMixin 
                         height: 80,
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
-                          gradient: LinearGradient(
+                          gradient: const LinearGradient(
                             colors: [
                               Colors.lightBlue,
                               Colors.lightBlue,
@@ -2762,11 +3295,11 @@ class LivePageState extends State<LivePage> with SingleTickerProviderStateMixin 
                               color: Colors.black.withOpacity(0.3),
                               spreadRadius: 2,
                               blurRadius: 10,
-                              offset: Offset(0, 5),
+                              offset: const Offset(0, 5),
                             )
                           ],
                         ),
-                        child: Center(
+                        child: const Center(
                           child: Icon(
                             Icons.close,
                             color: Colors.white,
@@ -2775,8 +3308,8 @@ class LivePageState extends State<LivePage> with SingleTickerProviderStateMixin 
                         ),
                       ),
                     ),
-                    SizedBox(height: 10),
-                    Text(
+                    const SizedBox(height: 10),
+                    const Text(
                       'keep',
                       style: TextStyle(
                         color: Colors.white,
@@ -2825,13 +3358,12 @@ class LivePageState extends State<LivePage> with SingleTickerProviderStateMixin 
   //   );
   // }
 
-
-
   Future<void> _showBottomSheet(BuildContext context, String roomId) async {
     // Prevent multiple bottom sheets
     final now = DateTime.now();
     if (_lastBottomSheetTime != null &&
-        now.difference(_lastBottomSheetTime!) < const Duration(milliseconds: 50)) {
+        now.difference(_lastBottomSheetTime!) <
+            const Duration(milliseconds: 50)) {
       return;
     }
     _lastBottomSheetTime = now;
@@ -2841,7 +3373,8 @@ class LivePageState extends State<LivePage> with SingleTickerProviderStateMixin 
     try {
       // Fetch the current userId from SharedPreferences
       final prefs = await SharedPreferences.getInstance();
-      final currentUserId = prefs.getString('userId') ?? ''; // Default to an empty string if not found
+      final currentUserId = prefs.getString('userId') ??
+          ''; // Default to an empty string if not found
 
       bool isUserJoined = await _isUserJoined(roomId, currentUserId);
       print("----------------------joining____________________");
@@ -2854,7 +3387,8 @@ class LivePageState extends State<LivePage> with SingleTickerProviderStateMixin 
 
       // Fetch room data
       final roomResponse = await http.get(
-        Uri.parse('http://145.223.21.62:8090/api/collections/voiceRooms/records/$roomId'),
+        Uri.parse(
+            'http://145.223.21.62:8090/api/collections/voiceRooms/records/$roomId'),
       );
 
       if (roomResponse.statusCode != 200) return;
@@ -2891,7 +3425,7 @@ class LivePageState extends State<LivePage> with SingleTickerProviderStateMixin 
         builder: (context) {
           return Container(
             height: MediaQuery.of(context).size.height * 0.85,
-            decoration: BoxDecoration(
+            decoration: const BoxDecoration(
               color: Colors.white,
               borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
             ),
@@ -2901,10 +3435,10 @@ class LivePageState extends State<LivePage> with SingleTickerProviderStateMixin 
                 children: [
                   // Header with close and settings buttons
                   Container(
-                    padding: EdgeInsets.all(16),
+                    padding: const EdgeInsets.all(16),
                     child: Row(
                       children: [
-                        Center(
+                        const Center(
                           child: Text(
                             "Room Information",
                             style: TextStyle(
@@ -2913,10 +3447,10 @@ class LivePageState extends State<LivePage> with SingleTickerProviderStateMixin 
                             ),
                           ),
                         ),
-                        Spacer(),
+                        const Spacer(),
                         if (isRoomOwner)
                           IconButton(
-                            icon: Icon(Icons.close),
+                            icon: const Icon(Icons.close),
                             onPressed: () => Navigator.pop(context),
                           ),
                       ],
@@ -2924,7 +3458,7 @@ class LivePageState extends State<LivePage> with SingleTickerProviderStateMixin 
                   ),
 
                   // Tab Bar
-                  TabBar(
+                  const TabBar(
                     tabs: [Tab(text: 'Profile'), Tab(text: 'Member')],
                     labelColor: Colors.blue,
                     unselectedLabelColor: Colors.grey,
@@ -2947,34 +3481,41 @@ class LivePageState extends State<LivePage> with SingleTickerProviderStateMixin 
                                 height: 120,
                                 decoration: BoxDecoration(
                                   shape: BoxShape.circle,
-                                  border: Border.all(color: Colors.grey[200]!, width: 2),
+                                  border: Border.all(
+                                      color: Colors.grey[200]!, width: 2),
                                 ),
                                 child: ClipRRect(
                                   borderRadius: BorderRadius.circular(60),
                                   child: CachedNetworkImage(
                                     imageUrl:
-                                    'http://145.223.21.62:8090/api/files/voiceRooms/${roomData['id']}/${roomData['group_photo']}',
+                                        'http://145.223.21.62:8090/api/files/voiceRooms/${roomData['id']}/${roomData['group_photo']}',
                                     fit: BoxFit.cover,
-                                    placeholder: (context, url) => CircularProgressIndicator(),
-                                    errorWidget: (context, url, error) => Icon(Icons.error),
+                                    placeholder: (context, url) =>
+                                        const CircularProgressIndicator(),
+                                    errorWidget: (context, url, error) =>
+                                        const Icon(Icons.error),
                                   ),
                                 ),
                               ),
                               const SizedBox(height: 16),
                               // Room Name
                               Text(
-                                roomData['voice_room_name'] ?? 'Welcome Everyone',
-                                style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+                                roomData['voice_room_name'] ??
+                                    'Welcome Everyone',
+                                style: const TextStyle(
+                                    fontSize: 24, fontWeight: FontWeight.bold),
                                 textAlign: TextAlign.center,
                               ),
                               const SizedBox(height: 8),
                               // Room ID with copy icon
                               StatefulBuilder(
-                                builder: (BuildContext context, StateSetter setModalState) {
+                                builder: (BuildContext context,
+                                    StateSetter setModalState) {
                                   return Column(
                                     children: [
                                       Row(
-                                        mainAxisAlignment: MainAxisAlignment.center,
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.center,
                                         children: [
                                           Text(
                                             'Room ID: ',
@@ -2985,11 +3526,15 @@ class LivePageState extends State<LivePage> with SingleTickerProviderStateMixin 
                                           ),
                                           GestureDetector(
                                             onTap: () {
-                                              Clipboard.setData(ClipboardData(text: roomData['voiceRoom_id'].toString()));
+                                              Clipboard.setData(ClipboardData(
+                                                  text: roomData['voiceRoom_id']
+                                                      .toString()));
                                               setModalState(() {
                                                 _showCopySuccess = true;
                                               });
-                                              Future.delayed(Duration(seconds: 2), () {
+                                              Future.delayed(
+                                                  const Duration(seconds: 2),
+                                                  () {
                                                 if (mounted) {
                                                   setModalState(() {
                                                     _showCopySuccess = false;
@@ -3007,7 +3552,7 @@ class LivePageState extends State<LivePage> with SingleTickerProviderStateMixin 
                                                   ),
                                                 ),
                                                 const SizedBox(width: 4),
-                                                Icon(
+                                                const Icon(
                                                   Icons.copy,
                                                   size: 16,
                                                   color: Colors.blue,
@@ -3018,7 +3563,7 @@ class LivePageState extends State<LivePage> with SingleTickerProviderStateMixin 
                                         ],
                                       ),
                                       if (_showCopySuccess)
-                                        Padding(
+                                        const Padding(
                                           padding: EdgeInsets.only(top: 4),
                                           child: Text(
                                             'Copied to clipboard',
@@ -3035,34 +3580,47 @@ class LivePageState extends State<LivePage> with SingleTickerProviderStateMixin 
                               const SizedBox(height: 24),
                               // Room Details Container
                               Container(
-                                margin: EdgeInsets.symmetric(horizontal: 24),
+                                margin:
+                                    const EdgeInsets.symmetric(horizontal: 24),
                                 decoration: BoxDecoration(
                                   color: Colors.white,
                                   borderRadius: BorderRadius.circular(12),
                                 ),
                                 child: Column(
                                   children: [
-                                    _buildDetailRow('Country:', roomData['voiceRoom_country'] ?? ''),
+                                    _buildDetailRow('Country:',
+                                        roomData['voiceRoom_country'] ?? ''),
                                     _buildLevelRow(),
-                                    _buildDetailRow('Members:', '$joinedUsersCount/500'),
+                                    _buildDetailRow(
+                                        'Members:', '$joinedUsersCount/500'),
                                     _buildRoomModeTags(roomData),
                                     _buildLanguageRow(),
                                     // Add Join Button here
                                     Padding(
-                                      padding: EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 16, vertical: 24),
                                       child: ElevatedButton(
                                         style: ElevatedButton.styleFrom(
-                                          backgroundColor: isUserJoined ? Colors.grey[400] : Colors.lightBlue,
-                                          minimumSize: Size(double.infinity, 50),
+                                          backgroundColor: isUserJoined
+                                              ? Colors.grey[400]
+                                              : Colors.lightBlue,
+                                          minimumSize:
+                                              const Size(double.infinity, 50),
                                           shape: RoundedRectangleBorder(
-                                            borderRadius: BorderRadius.circular(25),
+                                            borderRadius:
+                                                BorderRadius.circular(25),
                                           ),
                                           elevation: isUserJoined ? 0 : 2,
                                         ),
-                                        onPressed: isUserJoined ? null : () => _joinRoom(roomId, currentUserId),
+                                        onPressed: isUserJoined
+                                            ? null
+                                            : () => _joinRoom(
+                                                roomId, currentUserId),
                                         child: Text(
-                                          isUserJoined ? 'Already Joined' : 'Join Room',
-                                          style: TextStyle(
+                                          isUserJoined
+                                              ? 'Already Joined'
+                                              : 'Join Room',
+                                          style: const TextStyle(
                                             color: Colors.white,
                                             fontSize: 16,
                                             fontWeight: FontWeight.bold,
@@ -3101,11 +3659,9 @@ class LivePageState extends State<LivePage> with SingleTickerProviderStateMixin 
     }
   }
 
-
-
   Widget _buildDetailRow(String label, String value) {
     return Padding(
-      padding: EdgeInsets.all(16),
+      padding: const EdgeInsets.all(16),
       child: Row(
         children: [
           Text(
@@ -3115,10 +3671,10 @@ class LivePageState extends State<LivePage> with SingleTickerProviderStateMixin 
               fontSize: 16,
             ),
           ),
-          Spacer(),
+          const Spacer(),
           Text(
             value,
-            style: TextStyle(
+            style: const TextStyle(
               fontWeight: FontWeight.w500,
               fontSize: 16,
             ),
@@ -3128,10 +3684,9 @@ class LivePageState extends State<LivePage> with SingleTickerProviderStateMixin 
     );
   }
 
-
   Widget _buildLanguageRow() {
     return Padding(
-      padding: EdgeInsets.all(16),
+      padding: const EdgeInsets.all(16),
       child: Row(
         children: [
           Text(
@@ -3141,10 +3696,11 @@ class LivePageState extends State<LivePage> with SingleTickerProviderStateMixin 
               fontSize: 16,
             ),
           ),
-          Spacer(),
+          const Spacer(),
           Text(
-            _language ?? 'Not specified', // Display the language or a default message
-            style: TextStyle(
+            _language ??
+                'Not specified', // Display the language or a default message
+            style: const TextStyle(
               fontWeight: FontWeight.w500,
               fontSize: 16,
             ),
@@ -3156,7 +3712,7 @@ class LivePageState extends State<LivePage> with SingleTickerProviderStateMixin 
 
   Widget _buildLevelRow() {
     return Padding(
-      padding: EdgeInsets.all(16),
+      padding: const EdgeInsets.all(16),
       child: Row(
         children: [
           Text(
@@ -3166,10 +3722,10 @@ class LivePageState extends State<LivePage> with SingleTickerProviderStateMixin 
               fontSize: 16,
             ),
           ),
-          Spacer(),
+          const Spacer(),
           Row(
             children: [
-              Text(
+              const Text(
                 'LV.4',
                 style: TextStyle(
                   color: Colors.blue,
@@ -3223,7 +3779,7 @@ class LivePageState extends State<LivePage> with SingleTickerProviderStateMixin 
         .join(', '); // Join all tags with comma and space
 
     return Padding(
-      padding: EdgeInsets.all(16),
+      padding: const EdgeInsets.all(16),
       child: Row(
         children: [
           Text(
@@ -3233,10 +3789,10 @@ class LivePageState extends State<LivePage> with SingleTickerProviderStateMixin 
               fontSize: 16,
             ),
           ),
-          Spacer(),
+          const Spacer(),
           Text(
             tags.isEmpty ? 'Not specified' : tags,
-            style: TextStyle(
+            style: const TextStyle(
               fontWeight: FontWeight.w500,
               fontSize: 16,
             ),
@@ -3246,20 +3802,18 @@ class LivePageState extends State<LivePage> with SingleTickerProviderStateMixin 
     );
   }
 
-
-
-
 // Helper method to build member list item
   Widget _buildMemberListItem(Map<String, dynamic> user) {
     return Container(
       height: 70,
-      margin: EdgeInsets.only(bottom: 8),
+      margin: const EdgeInsets.only(bottom: 8),
       child: ListTile(
-        contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
         leading: ClipRRect(
           borderRadius: BorderRadius.circular(25),
           child: CachedNetworkImage(
-            imageUrl: "http://145.223.21.62:8090/api/files/${user['collectionId']}/${user['id']}/${user['avatar']}",
+            imageUrl:
+                "http://145.223.21.62:8090/api/files/${user['collectionId']}/${user['id']}/${user['avatar']}",
             width: 50,
             height: 50,
             fit: BoxFit.cover,
@@ -3280,20 +3834,18 @@ class LivePageState extends State<LivePage> with SingleTickerProviderStateMixin 
         ),
         title: Text(
           user['firstname'] ?? "Unknown",
-          style: TextStyle(fontWeight: FontWeight.bold),
+          style: const TextStyle(fontWeight: FontWeight.bold),
         ),
         subtitle: Text(
           user['bio'] ?? "No bio available",
-          style: TextStyle(fontSize: 12),
+          style: const TextStyle(fontSize: 12),
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
         ),
-        trailing: Icon(Icons.arrow_forward_ios, size: 16),
+        trailing: const Icon(Icons.arrow_forward_ios, size: 16),
       ),
     );
   }
-
-
 
 // Header Section
   Widget _buildHeader() {
@@ -3317,7 +3869,6 @@ class LivePageState extends State<LivePage> with SingleTickerProviderStateMixin 
       ),
     );
   }
-
 
 // Updated helper method for room tags
   Widget _buildRoomTags(String tags) {
@@ -3348,9 +3899,7 @@ class LivePageState extends State<LivePage> with SingleTickerProviderStateMixin 
     );
   }
 
-
 // Helper Widgets
-
 
   Widget _buildLevelProgress() {
     return Row(
@@ -3399,11 +3948,9 @@ class LivePageState extends State<LivePage> with SingleTickerProviderStateMixin 
     );
   }
 
-
-
-
-  Future<List<Map<String, dynamic>>> _fetchRoomUserDetails(String roomId) async {
-    final String url =
+  Future<List<Map<String, dynamic>>> _fetchRoomUserDetails(
+      String roomId) async {
+    const String url =
         "http://145.223.21.62:8090/api/collections/users/records"; // Replace with the actual API endpoint
     try {
       final response = await http.get(Uri.parse(url), headers: {
@@ -3434,9 +3981,9 @@ class LivePageState extends State<LivePage> with SingleTickerProviderStateMixin 
       ..mediaPlayer.supportTransparent = true
       ..foreground = giftForeground()
       ..emptyAreaBuilder = mediaPlayer
-    // ..topMenuBar.buttons = [
-    //   ZegoLiveAudioRoomMenuBarButtonName.minimizingButton, // Keep only this button
-    // ]
+      // ..topMenuBar.buttons = [
+      //   ZegoLiveAudioRoomMenuBarButtonName.minimizingButton, // Keep only this button
+      // ]
       ..userAvatarUrl = _userAvatarUrl;
   }
 
@@ -3457,9 +4004,9 @@ class LivePageState extends State<LivePage> with SingleTickerProviderStateMixin 
           debugPrint('on seat opened');
         },
         onChanged: (
-            Map<int, ZegoUIKitUser> takenSeats,
-            List<int> untakenSeats,
-            ) {
+          Map<int, ZegoUIKitUser> takenSeats,
+          List<int> untakenSeats,
+        ) {
           debugPrint(
             'on seats changed, taken seats:$takenSeats, untaken seats:$untakenSeats',
           );
@@ -3527,6 +4074,7 @@ class LivePageState extends State<LivePage> with SingleTickerProviderStateMixin 
       "https://ids13.com/wp-content/uploads/2021/04/gem-saviour-conquest.jpg",
       "https://play-lh.googleusercontent.com/uMCSwJnIKCemiAIc7xNTGBkOxlSu_e6xzZb29cqqV6bKU8Qz0m4ZQ5pmGhBNxE-vBrA",
     ];
+
     /// how to replace background view
     return Stack(
       children: [
@@ -3534,9 +4082,10 @@ class LivePageState extends State<LivePage> with SingleTickerProviderStateMixin 
           decoration: BoxDecoration(
             image: DecorationImage(
               fit: BoxFit.fill,
-              image:_backgroundImageUrl != null
+              image: _backgroundImageUrl != null
                   ? NetworkImage(_backgroundImageUrl!)
-                  : AssetImage('assets/images1/back.jpg') as ImageProvider,
+                  : const AssetImage('assets/images1/back.jpg')
+                      as ImageProvider,
             ),
           ),
         ),
@@ -3563,7 +4112,7 @@ class LivePageState extends State<LivePage> with SingleTickerProviderStateMixin 
         Positioned(
           bottom: 165, // Adjusted position
           right: 16, // Adjusted position
-          child: Container(
+          child: SizedBox(
             width: 70, // Vertical rectangle width
             height: 190, // Vertical rectangle height
             child: ImageCarouselSlider(
@@ -3581,19 +4130,26 @@ class LivePageState extends State<LivePage> with SingleTickerProviderStateMixin 
             builder: (context, child) {
               return InkWell(
                 onTap: () {
-                  showGiftListSheet(context , widget.roomID);
+                  showGiftListSheet(context, widget.roomID);
                 },
                 child: Container(
                   width: 48,
                   height: 48,
                   decoration: BoxDecoration(
-                    shape: BoxShape.circle, // Makes the glow round around the image
+                    shape: BoxShape
+                        .circle, // Makes the glow round around the image
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.yellowAccent.withOpacity(0.7), // Glow color (you can change it)
-                        spreadRadius: 6 * _glowAnimation.value, // Animated spread size of the glow
-                        blurRadius: 15 * _glowAnimation.value, // Animated blur size of the glow
-                        offset: const Offset(0, 0), // Position of the glow (centered around the image)
+                        color: Colors.yellowAccent
+                            .withOpacity(0.7), // Glow color (you can change it)
+                        spreadRadius: 6 *
+                            _glowAnimation
+                                .value, // Animated spread size of the glow
+                        blurRadius: 15 *
+                            _glowAnimation
+                                .value, // Animated blur size of the glow
+                        offset: const Offset(0,
+                            0), // Position of the glow (centered around the image)
                       ),
                     ],
                   ),
@@ -3639,14 +4195,14 @@ class LivePageState extends State<LivePage> with SingleTickerProviderStateMixin 
   }
 
   Widget avatarBuilder(
-      BuildContext context,
-      Size size,
-      ZegoUIKitUser? user,
-      Map<String, dynamic> extraInfo,
-      ) {
+    BuildContext context,
+    Size size,
+    ZegoUIKitUser? user,
+    Map<String, dynamic> extraInfo,
+  ) {
     return ClipRRect(
       borderRadius: BorderRadius.circular(size.width / 2),
-      child: Container(
+      child: SizedBox(
         width: size.width,
         height: size.width,
         child: Stack(
@@ -3662,28 +4218,27 @@ class LivePageState extends State<LivePage> with SingleTickerProviderStateMixin 
               ),
               child: _userAvatarUrl != null
                   ? CachedNetworkImage(
-                imageUrl: _userAvatarUrl!,
-                width: size.width,
-                height: size.width,
-                fit: BoxFit.cover,
-                placeholder: (context, url) => CircularProgressIndicator(),
-                errorWidget: (context, url, error) => Icon(Icons.error),
-              )
+                      imageUrl: _userAvatarUrl!,
+                      width: size.width,
+                      height: size.width,
+                      fit: BoxFit.cover,
+                      placeholder: (context, url) =>
+                          const CircularProgressIndicator(),
+                      errorWidget: (context, url, error) =>
+                          const Icon(Icons.error),
+                    )
                   : Container(
-                color: Colors.grey[300],
-                child: Icon(Icons.group, color: Colors.grey[400]),
-              ),
+                      color: Colors.grey[300],
+                      child: Icon(Icons.group, color: Colors.grey[400]),
+                    ),
             ),
 
             // Emoji overlay
-
           ],
         ),
       ),
     );
   }
-
-
 
   int getHostSeatIndex() {
     if (widget.layoutMode == LayoutMode.hostCenter) {
@@ -3704,7 +4259,7 @@ class LivePageState extends State<LivePage> with SingleTickerProviderStateMixin 
   ZegoLiveAudioRoomLayoutConfig getLayoutConfig() {
     final config = ZegoLiveAudioRoomLayoutConfig();
     LayoutMode lm = widget.layoutMode;
-    lm= LayoutMode.hostTopCenter;
+    lm = LayoutMode.hostTopCenter;
     switch (lm) {
       case LayoutMode.defaultLayout:
         break;
@@ -3712,7 +4267,7 @@ class LivePageState extends State<LivePage> with SingleTickerProviderStateMixin 
         config.rowSpacing = 5;
         config.rowConfigs = List.generate(
           4,
-              (index) => ZegoLiveAudioRoomLayoutRowConfig(
+          (index) => ZegoLiveAudioRoomLayoutRowConfig(
             count: 4,
             alignment: ZegoLiveAudioRoomLayoutAlignment.spaceBetween,
           ),
@@ -3731,7 +4286,7 @@ class LivePageState extends State<LivePage> with SingleTickerProviderStateMixin 
         config.rowSpacing = 5;
         config.rowConfigs = List.generate(
           8,
-              (index) => ZegoLiveAudioRoomLayoutRowConfig(
+          (index) => ZegoLiveAudioRoomLayoutRowConfig(
             count: 1,
             alignment: ZegoLiveAudioRoomLayoutAlignment.spaceBetween,
           ),
@@ -3751,7 +4306,6 @@ class LivePageState extends State<LivePage> with SingleTickerProviderStateMixin 
             count: 4,
             alignment: ZegoLiveAudioRoomLayoutAlignment.spaceBetween,
           ),
-
         ];
         break;
       case LayoutMode.hostCenter:
@@ -3765,7 +4319,6 @@ class LivePageState extends State<LivePage> with SingleTickerProviderStateMixin 
             count: 4,
             alignment: ZegoLiveAudioRoomLayoutAlignment.spaceBetween,
           ),
-
         ];
         break;
       case LayoutMode.fourPeoples:
@@ -3798,46 +4351,52 @@ class LivePageState extends State<LivePage> with SingleTickerProviderStateMixin 
           fontSize: 12,
           fontWeight: FontWeight.w500,
         );
-        final listMenu = ZegoUIKitPrebuiltLiveAudioRoomController().seat.localHasHostPermissions
+        final listMenu = ZegoUIKitPrebuiltLiveAudioRoomController()
+                .seat
+                .localHasHostPermissions
             ? [
-          GestureDetector(
-            onTap: () async {
-              Navigator.of(context).pop();
+                GestureDetector(
+                  onTap: () async {
+                    Navigator.of(context).pop();
 
-              ZegoUIKit().removeUserFromRoom(
-                [user.id],
-              ).then((result) {
-                debugPrint('kick out result:$result');
-              });
-            },
-            child: Text(
-              'Kick Out ${user.name}',
-              style: textStyle,
-            ),
-          ),
-          GestureDetector(
-            onTap: () async {
-              Navigator.of(context).pop();
+                    ZegoUIKit().removeUserFromRoom(
+                      [user.id],
+                    ).then((result) {
+                      debugPrint('kick out result:$result');
+                    });
+                  },
+                  child: Text(
+                    'Kick Out ${user.name}',
+                    style: textStyle,
+                  ),
+                ),
+                GestureDetector(
+                  onTap: () async {
+                    Navigator.of(context).pop();
 
-              ZegoUIKitPrebuiltLiveAudioRoomController().seat.host.inviteToTake(user.id).then((result) {
-                debugPrint('invite audience to take seat result:$result');
-              });
-            },
-            child: Text(
-              'Invite ${user.name} to take seat',
-              style: textStyle,
-            ),
-          ),
-          GestureDetector(
-            onTap: () async {
-              Navigator.of(context).pop();
-            },
-            child: const Text(
-              'Cancel',
-              style: textStyle,
-            ),
-          ),
-        ]
+                    ZegoUIKitPrebuiltLiveAudioRoomController()
+                        .seat
+                        .host
+                        .inviteToTake(user.id)
+                        .then((result) {
+                      debugPrint('invite audience to take seat result:$result');
+                    });
+                  },
+                  child: Text(
+                    'Invite ${user.name} to take seat',
+                    style: textStyle,
+                  ),
+                ),
+                GestureDetector(
+                  onTap: () async {
+                    Navigator.of(context).pop();
+                  },
+                  child: const Text(
+                    'Cancel',
+                    style: textStyle,
+                  ),
+                ),
+              ]
             : [];
         return AnimatedPadding(
           padding: MediaQuery.of(context).viewInsets,
@@ -3990,9 +4549,9 @@ class LivePageState extends State<LivePage> with SingleTickerProviderStateMixin 
     );
   }
 
-
   void onGiftReceived() {
-    final receivedGift = ZegoGiftManager().service.recvNotifier.value ?? ZegoGiftProtocolItem.empty();
+    final receivedGift = ZegoGiftManager().service.recvNotifier.value ??
+        ZegoGiftProtocolItem.empty();
     final giftData = queryGiftInItemList(receivedGift.name);
     if (null == giftData) {
       debugPrint('not ${receivedGift.name} exist');
@@ -4000,8 +4559,8 @@ class LivePageState extends State<LivePage> with SingleTickerProviderStateMixin 
     }
 
     ZegoGiftManager().playList.add(PlayData(
-      giftItem: giftData,
-      count: receivedGift.count,
-    ));
+          giftItem: giftData,
+          count: receivedGift.count,
+        ));
   }
 }

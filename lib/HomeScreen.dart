@@ -56,7 +56,7 @@ class _HomeScreenState extends State<HomeScreen> {
         ChatScreen1(
           userId: widget.userId,
         ),
-        GroupsScreen(),
+        const GroupsScreen(),
         const GameScreen(),
         const AccountScreen1(),
       ];

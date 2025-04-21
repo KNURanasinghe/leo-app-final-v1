@@ -86,6 +86,7 @@ dependencies:
   flutter_contacts: ^1.1.9+2
   # record: ^5.0.4
   audio_waveforms: ^1.0.4
+  rive: ^0.13.20
 
 
 dev_dependencies:

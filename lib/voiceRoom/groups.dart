@@ -22,7 +22,7 @@ class VoiceRoom {
   final String groupPhoto;
   final String tags;
   final String backgroundImages;
-  final String language;  // Added language field
+  final String language; // Added language field
 
   VoiceRoom({
     required this.id,
@@ -34,7 +34,7 @@ class VoiceRoom {
     required this.groupPhoto,
     required this.tags,
     required this.backgroundImages,
-    required this.language,  // Added to constructor
+    required this.language, // Added to constructor
   });
 
   factory VoiceRoom.fromJson(Map<String, dynamic> json) {
@@ -48,37 +48,41 @@ class VoiceRoom {
       groupPhoto: json['group_photo'],
       tags: json['tags'],
       backgroundImages: json['background_images'],
-      language: json['language'] ?? '',  // Added with null safety
+      language: json['language'] ?? '', // Added with null safety
     );
   }
 }
 
 class GroupsScreen extends StatefulWidget {
+  const GroupsScreen({super.key});
+
   @override
   _GroupsScreenState createState() => _GroupsScreenState();
 }
 
-class _GroupsScreenState extends State<GroupsScreen> with SingleTickerProviderStateMixin, WidgetsBindingObserver {
-  bool _isInitialMineLoad = true;
+class _GroupsScreenState extends State<GroupsScreen>
+    with SingleTickerProviderStateMixin, WidgetsBindingObserver {
+  final bool _isInitialMineLoad = true;
   String? _selectedCountry;
-  bool _showCountryDialog = false;
-  TextEditingController _countrySearchController = TextEditingController();
+  final bool _showCountryDialog = false;
+  final TextEditingController _countrySearchController =
+      TextEditingController();
 
-  bool _isSearchingById = false;
-  TextEditingController _roomIdController = TextEditingController();
+  final bool _isSearchingById = false;
+  final TextEditingController _roomIdController = TextEditingController();
 
   late TabController _tabController;
   final List<String> _tabs = ["Discover", "Mine"];
   List<VoiceRoom> _allVoiceRooms = []; // For discover tab
   List<VoiceRoom> _myVoiceRooms = []; // For mine tab (created + joined)
-  List<VoiceRoom> _voiceRooms = [];
+  final List<VoiceRoom> _voiceRooms = [];
   String? _userId;
   String? _username;
   bool _isLoading = true;
-  TextEditingController _searchController = TextEditingController();
+  final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
 
-  List<Map<String, String>> _countries = [
+  final List<Map<String, String>> _countries = [
     {'name': 'Sri Lanka', 'flag': 'https://flagcdn.com/w320/lk.png'},
     {'name': 'USA', 'flag': 'https://flagcdn.com/w320/us.png'},
     {'name': 'UK', 'flag': 'https://flagcdn.com/w320/gb.png'},
@@ -90,7 +94,7 @@ class _GroupsScreenState extends State<GroupsScreen> with SingleTickerProviderSt
     {'name': 'Bangladesh', 'flag': 'https://flagcdn.com/w320/bd.png'},
   ];
 
-  Map<String, String> _tagPhotos = {};
+  final Map<String, String> _tagPhotos = {};
 
   Future<void> _fetchTagPhotos() async {
     try {
@@ -111,8 +115,6 @@ class _GroupsScreenState extends State<GroupsScreen> with SingleTickerProviderSt
       print('Error fetching tag photos: $e');
     }
   }
-
-
 
   @override
   void initState() {
@@ -139,6 +141,7 @@ class _GroupsScreenState extends State<GroupsScreen> with SingleTickerProviderSt
       _fetchMineVoiceRooms();
     }
   }
+
   void _onSearchChanged() {
     setState(() {
       _searchQuery = _searchController.text.toLowerCase();
@@ -146,9 +149,11 @@ class _GroupsScreenState extends State<GroupsScreen> with SingleTickerProviderSt
   }
 
   void _handleTabChange() {
-    if (_tabController.index == 1) {  // Mine tab
+    if (_tabController.index == 1) {
+      // Mine tab
       _fetchMineVoiceRooms();
-    } else {  // Discover tab
+    } else {
+      // Discover tab
       _fetchVoiceRooms();
     }
   }
@@ -159,7 +164,8 @@ class _GroupsScreenState extends State<GroupsScreen> with SingleTickerProviderSt
     // Filter by country if selected
     if (_selectedCountry != null) {
       rooms = rooms.where((room) {
-        return room.voiceRoomCountry.toLowerCase() == _selectedCountry!.toLowerCase();
+        return room.voiceRoomCountry.toLowerCase() ==
+            _selectedCountry!.toLowerCase();
       }).toList();
     }
 
@@ -207,14 +213,16 @@ class _GroupsScreenState extends State<GroupsScreen> with SingleTickerProviderSt
   Future<void> _fetchVoiceRooms() async {
     try {
       final response = await http.get(
-        Uri.parse('http://145.223.21.62:8090/api/collections/voiceRooms/records'),
+        Uri.parse(
+            'http://145.223.21.62:8090/api/collections/voiceRooms/records'),
       );
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         final items = data['items'] as List;
         setState(() {
-          _allVoiceRooms = items.map((item) => VoiceRoom.fromJson(item)).toList();
+          _allVoiceRooms =
+              items.map((item) => VoiceRoom.fromJson(item)).toList();
           _isLoading = false;
         });
       } else {
@@ -225,7 +233,6 @@ class _GroupsScreenState extends State<GroupsScreen> with SingleTickerProviderSt
       setState(() => _isLoading = false);
     }
   }
-
 
   Future<void> _fetchMineVoiceRooms() async {
     try {
@@ -244,20 +251,19 @@ class _GroupsScreenState extends State<GroupsScreen> with SingleTickerProviderSt
       // 1. First fetch self-created rooms
       final createdResponse = await http.get(
         Uri.parse(
-            'http://145.223.21.62:8090/api/collections/voiceRooms/records?filter=(ownerId="$userId")'
-        ),
+            'http://145.223.21.62:8090/api/collections/voiceRooms/records?filter=(ownerId="$userId")'),
       );
 
       // 2. Then fetch joined rooms list
       final joinedResponse = await http.get(
         Uri.parse(
-            'http://145.223.21.62:8090/api/collections/joined_users/records?filter=(userid="$userId")'
-        ),
+            'http://145.223.21.62:8090/api/collections/joined_users/records?filter=(userid="$userId")'),
       );
 
       print('Debug: Joined rooms API response: ${joinedResponse.body}');
 
-      if (createdResponse.statusCode == 200 && joinedResponse.statusCode == 200) {
+      if (createdResponse.statusCode == 200 &&
+          joinedResponse.statusCode == 200) {
         // Parse created rooms
         final createdRoomsData = json.decode(createdResponse.body);
         final createdRooms = (createdRoomsData['items'] as List)
@@ -280,8 +286,7 @@ class _GroupsScreenState extends State<GroupsScreen> with SingleTickerProviderSt
           // Fetch the actual room details
           final roomResponse = await http.get(
             Uri.parse(
-                'http://145.223.21.62:8090/api/collections/voiceRooms/records?filter=(id="$voiceRoomId")'
-            ),
+                'http://145.223.21.62:8090/api/collections/voiceRooms/records?filter=(id="$voiceRoomId")'),
           );
 
           if (roomResponse.statusCode == 200) {
@@ -289,7 +294,8 @@ class _GroupsScreenState extends State<GroupsScreen> with SingleTickerProviderSt
             if (roomData['items'] != null && roomData['items'].isNotEmpty) {
               final room = VoiceRoom.fromJson(roomData['items'][0]);
               joinedRooms.add(room);
-              print('Debug: Successfully added joined room: ${room.voiceRoomName}');
+              print(
+                  'Debug: Successfully added joined room: ${room.voiceRoomName}');
             }
           }
         }
@@ -320,14 +326,15 @@ class _GroupsScreenState extends State<GroupsScreen> with SingleTickerProviderSt
         return false;
       }
 
-      print('Debug: Checking removal status for userId: $userId and voiceRoomId: $voiceRoomId');
+      print(
+          'Debug: Checking removal status for userId: $userId and voiceRoomId: $voiceRoomId');
 
       // Using PocketBase's list filter syntax
-      final encodedFilter = Uri.encodeComponent('user_id="$userId" && voice_room_id="$voiceRoomId"');
+      final encodedFilter = Uri.encodeComponent(
+          'user_id="$userId" && voice_room_id="$voiceRoomId"');
       final response = await http.get(
         Uri.parse(
-            'http://145.223.21.62:8090/api/collections/removed_users/records?filter=($encodedFilter)'
-        ),
+            'http://145.223.21.62:8090/api/collections/removed_users/records?filter=($encodedFilter)'),
       );
 
       print('Debug: API Response Status Code: ${response.statusCode}');
@@ -346,7 +353,6 @@ class _GroupsScreenState extends State<GroupsScreen> with SingleTickerProviderSt
 
       print('Debug: API call failed with status code: ${response.statusCode}');
       return false;
-
     } catch (e) {
       print('Debug: Error checking if user is removed: $e');
       return false;
@@ -363,7 +369,8 @@ class _GroupsScreenState extends State<GroupsScreen> with SingleTickerProviderSt
       }
 
       final response = await http.get(
-        Uri.parse('http://145.223.21.62:8090/api/collections/voiceRooms/records?filter=(ownerId="$userId")'),
+        Uri.parse(
+            'http://145.223.21.62:8090/api/collections/voiceRooms/records?filter=(ownerId="$userId")'),
         headers: {'Content-Type': 'application/json'},
       );
 
@@ -396,8 +403,6 @@ class _GroupsScreenState extends State<GroupsScreen> with SingleTickerProviderSt
     }
   }
 
-
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -422,7 +427,9 @@ class _GroupsScreenState extends State<GroupsScreen> with SingleTickerProviderSt
                       delegate: _SliverAppBarDelegate(
                         TabBar(
                           controller: _tabController,
-                          tabs: _tabs.map((String name) => Tab(text: name)).toList(),
+                          tabs: _tabs
+                              .map((String name) => Tab(text: name))
+                              .toList(),
                           labelColor: Colors.blue[700],
                           unselectedLabelColor: Colors.grey,
                           indicatorColor: Colors.blue[700],
@@ -448,12 +455,12 @@ class _GroupsScreenState extends State<GroupsScreen> with SingleTickerProviderSt
 
   Widget _buildSearchBar() {
     return Container(
-      padding: EdgeInsets.all(16),
+      padding: const EdgeInsets.all(16),
       color: Colors.lightBlue[50],
       child: Row(
         children: [
           Expanded(
-            child: Container(
+            child: SizedBox(
               width: MediaQuery.of(context).size.width * 0.7,
               child: TextField(
                 controller: _searchController,
@@ -461,42 +468,45 @@ class _GroupsScreenState extends State<GroupsScreen> with SingleTickerProviderSt
                 textInputAction: TextInputAction.search,
                 decoration: InputDecoration(
                   hintText: 'Search by room name or ID...',
-                  prefixIcon: Icon(Icons.search, color: Colors.blue),
+                  prefixIcon: const Icon(Icons.search, color: Colors.blue),
                   filled: true,
                   fillColor: Colors.white,
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(30),
                     borderSide: BorderSide.none,
                   ),
-                  contentPadding: EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                  contentPadding:
+                      const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
                 ),
               ),
             ),
           ),
-          SizedBox(width: 12),
+          const SizedBox(width: 12),
           GestureDetector(
             onTap: _navigateToCreateRoom,
             child: Container(
-              padding: EdgeInsets.all(8),
+              padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
                 color: Colors.blue,
                 borderRadius: BorderRadius.circular(30),
               ),
-              child: Icon(Icons.add, color: Colors.white, size: 24),
+              child: const Icon(Icons.add, color: Colors.white, size: 24),
             ),
           ),
         ],
       ),
     );
   }
+
   Widget _buildAdvertBanner() {
     return Container(
       height: 100,
-      margin: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(12),
-        image: DecorationImage(
-          image: NetworkImage('https://www.perfectly-nintendo.com/wp-content/uploads/2024/07/Battle-Crush.jpg'),
+        image: const DecorationImage(
+          image: NetworkImage(
+              'https://www.perfectly-nintendo.com/wp-content/uploads/2024/07/Battle-Crush.jpg'),
           fit: BoxFit.cover,
         ),
       ),
@@ -514,7 +524,7 @@ class _GroupsScreenState extends State<GroupsScreen> with SingleTickerProviderSt
           elevation: 0,
           backgroundColor: Colors.transparent,
           child: Container(
-            padding: EdgeInsets.all(20),
+            padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 colors: [
@@ -530,7 +540,7 @@ class _GroupsScreenState extends State<GroupsScreen> with SingleTickerProviderSt
                   color: Colors.blue.withOpacity(0.2),
                   spreadRadius: 4,
                   blurRadius: 10,
-                  offset: Offset(0, 3),
+                  offset: const Offset(0, 3),
                 ),
               ],
             ),
@@ -539,7 +549,7 @@ class _GroupsScreenState extends State<GroupsScreen> with SingleTickerProviderSt
               children: [
                 // Error Icon
                 Container(
-                  padding: EdgeInsets.all(16),
+                  padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
                     color: Colors.red[50],
                     shape: BoxShape.circle,
@@ -550,7 +560,7 @@ class _GroupsScreenState extends State<GroupsScreen> with SingleTickerProviderSt
                     size: 40,
                   ),
                 ),
-                SizedBox(height: 20),
+                const SizedBox(height: 20),
 
                 // Title
                 Text(
@@ -561,7 +571,7 @@ class _GroupsScreenState extends State<GroupsScreen> with SingleTickerProviderSt
                     color: Colors.blue[900],
                   ),
                 ),
-                SizedBox(height: 12),
+                const SizedBox(height: 12),
 
                 // Message
                 Text(
@@ -573,7 +583,7 @@ class _GroupsScreenState extends State<GroupsScreen> with SingleTickerProviderSt
                     height: 1.4,
                   ),
                 ),
-                SizedBox(height: 24),
+                const SizedBox(height: 24),
 
                 // Button
                 Container(
@@ -590,21 +600,21 @@ class _GroupsScreenState extends State<GroupsScreen> with SingleTickerProviderSt
                         color: Colors.blue.withOpacity(0.3),
                         spreadRadius: 1,
                         blurRadius: 8,
-                        offset: Offset(0, 4),
+                        offset: const Offset(0, 4),
                       ),
                     ],
                   ),
                   child: ElevatedButton(
                     onPressed: () => Navigator.of(context).pop(),
                     style: ElevatedButton.styleFrom(
-                      padding: EdgeInsets.symmetric(vertical: 16),
+                      padding: const EdgeInsets.symmetric(vertical: 16),
                       backgroundColor: Colors.transparent,
                       shadowColor: Colors.transparent,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(15),
                       ),
                     ),
-                    child: Text(
+                    child: const Text(
                       'Got it',
                       style: TextStyle(
                         fontSize: 16,
@@ -624,7 +634,7 @@ class _GroupsScreenState extends State<GroupsScreen> with SingleTickerProviderSt
 
   Widget _buildVoiceRoomsList(bool isDiscoverTab) {
     if (_isLoading) {
-      return Center(child: CircularProgressIndicator(color: Colors.blue));
+      return const Center(child: CircularProgressIndicator(color: Colors.blue));
     }
 
     List<VoiceRoom> roomsToShow;
@@ -636,7 +646,8 @@ class _GroupsScreenState extends State<GroupsScreen> with SingleTickerProviderSt
       // Apply country filter if selected
       if (_selectedCountry != null) {
         roomsToShow = roomsToShow.where((room) {
-          return room.voiceRoomCountry.toLowerCase() == _selectedCountry!.toLowerCase();
+          return room.voiceRoomCountry.toLowerCase() ==
+              _selectedCountry!.toLowerCase();
         }).toList();
       }
     } else {
@@ -647,7 +658,9 @@ class _GroupsScreenState extends State<GroupsScreen> with SingleTickerProviderSt
     // Apply search filter
     if (_searchQuery.isNotEmpty) {
       roomsToShow = roomsToShow.where((room) {
-        return room.voiceRoomName.toLowerCase().contains(_searchQuery.toLowerCase()) ||
+        return room.voiceRoomName
+                .toLowerCase()
+                .contains(_searchQuery.toLowerCase()) ||
             room.voiceRoomId.toString().contains(_searchQuery);
       }).toList();
     }
@@ -662,7 +675,7 @@ class _GroupsScreenState extends State<GroupsScreen> with SingleTickerProviderSt
     }
 
     return ListView.builder(
-      padding: EdgeInsets.all(16),
+      padding: const EdgeInsets.all(16),
       itemCount: roomsToShow.length,
       itemBuilder: (context, index) {
         final room = roomsToShow[index];
@@ -676,7 +689,7 @@ class _GroupsScreenState extends State<GroupsScreen> with SingleTickerProviderSt
       if (_isSearchingById) {
         return 'No rooms found with this ID';
       } else if (_selectedCountry != null) {
-        return 'No rooms found in ${_selectedCountry}';
+        return 'No rooms found in $_selectedCountry';
       }
       return 'No voice rooms found';
     }
@@ -685,7 +698,8 @@ class _GroupsScreenState extends State<GroupsScreen> with SingleTickerProviderSt
 
   Widget _buildStatsSquares() {
     return Container(
-      padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8), // Reduced vertical padding
+      padding: const EdgeInsets.symmetric(
+          horizontal: 16, vertical: 8), // Reduced vertical padding
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
@@ -693,9 +707,9 @@ class _GroupsScreenState extends State<GroupsScreen> with SingleTickerProviderSt
           Expanded(
             child: Container(
               height: 80, // Reduced from 100
-              margin: EdgeInsets.only(right: 8),
+              margin: const EdgeInsets.only(right: 8),
               decoration: BoxDecoration(
-                gradient: LinearGradient(
+                gradient: const LinearGradient(
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                   colors: [
@@ -707,16 +721,17 @@ class _GroupsScreenState extends State<GroupsScreen> with SingleTickerProviderSt
                 borderRadius: BorderRadius.circular(12),
                 boxShadow: [
                   BoxShadow(
-                    color: Color(0xFF40E0D0).withOpacity(0.3),
+                    color: const Color(0xFF40E0D0).withOpacity(0.3),
                     blurRadius: 8,
-                    offset: Offset(0, 4),
+                    offset: const Offset(0, 4),
                   ),
                 ],
               ),
-              child: Column(
+              child: const Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(Icons.family_restroom, color: Colors.white, size: 28), // Reduced icon size
+                  Icon(Icons.family_restroom,
+                      color: Colors.white, size: 28), // Reduced icon size
                   SizedBox(height: 4), // Reduced spacing
                   Text(
                     'Family',
@@ -733,20 +748,21 @@ class _GroupsScreenState extends State<GroupsScreen> with SingleTickerProviderSt
 
           // Rank Square
           Expanded(
-            child: GestureDetector(  // Added GestureDetector for tap handling
+            child: GestureDetector(
+              // Added GestureDetector for tap handling
               onTap: () {
                 Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (context) => GlobalRanking(),
+                    builder: (context) => const GlobalRanking(),
                   ),
                 );
               },
               child: Container(
                 height: 80,
-                margin: EdgeInsets.symmetric(horizontal: 4),
+                margin: const EdgeInsets.symmetric(horizontal: 4),
                 decoration: BoxDecoration(
-                  gradient: LinearGradient(
+                  gradient: const LinearGradient(
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                     colors: [
@@ -758,16 +774,17 @@ class _GroupsScreenState extends State<GroupsScreen> with SingleTickerProviderSt
                   borderRadius: BorderRadius.circular(12),
                   boxShadow: [
                     BoxShadow(
-                      color: Color(0xFFFFB347).withOpacity(0.3),
+                      color: const Color(0xFFFFB347).withOpacity(0.3),
                       blurRadius: 8,
-                      offset: Offset(0, 4),
+                      offset: const Offset(0, 4),
                     ),
                   ],
                 ),
-                child: Column(
+                child: const Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(Icons.workspace_premium, color: Colors.white, size: 28),
+                    Icon(Icons.workspace_premium,
+                        color: Colors.white, size: 28),
                     SizedBox(height: 4),
                     Text(
                       'Rank',
@@ -787,9 +804,9 @@ class _GroupsScreenState extends State<GroupsScreen> with SingleTickerProviderSt
           Expanded(
             child: Container(
               height: 80, // Reduced from 100
-              margin: EdgeInsets.only(left: 8),
+              margin: const EdgeInsets.only(left: 8),
               decoration: BoxDecoration(
-                gradient: LinearGradient(
+                gradient: const LinearGradient(
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                   colors: [
@@ -801,16 +818,17 @@ class _GroupsScreenState extends State<GroupsScreen> with SingleTickerProviderSt
                 borderRadius: BorderRadius.circular(12),
                 boxShadow: [
                   BoxShadow(
-                    color: Color(0xFFFF6B95).withOpacity(0.3),
+                    color: const Color(0xFFFF6B95).withOpacity(0.3),
                     blurRadius: 8,
-                    offset: Offset(0, 4),
+                    offset: const Offset(0, 4),
                   ),
                 ],
               ),
-              child: Column(
+              child: const Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(Icons.favorite, color: Colors.white, size: 28), // Reduced icon size
+                  Icon(Icons.favorite,
+                      color: Colors.white, size: 28), // Reduced icon size
                   SizedBox(height: 4), // Reduced spacing
                   Text(
                     'Couple',
@@ -840,11 +858,11 @@ class _GroupsScreenState extends State<GroupsScreen> with SingleTickerProviderSt
       child: Column(
         children: [
           Container(
-            width: 40,  // Fixed small square size
+            width: 40, // Fixed small square size
             height: 40, // Fixed small square size
             decoration: BoxDecoration(
               border: Border.all(
-                color: isSelected ? Colors.blue : Colors.white!,
+                color: isSelected ? Colors.blue : Colors.white,
                 width: isSelected ? 2 : 1,
               ),
               borderRadius: BorderRadius.circular(8),
@@ -854,13 +872,15 @@ class _GroupsScreenState extends State<GroupsScreen> with SingleTickerProviderSt
               borderRadius: BorderRadius.circular(6),
               child: Image.network(
                 country['flag']!,
-                fit: BoxFit.contain, // This will show the full flag within container
+                fit: BoxFit
+                    .contain, // This will show the full flag within container
               ),
             ),
           ),
-          SizedBox(height: 4),
+          const SizedBox(height: 4),
           Text(
-            country['name']!.split(' ')[0], // Show only first word of country name
+            country['name']!
+                .split(' ')[0], // Show only first word of country name
             style: TextStyle(
               fontSize: 10,
               color: isSelected ? Colors.blue : Colors.grey[600],
@@ -883,7 +903,7 @@ class _GroupsScreenState extends State<GroupsScreen> with SingleTickerProviderSt
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
+              const Text(
                 'Popular Countries',
                 style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
               ),
@@ -894,7 +914,7 @@ class _GroupsScreenState extends State<GroupsScreen> with SingleTickerProviderSt
                       _selectedCountry = null;
                     });
                   },
-                  child: Text(
+                  child: const Text(
                     'Clear Filter',
                     style: TextStyle(
                       color: Colors.blue,
@@ -908,20 +928,26 @@ class _GroupsScreenState extends State<GroupsScreen> with SingleTickerProviderSt
         ),
         // First Row of Countries
         Padding(
-          padding: EdgeInsets.symmetric(horizontal: 16),
+          padding: const EdgeInsets.symmetric(horizontal: 16),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: _countries.take(5).map((country) => _buildSmallSquareFlag(country)).toList(),
+            children: _countries
+                .take(5)
+                .map((country) => _buildSmallSquareFlag(country))
+                .toList(),
           ),
         ),
-        SizedBox(height: 12),
+        const SizedBox(height: 12),
         // Second Row of Countries
         Padding(
-          padding: EdgeInsets.symmetric(horizontal: 16),
+          padding: const EdgeInsets.symmetric(horizontal: 16),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              ..._countries.skip(5).take(4).map((country) => _buildSmallSquareFlag(country)).toList(),
+              ..._countries
+                  .skip(5)
+                  .take(4)
+                  .map((country) => _buildSmallSquareFlag(country)),
               // More button
               GestureDetector(
                 onTap: _showCountryPicker,
@@ -934,9 +960,10 @@ class _GroupsScreenState extends State<GroupsScreen> with SingleTickerProviderSt
                         color: Colors.grey[200],
                         borderRadius: BorderRadius.circular(8),
                       ),
-                      child: Icon(Icons.more_horiz, color: Colors.grey[600], size: 20),
+                      child: Icon(Icons.more_horiz,
+                          color: Colors.grey[600], size: 20),
                     ),
-                    SizedBox(height: 4),
+                    const SizedBox(height: 4),
                     Text(
                       'More',
                       style: TextStyle(
@@ -954,8 +981,6 @@ class _GroupsScreenState extends State<GroupsScreen> with SingleTickerProviderSt
     );
   }
 
-
-
   Widget _buildCountryItem(Map<String, String> country) {
     final isSelected = _selectedCountry == country['name'];
     return GestureDetector(
@@ -964,19 +989,21 @@ class _GroupsScreenState extends State<GroupsScreen> with SingleTickerProviderSt
           _selectedCountry = isSelected ? null : country['name'];
         });
       },
-      child: Container(
+      child: SizedBox(
         width: 45, // Reduced width
         child: Column(
           children: [
             Container(
-              padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
               decoration: BoxDecoration(
                 border: Border.all(
                   color: isSelected ? Colors.blue : Colors.grey.shade300,
                   width: 1,
                 ),
                 borderRadius: BorderRadius.circular(25), // More oval shape
-                color: isSelected ? Colors.blue.withOpacity(0.1) : Colors.transparent,
+                color: isSelected
+                    ? Colors.blue.withOpacity(0.1)
+                    : Colors.transparent,
               ),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
@@ -993,7 +1020,7 @@ class _GroupsScreenState extends State<GroupsScreen> with SingleTickerProviderSt
                 ],
               ),
             ),
-            SizedBox(height: 4),
+            const SizedBox(height: 4),
             Text(
               country['name']!,
               style: TextStyle(
@@ -1017,13 +1044,14 @@ class _GroupsScreenState extends State<GroupsScreen> with SingleTickerProviderSt
       builder: (context) => StatefulBuilder(
         builder: (context, setState) {
           final filteredCountries = _countries.where((country) {
-            return country['name']!.toLowerCase()
+            return country['name']!
+                .toLowerCase()
                 .contains(_countrySearchController.text.toLowerCase());
           }).toList();
 
           return AlertDialog(
-            title: Text('Select Country'),
-            content: Container(
+            title: const Text('Select Country'),
+            content: SizedBox(
               width: double.maxFinite,
               child: Column(
                 mainAxisSize: MainAxisSize.min,
@@ -1032,15 +1060,15 @@ class _GroupsScreenState extends State<GroupsScreen> with SingleTickerProviderSt
                     controller: _countrySearchController,
                     decoration: InputDecoration(
                       hintText: 'Search country...',
-                      prefixIcon: Icon(Icons.search),
+                      prefixIcon: const Icon(Icons.search),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(10),
                       ),
                     ),
                     onChanged: (_) => setState(() {}),
                   ),
-                  SizedBox(height: 16),
-                  Container(
+                  const SizedBox(height: 16),
+                  SizedBox(
                     height: 300,
                     child: ListView.builder(
                       shrinkWrap: true,
@@ -1070,7 +1098,7 @@ class _GroupsScreenState extends State<GroupsScreen> with SingleTickerProviderSt
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(context),
-                child: Text('Cancel'),
+                child: const Text('Cancel'),
               ),
             ],
           );
@@ -1083,7 +1111,7 @@ class _GroupsScreenState extends State<GroupsScreen> with SingleTickerProviderSt
     showCountryPicker(
       context: context,
       showPhoneCode: false,
-      countryListTheme: CountryListThemeData(
+      countryListTheme: const CountryListThemeData(
         flagSize: 25,
         backgroundColor: Colors.white,
         textStyle: TextStyle(fontSize: 16, color: Colors.black),
@@ -1095,7 +1123,7 @@ class _GroupsScreenState extends State<GroupsScreen> with SingleTickerProviderSt
         inputDecoration: InputDecoration(
           labelText: 'Search',
           hintText: 'Start typing to search',
-          prefixIcon: const Icon(Icons.search),
+          prefixIcon: Icon(Icons.search),
           border: OutlineInputBorder(
             borderSide: BorderSide(color: Colors.blue),
           ),
@@ -1108,8 +1136,6 @@ class _GroupsScreenState extends State<GroupsScreen> with SingleTickerProviderSt
       },
     );
   }
-
-
 
   Widget _buildRoomCard(VoiceRoom room) {
     return Padding(
@@ -1130,7 +1156,7 @@ class _GroupsScreenState extends State<GroupsScreen> with SingleTickerProviderSt
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),
           ),
-          child: Container(
+          child: SizedBox(
             height: 110,
             child: Row(
               children: [
@@ -1140,12 +1166,12 @@ class _GroupsScreenState extends State<GroupsScreen> with SingleTickerProviderSt
                     topLeft: Radius.circular(12),
                     bottomLeft: Radius.circular(12),
                   ),
-                  child: Container(
+                  child: SizedBox(
                     width: 100,
                     height: double.infinity,
                     child: CachedNetworkImage(
                       imageUrl:
-                      'http://145.223.21.62:8090/api/files/voiceRooms/${room.id}/${room.groupPhoto}',
+                          'http://145.223.21.62:8090/api/files/voiceRooms/${room.id}/${room.groupPhoto}',
                       fit: BoxFit.cover,
                       placeholder: (context, url) => Container(
                         color: Colors.grey[100],
@@ -1259,7 +1285,7 @@ class _GroupsScreenState extends State<GroupsScreen> with SingleTickerProviderSt
                                 vertical: 2,
                               ),
                               decoration: BoxDecoration(
-                                gradient: LinearGradient(
+                                gradient: const LinearGradient(
                                   begin: Alignment.topLeft,
                                   end: Alignment.bottomRight,
                                   colors: [
@@ -1271,7 +1297,7 @@ class _GroupsScreenState extends State<GroupsScreen> with SingleTickerProviderSt
                               ),
                               child: Text(
                                 room.language,
-                                style: TextStyle(
+                                style: const TextStyle(
                                   fontSize: 11,
                                   color: Colors.white,
                                   fontWeight: FontWeight.w600,
@@ -1283,15 +1309,15 @@ class _GroupsScreenState extends State<GroupsScreen> with SingleTickerProviderSt
 
                             // Tags
                             Expanded(
-                              child: Container(
+                              child: SizedBox(
                                 height: 20,
                                 child: ListView(
                                   scrollDirection: Axis.horizontal,
                                   children: room.tags.split(',').map((tag) {
                                     final trimmedTag = tag.trim();
                                     return Container(
-                                      margin:
-                                      const EdgeInsets.symmetric(horizontal: 4),
+                                      margin: const EdgeInsets.symmetric(
+                                          horizontal: 4),
                                       padding: const EdgeInsets.symmetric(
                                         horizontal: 6,
                                       ),
@@ -1341,7 +1367,7 @@ class _GroupsScreenState extends State<GroupsScreen> with SingleTickerProviderSt
           elevation: 0,
           backgroundColor: Colors.transparent,
           child: Container(
-            padding: EdgeInsets.all(20),
+            padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
               color: Colors.white,
               borderRadius: BorderRadius.circular(20),
@@ -1350,27 +1376,27 @@ class _GroupsScreenState extends State<GroupsScreen> with SingleTickerProviderSt
                   color: Colors.grey.withOpacity(0.2),
                   spreadRadius: 4,
                   blurRadius: 10,
-                  offset: Offset(0, 3),
+                  offset: const Offset(0, 3),
                 ),
               ],
             ),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(
+                const Icon(
                   Icons.block,
                   color: Colors.red,
                   size: 48,
                 ),
-                SizedBox(height: 16),
-                Text(
+                const SizedBox(height: 16),
+                const Text(
                   'Access Denied',
                   style: TextStyle(
                     fontSize: 20,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
-                SizedBox(height: 12),
+                const SizedBox(height: 12),
                 Text(
                   'You have been removed from this voice room and cannot rejoin.',
                   textAlign: TextAlign.center,
@@ -1379,7 +1405,7 @@ class _GroupsScreenState extends State<GroupsScreen> with SingleTickerProviderSt
                     color: Colors.grey[700],
                   ),
                 ),
-                SizedBox(height: 20),
+                const SizedBox(height: 20),
                 ElevatedButton(
                   onPressed: () => Navigator.of(context).pop(),
                   style: ElevatedButton.styleFrom(
@@ -1387,11 +1413,12 @@ class _GroupsScreenState extends State<GroupsScreen> with SingleTickerProviderSt
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(10),
                     ),
-                    padding: EdgeInsets.symmetric(horizontal: 30, vertical: 12),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 30, vertical: 12),
                   ),
-                  child: Text(
+                  child: const Text(
                     'OK',
-                    style: TextStyle(fontSize: 16,color: Colors.white),
+                    style: TextStyle(fontSize: 16, color: Colors.white),
                   ),
                 ),
               ],
@@ -1401,9 +1428,6 @@ class _GroupsScreenState extends State<GroupsScreen> with SingleTickerProviderSt
       },
     );
   }
-
-
-
 
   //
   // Widget _buildDiscoverHeader() {
@@ -1437,22 +1461,23 @@ class _GroupsScreenState extends State<GroupsScreen> with SingleTickerProviderSt
   //   );
   // }
 
-
   Widget _buildTags(String tags) {
     final tagsList = tags.split(',');
     return Row(
-      children: tagsList.map((tag) => Container(
-        margin: EdgeInsets.only(left: 4),
-        padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-        decoration: BoxDecoration(
-          color: Colors.lightBlue[100],
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Text(
-          tag.trim(),
-          style: TextStyle(fontSize: 12, color: Colors.blue[700]),
-        ),
-      )).toList(),
+      children: tagsList
+          .map((tag) => Container(
+                margin: const EdgeInsets.only(left: 4),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Colors.lightBlue[100],
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  tag.trim(),
+                  style: TextStyle(fontSize: 12, color: Colors.blue[700]),
+                ),
+              ))
+          .toList(),
     );
   }
 
@@ -1476,6 +1501,7 @@ class _GroupsScreenState extends State<GroupsScreen> with SingleTickerProviderSt
       ),
     );
   }
+
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
@@ -1485,7 +1511,6 @@ class _GroupsScreenState extends State<GroupsScreen> with SingleTickerProviderSt
     super.dispose();
   }
 }
-
 
 class _SliverAppBarDelegate extends SliverPersistentHeaderDelegate {
   final TabBar _tabBar;
@@ -1498,7 +1523,8 @@ class _SliverAppBarDelegate extends SliverPersistentHeaderDelegate {
   double get maxExtent => _tabBar.preferredSize.height;
 
   @override
-  Widget build(BuildContext context, double shrinkOffset, bool overlapsContent) {
+  Widget build(
+      BuildContext context, double shrinkOffset, bool overlapsContent) {
     return Container(
       color: Colors.white,
       child: _tabBar,
