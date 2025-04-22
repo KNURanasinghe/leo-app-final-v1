@@ -214,9 +214,10 @@ class HttpService {
   // Add this to your HttpService class
   static Future<Map<String, String>> fetchUsersRiveFiles(String roomId) async {
     try {
+      final roomFilter = Uri.encodeComponent('voice_room_id="$roomId"');
       final response = await http.get(
         Uri.parse(
-            '$baseUrl/api/collections/joined_users/records?filter=(voice_room_id="$roomId")'),
+            '$baseUrl/api/collections/joined_users/records?filter=$roomFilter'),
         headers: {'Content-Type': 'application/json'},
       );
 
@@ -231,30 +232,44 @@ class HttpService {
 
       for (var user in joinedUsers) {
         final userId = user['userid'];
-
-        // Fetch user's items to find their active rive file
-        final itemsResponse = await http.get(
-          Uri.parse(
-              '$baseUrl/api/collections/myItems/records?filter=(userId="$userId" && is_used=true)'),
-          headers: {'Content-Type': 'application/json'},
-        );
-
-        if (itemsResponse.statusCode == 200) {
-          final itemsData = json.decode(itemsResponse.body);
-          final items = itemsData['items'] as List;
-
-          if (items.isNotEmpty && items[0]['rive_file'] != null) {
-            final item = items[0];
-            userRiveFiles[userId] =
-                '$baseUrl/api/files/myItems/${item['id']}/${item['rive_file']}';
-          }
+        final riveFileUrl = await getUserActiveRiveFile(userId);
+        if (riveFileUrl != null) {
+          userRiveFiles[userId] = riveFileUrl;
         }
       }
+
       print('Fetched users rive files: $userRiveFiles');
       return userRiveFiles;
     } catch (e) {
       print('Error fetching users rive files: $e');
       return {};
+    }
+  }
+
+  // Add this to HttpService
+  static Future<String?> getUserActiveRiveFile(String userId) async {
+    try {
+      // URL encode the filter parameter
+      final filter = Uri.encodeComponent('userId="$userId" && is_used=true');
+
+      final response = await http.get(
+        Uri.parse('$baseUrl/api/collections/myItems/records?filter=$filter'),
+        headers: {'Content-Type': 'application/json'},
+      );
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        final items = data['items'] as List;
+
+        if (items.isNotEmpty && items[0]['rive_file'] != null) {
+          final item = items[0];
+          return '$baseUrl/api/files/myItems/${item['id']}/${item['rive_file']}';
+        }
+      }
+      return null;
+    } catch (e) {
+      print('Error fetching user rive file: $e');
+      return null;
     }
   }
 }
