@@ -214,34 +214,68 @@ class HttpService {
   // Add this to your HttpService class
   static Future<Map<String, String>> fetchUsersRiveFiles(String roomId) async {
     try {
+      print('Fetching Rive files for room: $roomId');
+      Map<String, String> userRiveFiles = {};
+
+      // First, get all joined users for this room
       final roomFilter = Uri.encodeComponent('voice_room_id="$roomId"');
-      final response = await http.get(
+      final joinedResponse = await http.get(
         Uri.parse(
             '$baseUrl/api/collections/joined_users/records?filter=$roomFilter'),
         headers: {'Content-Type': 'application/json'},
       );
 
-      if (response.statusCode != 200) {
-        throw Exception('Failed to fetch users');
+      if (joinedResponse.statusCode != 200) {
+        print('Failed to fetch joined users: ${joinedResponse.statusCode}');
+        return userRiveFiles;
       }
 
-      final data = json.decode(response.body);
-      final joinedUsers = data['items'] as List;
+      final joinedData = json.decode(joinedResponse.body);
+      final joinedUsers = joinedData['items'] as List;
 
-      Map<String, String> userRiveFiles = {};
+      // Then, get the room owner
+      final roomResponse = await http.get(
+        Uri.parse('$baseUrl/api/collections/voiceRooms/records/$roomId'),
+        headers: {'Content-Type': 'application/json'},
+      );
 
-      for (var user in joinedUsers) {
-        final userId = user['userid'];
-        final riveFileUrl = await getUserActiveRiveFile(userId);
-        if (riveFileUrl != null) {
-          userRiveFiles[userId] = riveFileUrl;
+      String? ownerId;
+      if (roomResponse.statusCode == 200) {
+        final roomData = json.decode(roomResponse.body);
+        ownerId = roomData['ownerId'];
+
+        // Process the owner first
+        if (ownerId != null) {
+          final ownerRiveFile = await getUserActiveRiveFile(ownerId);
+          if (ownerRiveFile != null) {
+            userRiveFiles[ownerId] = ownerRiveFile;
+            print('Added owner ($ownerId) Rive file: $ownerRiveFile');
+          }
         }
       }
 
-      print('Fetched users rive files: $userRiveFiles');
+      // Process all joined users
+      List<Future> futures = [];
+      for (var user in joinedUsers) {
+        final userId = user['userid'];
+        if (userId != ownerId) {
+          // Skip owner as we already processed them
+          futures.add(getUserActiveRiveFile(userId).then((riveFileUrl) {
+            if (riveFileUrl != null) {
+              userRiveFiles[userId] = riveFileUrl;
+              print('Added user ($userId) Rive file: $riveFileUrl');
+            }
+          }));
+        }
+      }
+
+      // Wait for all requests to complete
+      await Future.wait(futures);
+
+      print('Fetched ${userRiveFiles.length} Rive files for room $roomId');
       return userRiveFiles;
     } catch (e) {
-      print('Error fetching users rive files: $e');
+      print('Error fetching users Rive files: $e');
       return {};
     }
   }
@@ -249,6 +283,8 @@ class HttpService {
   // Add this to HttpService
   static Future<String?> getUserActiveRiveFile(String userId) async {
     try {
+      print('Fetching Rive file for user: $userId');
+
       // URL encode the filter parameter
       final filter = Uri.encodeComponent('userId="$userId" && is_used=true');
 
@@ -261,15 +297,38 @@ class HttpService {
         final data = json.decode(response.body);
         final items = data['items'] as List;
 
-        if (items.isNotEmpty && items[0]['rive_file'] != null) {
-          final item = items[0];
-          return '$baseUrl/api/files/myItems/${item['id']}/${item['rive_file']}';
+        if (items.isNotEmpty) {
+          // Find the item with a Rive file
+          for (var item in items) {
+            if (item['rive_file'] != null) {
+              final url =
+                  '$baseUrl/api/files/myItems/${item['id']}/${item['rive_file']}';
+              print('Found Rive file for user $userId: $url');
+              return url;
+            }
+          }
+          print('User $userId has items but no Rive file');
+        } else {
+          print('No items found for user $userId');
         }
+      } else {
+        print('Error response (${response.statusCode}): ${response.body}');
       }
       return null;
     } catch (e) {
-      print('Error fetching user rive file: $e');
+      print('Error fetching user Rive file: $e');
       return null;
+    }
+  }
+
+// New method to check if a user has a specific Rive file cached
+  static Future<bool> checkRiveFileExists(String url) async {
+    try {
+      final response = await http.head(Uri.parse(url));
+      return response.statusCode == 200;
+    } catch (e) {
+      print('Error checking Rive file exists: $e');
+      return false;
     }
   }
 }

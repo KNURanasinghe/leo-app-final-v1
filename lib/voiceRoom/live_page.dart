@@ -126,6 +126,10 @@ class LivePage extends StatefulWidget {
 
 class LivePageState extends State<LivePage>
     with SingleTickerProviderStateMixin {
+  bool _hasShownInitialEntry = false;
+  DateTime? _lastEntryTime;
+  final Map<String, DateTime> _userLastEntryTimes = {};
+
   final pb = PocketBase('http://145.223.21.62:8090');
   late UnsubscribeFunc? _unsubscribe;
   int userCount = 0; // Add this to track user count
@@ -175,14 +179,45 @@ class LivePageState extends State<LivePage>
       'http://145.223.21.62:8090'; // Replace with your actual PocketBase URL
   bool _isLoading = false;
   Timer? _riveRefreshTimer;
+
+  bool _hasJoinedRoom = false;
+
   @override
   void initState() {
     super.initState();
-    _initializeSocket();
-    _fetchInitialUsers();
-    _loadUserRiveFiles();
-    _fetchOwnRiveFile();
 
+    // Sync animations every 30 seconds
+    Timer.periodic(const Duration(seconds: 30), (_) {
+      if (mounted && socket.connected) {
+        _syncRiveAnimations();
+      }
+    });
+
+    _initializeSocket();
+    _resetAnimationState();
+
+    _fetchOwnRiveFile().then((riveFileUrl) {
+      // Only trigger entry animation when joining a room for the first time
+      if (socket.connected) {
+        socket.emit('joinRoom', {
+          'roomId': widget.roomID,
+          'userId': widget.userId,
+          'userName': widget.username1,
+          'userAvatar': _userAvatarUrl,
+          'riveFileUrl': _userRiveFiles[widget.userId], // Include Rive URL
+        });
+
+        _fetchInitialUsers();
+        _loadUserRiveFiles();
+      }
+    });
+// Add this to your initState
+    Timer.periodic(const Duration(seconds: 10), (_) {
+      if (mounted && _userRiveFiles.containsKey(widget.userId)) {
+        // Resend our animation periodically
+        _notifyRiveAnimationChange(_userRiveFiles[widget.userId]!);
+      }
+    });
     // Add this after socket initialization
     socket.on('riveAnimationChange', (data) {
       if (!mounted) return;
@@ -198,7 +233,7 @@ class LivePageState extends State<LivePage>
         });
 
         // Force UI refresh
-        Future.delayed(Duration(milliseconds: 100), () {
+        Future.delayed(const Duration(milliseconds: 100), () {
           if (mounted) setState(() {});
         });
       }
@@ -220,42 +255,6 @@ class LivePageState extends State<LivePage>
       if (mounted) {
         setState(() {
           _showWelcomeMessage = false;
-        });
-      }
-    });
-
-    // Similarly update the socket event handler for userEntryAnimation
-    socket.on('userEntryAnimation', (data) {
-      print('Received entry animation: $data');
-      final userId = data['userId'];
-      final riveFileUrl = data['riveFileUrl'];
-
-      if (userId != null && riveFileUrl != null && mounted) {
-        final normalizedId = _normalizeUserId(userId.toString());
-        print('Setting animation for normalized user ID: $normalizedId');
-
-        setState(() {
-          _userRiveFiles[normalizedId] = riveFileUrl.toString();
-          _activeAnimationSeats[normalizedId] = DateTime.now();
-
-          // Debug output
-          print(
-              'AFTER setting animation - _userRiveFiles map: $_userRiveFiles');
-          print('Animation active for users: ${_activeAnimationSeats.keys}');
-        });
-
-        // Force UI refresh
-        Future.delayed(Duration(milliseconds: 100), () {
-          if (mounted) setState(() {});
-        });
-
-        // Remove highlight after a few seconds
-        Timer(const Duration(seconds: 5), () {
-          if (mounted) {
-            setState(() {
-              _activeAnimationSeats.remove(normalizedId);
-            });
-          }
         });
       }
     });
@@ -291,7 +290,9 @@ class LivePageState extends State<LivePage>
     _fetchOnlineUsers();
     // ZegoGiftManager().cache.cacheAllFiles(giftItemList);
     // ZegoGiftManager().service.recvNotifier.addListener(onGiftReceived);
-
+    _fetchAndSetUserAvatar();
+    _fetchVoiceRoomDetails();
+    _createOnlineUserRecord();
     WidgetsBinding.instance.addPostFrameCallback((timeStamp) {
       ZegoGiftManager().service.init(
             appID: 2069292420,
@@ -304,10 +305,8 @@ class LivePageState extends State<LivePage>
       print(localUserID);
       // Fetch avatar URL when component mounts
       updateStartTime(widget.userId, widget.roomID);
-      _fetchAndSetUserAvatar();
-      _fetchVoiceRoomDetails();
+
       _fetchLanguageDetails(widget.roomID);
-      _createOnlineUserRecord();
     });
 
     _controller = AnimationController(
@@ -334,6 +333,29 @@ class LivePageState extends State<LivePage>
     // });
   }
 
+  void _syncRiveAnimations() {
+    final animations = <String, String>{};
+    _userRiveFiles.forEach((userId, url) {
+      if (url.isNotEmpty) {
+        animations[userId] = url;
+      }
+    });
+
+    socket.emit('syncRiveAnimations',
+        {'roomId': widget.roomID, 'animations': animations});
+  }
+
+  void _resetAnimationState() {
+    // Cancel all existing timers
+    _emojiTimers.forEach((key, timer) => timer.cancel());
+    _emojiTimers.clear();
+
+    // Clear active animations
+    setState(() {
+      _activeAnimationSeats.clear();
+    });
+  }
+
 // Add this debug helper method
   void _dumpRiveFilesMap() {
     print('==== RIVE FILES MAP DUMP ====');
@@ -346,13 +368,8 @@ class LivePageState extends State<LivePage>
 
 // Add this helper method to your LivePageState class to normalize user IDs
   String _normalizeUserId(String userId) {
-    // Sometimes Zego SDK adds prefixes to user IDs, this removes them
-    // This function helps ensure consistent user ID format
-    if (userId.contains("_")) {
-      final parts = userId.split("_");
-      return parts.last; // Return the last part after any prefixes
-    }
-    return userId;
+    // Remove any prefixes/suffixes that might be added by Zego
+    return userId.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '');
   }
 
   // Add this after fetching your own Rive file
@@ -369,13 +386,11 @@ class LivePageState extends State<LivePage>
           _userRiveFiles[widget.userId] = riveFileUrl;
         });
 
-        // Notify others about your Rive animation
+        // Always trigger entry animation when we have a Rive file
+        // This should happen AFTER joining the room
         if (socket.connected) {
-          socket.emit('riveAnimationChange', {
-            'roomId': widget.roomID,
-            'userId': widget.userId,
-            'riveFileUrl': riveFileUrl
-          });
+          // IMPORTANT: Always call this for entry animation
+          _handleEntryAnimation(riveFileUrl);
         }
       }
     } catch (e) {
@@ -383,22 +398,43 @@ class LivePageState extends State<LivePage>
     }
   }
 
-  void _handleEntryAnimation(String riveFileUrl) {
+  void _handleEntryAnimation(String riveFileUrl, {bool isReconnect = false}) {
+    if (riveFileUrl.isEmpty) return;
+
+    // Check if we recently showed this animation (within last 30 seconds)
+    final now = DateTime.now();
+    if (_lastEntryTime != null &&
+        now.difference(_lastEntryTime!) < const Duration(seconds: 30)) {
+      return;
+    }
+
+    print('Triggering entry animation for ${widget.userId}');
+
+    // Update last entry time
+    _lastEntryTime = now;
+
+    // Update local state
+    setState(() {
+      _userRiveFiles[widget.userId] = riveFileUrl;
+      _activeAnimationSeats[widget.userId] = now;
+    });
+
+    // Broadcast to server
     if (socket.connected) {
       socket.emit('userEntryAnimation', {
         'roomId': widget.roomID,
         'userId': widget.userId,
-        'riveFileUrl': riveFileUrl
+        'userName': widget.username1,
+        'riveFileUrl': riveFileUrl,
+        'isEntry': true,
+        'isReconnect': isReconnect,
+        'duration': 10000,
+        'timestamp': now.millisecondsSinceEpoch,
       });
     }
 
-    setState(() {
-      _userRiveFiles[widget.userId] = riveFileUrl;
-      _activeAnimationSeats[widget.userId] = DateTime.now();
-    });
-
-    // Remove highlight after 5 seconds
-    Timer(const Duration(seconds: 5), () {
+    // Remove after 10 seconds
+    _emojiTimers[widget.userId] = Timer(const Duration(seconds: 10), () {
       if (mounted) {
         setState(() {
           _activeAnimationSeats.remove(widget.userId);
@@ -835,45 +871,98 @@ class LivePageState extends State<LivePage>
       'reconnection': true,
       'reconnectionDelay': 1000,
       'reconnectionDelayMax': 5000,
-      'reconnectionAttempts': maxReconnectAttempts,
+      'reconnectionAttempts': 5,
     });
 
     socket.onConnect((_) async {
       print('Connected to Socket.IO server');
+
+      // Reset connection state
       reconnectAttempts = 0;
       isReconnecting = false;
 
       if (mounted) {
-        setState(() {
-          isConnecting = false;
-        });
+        setState(() => isConnecting = false);
       }
 
-      // Fetch your own Rive file URL
-      final riveFileUrl =
-          await HttpService.getUserActiveRiveFile(widget.userId);
-      if (riveFileUrl != null) {
-        setState(() {
-          _userRiveFiles[widget.userId] = riveFileUrl;
-        });
-        print('Found active Rive animation: $riveFileUrl');
-      }
+      // Always fetch fresh Rive file on connection
+      await _fetchOwnRiveFile();
 
-      // Send full user details when joining, including Rive file URL
+      // Join room with forceEntry flag if it's a fresh connection
       socket.emit('joinRoom', {
         'roomId': widget.roomID,
         'userId': widget.userId,
         'userName': widget.username1,
         'userAvatar': _userAvatarUrl,
-        'userMotto': '',
-        'riveFileUrl': riveFileUrl, // Include your Rive file URL
+        'riveFileUrl': _userRiveFiles[widget.userId],
+        'forceEntry':
+            !_hasShownInitialEntry, // Only force entry animation first time
+        'isReconnect': isReconnecting,
       });
 
-      // CRITICAL: Immediately request current Rive files
+      _hasShownInitialEntry = true;
+
+      // Rest of your connection logic...
+
+      // After joining the room, THEN fetch own Rive file
+      await _fetchOwnRiveFile();
+      _fetchInitialUsers();
+      _loadUserRiveFiles();
+      // Fetch your own Rive file URL
+      String? riveFileUrl = _userRiveFiles[widget.userId];
+
+      if (riveFileUrl != null) {
+        print('RIVE DEBUG: Found active user Rive animation: $riveFileUrl');
+
+        _handleEntryAnimation(riveFileUrl);
+      }
+
+      // In your socket.onConnect handler:
+      socket.on('userEntryAnimation', (data) {
+        if (!mounted) return;
+
+        final userId = data['userId'];
+        final riveFileUrl = data['riveFileUrl'];
+
+        if (userId != null && riveFileUrl != null) {
+          setState(() {
+            _activeAnimationSeats[userId] = DateTime.now();
+            _userRiveFiles[userId] = riveFileUrl;
+          });
+
+          // Force UI refresh
+          Future.delayed(const Duration(milliseconds: 100), () {
+            if (mounted) setState(() {});
+          });
+        }
+        _emojiTimers[userId] = Timer(const Duration(seconds: 10), () {
+          if (mounted) {
+            setState(() {
+              _activeAnimationSeats.remove(userId);
+            });
+          }
+        });
+      });
+
       socket.emit('fetchUserRiveFiles', {'roomId': widget.roomID});
+      // Send full user details when joining, including Rive file URL
+
+      // Also broadcast your own Rive file to ensure everyone has it
+      if (riveFileUrl != null) {
+        // Use entry animation for first join
+        _handleEntryAnimation(riveFileUrl);
+      }
     });
 
-    // CRITICAL: Add a new event handler for receiving all Rive files at once
+    socket.onConnectError((error) {
+      print('Socket connection error: $error');
+    });
+
+    socket.onError((error) {
+      print('Socket error: $error');
+    });
+
+    // Better handler for receiving all Rive files at once
     socket.on('userRiveFiles', (data) {
       print('Received user Rive files: $data');
       if (data is Map) {
@@ -881,17 +970,29 @@ class LivePageState extends State<LivePage>
           setState(() {
             data.forEach((userId, riveFileUrl) {
               if (userId != null && riveFileUrl != null) {
+                // Store with both original and normalized ID to ensure we catch it
+                final normalizedId = _normalizeUserId(userId.toString());
                 _userRiveFiles[userId.toString()] = riveFileUrl.toString();
+                if (normalizedId != userId.toString()) {
+                  _userRiveFiles[normalizedId] = riveFileUrl.toString();
+                }
                 print('Added Rive file for user $userId: $riveFileUrl');
               }
             });
           });
-          print('Updated Rive files map: $_userRiveFiles');
+
+          // Force UI refresh after updating data
+          Future.delayed(const Duration(milliseconds: 100), () {
+            if (mounted) {
+              setState(() {});
+              _dumpRiveFilesMap(); // Debug dump after update
+            }
+          });
         }
       }
     });
 
-    // Also update the riveAnimationChange handler similarly
+    // Improve riveAnimationChange handler
     socket.on('riveAnimationChange', (data) {
       if (!mounted) return;
 
@@ -909,7 +1010,7 @@ class LivePageState extends State<LivePage>
         print('Current _userRiveFiles map: $_userRiveFiles');
 
         // Force UI refresh
-        Future.delayed(Duration(milliseconds: 100), () {
+        Future.delayed(const Duration(milliseconds: 100), () {
           if (mounted) setState(() {});
         });
       }
@@ -1480,6 +1581,14 @@ class LivePageState extends State<LivePage>
 
   Future<void> _joinRoom(String roomId, String userId) async {
     try {
+      if (!_hasJoinedRoom && socket.connected) {
+        _hasJoinedRoom = true;
+
+        // Now trigger entry animation as we actually join the room
+        if (_userRiveFiles.containsKey(widget.userId)) {
+          _handleEntryAnimation(_userRiveFiles[widget.userId]!);
+        }
+      }
       final response = await http.post(
         Uri.parse(
             'http://145.223.21.62:8090/api/collections/joined_users/records'),
@@ -1758,9 +1867,13 @@ class LivePageState extends State<LivePage>
   @override
   void dispose() {
     reconnectionTimer?.cancel();
+    _resetAnimationState();
     socket.emit('leaveRoom', {
       'roomId': widget.roomID,
       'userId': widget.userId,
+    });
+    setState(() {
+      _activeAnimationSeats.clear();
     });
     socket.dispose();
     // Only cleanup if not minimized
@@ -1819,46 +1932,87 @@ class LivePageState extends State<LivePage>
     );
   }
 
-  Widget foregroundBuilder(
-      BuildContext context, Size size, ZegoUIKitUser? user, Map extraInfo) {
-    if (user?.id != null) {
-      final normalizedId = _normalizeUserId(user!.id);
-      print('RIVE DEBUG: foregroundBuilder called for user ${user.id}');
-      print('RIVE DEBUG: Normalized ID: $normalizedId');
-      print('RIVE DEBUG: Current user ID: ${widget.userId}');
+  void _debugUserIds(ZegoUIKitUser? user) {
+    if (user == null) {
+      print('RIVE DEBUG: User is null');
+      return;
+    }
 
-      // Use normalized ID for checking the map
-      final hasRiveFile = _userRiveFiles.containsKey(normalizedId);
-      print('RIVE DEBUG: Has Rive file: $hasRiveFile');
+    // Log all user properties to find the issue
+    print('RIVE DEBUG: User details:');
+    print('  - ID: "${user.id}"');
+    print('  - Name: "${user.name}"');
+    print('  - inRoomAttributes: ${user.inRoomAttributes.value}');
 
-      if (hasRiveFile) {
-        print('RIVE DEBUG: Rive file URL: ${_userRiveFiles[normalizedId]}');
+    // Test different ID extraction methods
+    if (user.id.isNotEmpty) {
+      final normalizedId = _normalizeUserId(user.id);
+      print('RIVE DEBUG: Normalized ID: "$normalizedId"');
+
+      // Check if ID exists in our map
+      if (_userRiveFiles.containsKey(normalizedId)) {
+        print(
+            'RIVE DEBUG: Found Rive file for normalized ID: ${_userRiveFiles[normalizedId]}');
+      } else if (_userRiveFiles.containsKey(user.id)) {
+        print(
+            'RIVE DEBUG: Found Rive file for original ID: ${_userRiveFiles[user.id]}');
+      } else {
+        print('RIVE DEBUG: No Rive file found for this user');
+        // Print all keys for debugging
+        print(
+            'RIVE DEBUG: Available keys in _userRiveFiles: ${_userRiveFiles.keys.toList()}');
       }
     }
-    print(
-        'RIVE DEBUG: Will try to render Rive file: ${_userRiveFiles[user?.id]}');
+  }
+
+  Widget foregroundBuilder(
+      BuildContext context, Size size, ZegoUIKitUser? user, Map extraInfo) {
+    if (user == null || user.id.isEmpty) {
+      return Container();
+    }
+
+    // Check for Rive file with this user ID
+    final riveFileUrl = _userRiveFiles[user.id];
+    final bool hasActiveAnimation = _activeAnimationSeats.containsKey(user.id);
+
     return Stack(
       children: [
-        // If the user has a Rive animation, show it
+        // Highlight effect for entry animation
+        if (hasActiveAnimation)
+          AnimatedContainer(
+            duration: const Duration(milliseconds: 300),
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              border: Border.all(
+                color: Colors.amber,
+                width: 3,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.amber.withOpacity(0.7),
+                  blurRadius: 10,
+                  spreadRadius: 3,
+                ),
+              ],
+            ),
+          ),
 
-        if (user?.id != null && _userRiveFiles.containsKey(user!.id))
+        // Rive animation if available
+        if (riveFileUrl != null)
           Positioned.fill(
             child: ClipRRect(
               borderRadius: BorderRadius.circular(size.width / 2),
               child: rive.RiveAnimation.network(
-                _userRiveFiles[user.id]!,
+                riveFileUrl,
                 fit: BoxFit.cover,
-                artboard: 'Main', // Use common artboard names
-                animations: const ['idle'], // Use common animation names
-                // onError: (error) {
-                //   print('Error loading Rive animation for ${user.id}: $error');
-                // },
+                artboard: 'Main',
+                animations: const ['idle'],
               ),
             ),
           ),
 
         // Username text
-        if (user?.name != null && user!.name.isNotEmpty)
+        if (user.name.isNotEmpty)
           Positioned(
             bottom: 0,
             left: 0,
@@ -2284,6 +2438,8 @@ class LivePageState extends State<LivePage>
 
   @override
   Widget build(BuildContext context) {
+    print(
+        'Build called, activeAnimationSeats: ${_activeAnimationSeats.length}, keys: ${_activeAnimationSeats.keys.toList()}');
     // Add this before your return statement
     if (_userRiveFiles.containsKey(widget.userId)) {
       print(
@@ -2291,6 +2447,9 @@ class LivePageState extends State<LivePage>
     } else {
       print(
           'RIVE DEBUG: Test widget - No Rive file found for user ${widget.userId}');
+    }
+    if (_activeAnimationSeats.isNotEmpty) {
+      print('Build: Active animations: ${_activeAnimationSeats.keys.toList()}');
     }
     return WillPopScope(
       onWillPop: () async {
@@ -2460,9 +2619,9 @@ class LivePageState extends State<LivePage>
           children: [
             // Main Zego UIKit widget
             ZegoUIKitPrebuiltLiveAudioRoom(
-              appID: 2069292420,
+              appID: 1066732685,
               appSign:
-                  '3b8893143a13c24f6d82dd7260b70a9d29814b99130e7bcebfe3e09dac8c0731',
+                  '22efdc0ebc48810e8635ca83123f402060a251617123f310a63d6dcd52c25d1d',
               userID: localUserID,
               userName: widget.username1,
               roomID: widget.roomID,
@@ -2498,6 +2657,76 @@ class LivePageState extends State<LivePage>
                   ),
                 ),
               ),
+
+            // Add this to your build method Stack
+            // Add this to your build method Stack
+            if (_activeAnimationSeats.isNotEmpty)
+              Positioned.fill(
+                child: Container(
+                  color: Colors.black.withOpacity(0.6), // Darken the background
+                  child: Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        for (final entry in _activeAnimationSeats.entries)
+                          if (_userRiveFiles.containsKey(entry.key))
+                            Padding(
+                              padding: const EdgeInsets.only(bottom: 20),
+                              child: Column(
+                                children: [
+                                  Container(
+                                    width:
+                                        MediaQuery.of(context).size.width * 0.7,
+                                    height:
+                                        MediaQuery.of(context).size.width * 0.7,
+                                    decoration: BoxDecoration(
+                                      shape: BoxShape.circle,
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: Colors.amber.withOpacity(0.5),
+                                          blurRadius: 20,
+                                          spreadRadius: 10,
+                                        ),
+                                      ],
+                                    ),
+                                    child: rive.RiveAnimation.network(
+                                      _userRiveFiles[entry.key]!,
+                                      fit: BoxFit.cover,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 10),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 20,
+                                      vertical: 10,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: Colors.black.withOpacity(0.7),
+                                      borderRadius: BorderRadius.circular(20),
+                                      border: Border.all(
+                                        color: Colors.amber,
+                                        width: 2,
+                                      ),
+                                    ),
+                                    child: Text(
+                                      "New entry! ${_findUserName(entry.key)}",
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 18,
+                                        fontWeight: FontWeight.bold,
+                                        decoration: TextDecoration.none,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+
             // Power/Logout button
             Positioned(
               top: MediaQuery.of(context).padding.top + 2,
@@ -3024,6 +3253,22 @@ class LivePageState extends State<LivePage>
         ),
       ),
     );
+  }
+
+  String _findUserName(String userId) {
+    // First check online users
+    for (final user in onlineUsers) {
+      if (user.id == userId) {
+        return user.name;
+      }
+    }
+
+    // If current user
+    if (userId == widget.userId) {
+      return widget.username1;
+    }
+
+    return "User";
   }
 
   void _showOnlineUsersBottomSheet(BuildContext context) {
