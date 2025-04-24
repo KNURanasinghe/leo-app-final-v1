@@ -30,7 +30,6 @@ class AccountScreen1 extends StatelessWidget {
         enableScroll: true,
         child: Column(
           children: [
-
             Material(
               color: darkModeEnabled ? kDarkBoxColor : kLightBlueColor,
               shadowColor: Colors.black26,
@@ -43,9 +42,7 @@ class AccountScreen1 extends StatelessWidget {
                   width: double.infinity,
                   child: Padding(
                     padding: const EdgeInsets.symmetric(
-                        vertical: 20.0,
-                        horizontal: 20.0
-                    ),
+                        vertical: 20.0, horizontal: 20.0),
                     child: Row(
                       crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
@@ -58,11 +55,9 @@ class AccountScreen1 extends StatelessWidget {
                             fit: BoxFit.cover,
                           ),
                         ),
-
                         SizedBox(
                           width: 15.w,
                         ),
-
                         Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
@@ -74,7 +69,6 @@ class AccountScreen1 extends StatelessWidget {
                                 fontWeight: FontWeight.bold,
                               ),
                             ),
-
                             Text(
                               'Phone: 077 5580 646',
                               style: TextStyle(
@@ -84,12 +78,12 @@ class AccountScreen1 extends StatelessWidget {
                             ),
                           ],
                         ),
-
                         const Spacer(),
-
                         SvgPicture.asset(
                           'assets/icons/ic-arrow-right.svg',
-                          colorFilter: const ColorFilter.mode(darkModeEnabled ? kDarkTextColor : kTextColor, BlendMode.srcIn),
+                          colorFilter: const ColorFilter.mode(
+                              darkModeEnabled ? kDarkTextColor : kTextColor,
+                              BlendMode.srcIn),
                         ),
                       ],
                     ),
@@ -97,11 +91,9 @@ class AccountScreen1 extends StatelessWidget {
                 ),
               ),
             ),
-
             SizedBox(
               height: 15.w,
             ),
-
             Material(
               color: darkModeEnabled ? kDarkBoxColor : kLightBlueColor,
               shadowColor: Colors.black26,
@@ -109,12 +101,11 @@ class AccountScreen1 extends StatelessWidget {
               borderRadius: BorderRadius.circular(10.w),
               child: Padding(
                 padding: const EdgeInsets.symmetric(
-                    vertical: 20.0,
-                    horizontal: 10.0
-                ),
+                    vertical: 20.0, horizontal: 10.0),
                 child: Column(
                   children: [
                     AccountTile(
+                      isUpcomming: false,
                       icon: Icons.wallet,
                       text: 'Wallet',
                       onTap: () {},
@@ -123,13 +114,12 @@ class AccountScreen1 extends StatelessWidget {
                         showArrow: true,
                       ),
                     ),
-
                     const Divider(
                       color: Colors.black12,
                       thickness: 0.3,
                     ),
-
                     AccountTile(
+                      isUpcomming: true,
                       icon: Icons.diamond_outlined,
                       text: 'Earn diamond',
                       onTap: () {},
@@ -142,11 +132,9 @@ class AccountScreen1 extends StatelessWidget {
                 ),
               ),
             ),
-
             SizedBox(
               height: 15.w,
             ),
-
             Material(
               color: darkModeEnabled ? kDarkBoxColor : kLightBlueColor,
               shadowColor: Colors.black26,
@@ -154,12 +142,11 @@ class AccountScreen1 extends StatelessWidget {
               borderRadius: BorderRadius.circular(10.w),
               child: Padding(
                 padding: const EdgeInsets.symmetric(
-                    vertical: 20.0,
-                    horizontal: 10.0
-                ),
+                    vertical: 20.0, horizontal: 10.0),
                 child: Column(
                   children: [
                     AccountTile(
+                      isUpcomming: false,
                       icon: Icons.leaderboard_outlined,
                       text: 'Level',
                       onTap: () {},
@@ -168,13 +155,12 @@ class AccountScreen1 extends StatelessWidget {
                         showArrow: true,
                       ),
                     ),
-
                     const Divider(
                       color: Colors.black12,
                       thickness: 0.3,
                     ),
-
                     AccountTile(
+                      isUpcomming: false,
                       icon: Icons.wallet_giftcard_outlined,
                       text: 'Nobel',
                       onTap: () {},
@@ -183,13 +169,12 @@ class AccountScreen1 extends StatelessWidget {
                         showArrow: true,
                       ),
                     ),
-
                     const Divider(
                       color: Colors.black12,
                       thickness: 0.3,
                     ),
-
                     AccountTile(
+                      isUpcomming: false,
                       icon: Icons.workspace_premium_outlined,
                       text: 'Svip',
                       onTap: () {},
@@ -198,13 +183,12 @@ class AccountScreen1 extends StatelessWidget {
                         showArrow: true,
                       ),
                     ),
-
                     const Divider(
                       color: Colors.black12,
                       thickness: 0.3,
                     ),
-
                     AccountTile(
+                      isUpcomming: false,
                       icon: Icons.favorite_border_rounded,
                       text: 'Cp space',
                       onTap: () {},
@@ -213,13 +197,12 @@ class AccountScreen1 extends StatelessWidget {
                         showArrow: true,
                       ),
                     ),
-
                     const Divider(
                       color: Colors.black12,
                       thickness: 0.3,
                     ),
-
                     AccountTile(
+                      isUpcomming: false,
                       icon: Icons.family_restroom_rounded,
                       text: 'Family',
                       onTap: () {},
@@ -232,11 +215,9 @@ class AccountScreen1 extends StatelessWidget {
                 ),
               ),
             ),
-
             SizedBox(
               height: 15.w,
             ),
-
             Material(
               color: darkModeEnabled ? kDarkBoxColor : kLightBlueColor,
               shadowColor: Colors.black26,
@@ -244,12 +225,11 @@ class AccountScreen1 extends StatelessWidget {
               borderRadius: BorderRadius.circular(10.w),
               child: Padding(
                 padding: const EdgeInsets.symmetric(
-                    vertical: 20.0,
-                    horizontal: 10.0
-                ),
+                    vertical: 20.0, horizontal: 10.0),
                 child: Column(
                   children: [
                     AccountTile(
+                      isUpcomming: false,
                       icon: Icons.add_chart_outlined,
                       text: 'Achievement',
                       onTap: () {},
@@ -258,13 +238,12 @@ class AccountScreen1 extends StatelessWidget {
                         showArrow: true,
                       ),
                     ),
-
                     const Divider(
                       color: Colors.black12,
                       thickness: 0.3,
                     ),
-
                     AccountTile(
+                      isUpcomming: false,
                       icon: Icons.list,
                       text: 'My items',
                       onTap: () {},
@@ -273,13 +252,12 @@ class AccountScreen1 extends StatelessWidget {
                         showArrow: true,
                       ),
                     ),
-
                     const Divider(
                       color: Colors.black12,
                       thickness: 0.3,
                     ),
-
                     AccountTile(
+                      isUpcomming: false,
                       icon: Icons.group_add_outlined,
                       text: 'Invited friends',
                       onTap: () {},
@@ -292,11 +270,9 @@ class AccountScreen1 extends StatelessWidget {
                 ),
               ),
             ),
-
             SizedBox(
               height: 15.w,
             ),
-
             Material(
               color: darkModeEnabled ? kDarkBoxColor : kLightBlueColor,
               shadowColor: Colors.black26,
@@ -304,12 +280,11 @@ class AccountScreen1 extends StatelessWidget {
               borderRadius: BorderRadius.circular(10.w),
               child: Padding(
                 padding: const EdgeInsets.symmetric(
-                    vertical: 20.0,
-                    horizontal: 10.0
-                ),
+                    vertical: 20.0, horizontal: 10.0),
                 child: Column(
                   children: [
                     AccountTile(
+                      isUpcomming: false,
                       icon: Icons.language_outlined,
                       text: 'Language',
                       onTap: () {},
@@ -318,13 +293,12 @@ class AccountScreen1 extends StatelessWidget {
                         showArrow: true,
                       ),
                     ),
-
                     const Divider(
                       color: Colors.black12,
                       thickness: 0.3,
                     ),
-
                     AccountTile(
+                      isUpcomming: false,
                       icon: Icons.feedback_outlined,
                       text: 'Feedback',
                       onTap: () {},
@@ -333,13 +307,12 @@ class AccountScreen1 extends StatelessWidget {
                         showArrow: true,
                       ),
                     ),
-
                     const Divider(
                       color: Colors.black12,
                       thickness: 0.3,
                     ),
-
                     AccountTile(
+                      isUpcomming: false,
                       icon: Icons.settings_outlined,
                       text: 'Setting',
                       onTap: () {},

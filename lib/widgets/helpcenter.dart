@@ -339,6 +339,7 @@ class _ContactUsFormState extends State<ContactUsForm> {
     }
   }
 
+  // Update the _submitHelpRequest method in the _ContactUsFormState class
   Future<void> _submitHelpRequest() async {
     if (!_formKey.currentState!.validate()) {
       return;
@@ -351,14 +352,16 @@ class _ContactUsFormState extends State<ContactUsForm> {
     });
 
     try {
-      // Convert attachments to base64 or appropriate format for sending
+      // Prepare attachments for sending
       List<Map<String, dynamic>> attachmentData = [];
       for (var file in _attachments) {
-        attachmentData.add({
-          'name': file.name,
-          'data': file.bytes,
-          'size': file.size,
-        });
+        if (file.bytes != null) {
+          attachmentData.add({
+            'name': file.name,
+            'data': file.bytes,
+            'size': file.size,
+          });
+        }
       }
 
       // Use the service to send feedback with attachments
@@ -370,15 +373,11 @@ class _ContactUsFormState extends State<ContactUsForm> {
         attachments: attachmentData,
       );
 
-      print('Help request result: $result');
-
       if (result['success']) {
         setState(() {
           _successMessage =
               'Your request has been sent successfully. Our team will get back to you shortly.';
           // Clear all fields after success
-          _nameController.clear();
-          _emailController.clear();
           _messageController.clear();
           _selectedHelpTopic = 'General Inquiries';
           _attachments = [];

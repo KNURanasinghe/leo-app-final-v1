@@ -73,6 +73,9 @@ class Web3FormsService {
     }
   }
 
+  /// Sends feedback with attachments to the support team using Web3Forms API
+  ///
+  /// Returns a [Map] with 'success' boolean and 'message' string
   static Future<Map<String, dynamic>> sendFeedbackWithAttachments({
     required String name,
     required String email,
@@ -81,6 +84,7 @@ class Web3FormsService {
     required List<Map<String, dynamic>> attachments,
   }) async {
     try {
+      // Create a multipart request
       var request = http.MultipartRequest('POST', Uri.parse(_baseUrl));
 
       // Add form fields
@@ -92,25 +96,47 @@ class Web3FormsService {
       request.fields['feedback_type'] = feedbackType;
       request.fields['from_app'] = 'true';
 
+      print('Preparing ${attachments.length} attachments for upload');
+
       // Add attachments
-      for (var file in attachments) {
-        final bytes = file['bytes'] as Uint8List?;
+      for (int i = 0; i < attachments.length; i++) {
+        final file = attachments[i];
+        final bytes = file['data'] as Uint8List?;
+
         if (bytes != null) {
-          final mimeType = lookupMimeType(file['name'] ?? 'file') ??
-              'application/octet-stream';
-          request.files.add(http.MultipartFile.fromBytes(
-            'file',
+          // Determine the MIME type based on the file name, defaulting to octet-stream if unknown
+          final fileName = file['name'] as String? ?? 'file_$i';
+          final mimeType =
+              lookupMimeType(fileName) ?? 'application/octet-stream';
+
+          // Create the multipart file
+          final multipartFile = http.MultipartFile.fromBytes(
+            'attachment', // The field name that Web3Forms expects for attachments
             bytes,
-            filename: file['name'],
+            filename: fileName,
             contentType: MediaType.parse(mimeType),
-          ));
+          );
+
+          // Add the file to the request
+          request.files.add(multipartFile);
+          print(
+              'Added file: $fileName (${bytes.length} bytes, type: $mimeType)');
         }
       }
 
-      final response = await request.send();
-      final responseBody = await response.stream.bytesToString();
-      final responseData = json.decode(responseBody);
+      print('Sending request with ${request.files.length} files');
 
+      // Send the request
+      final streamedResponse = await request.send();
+      final response = await http.Response.fromStream(streamedResponse);
+
+      print('Response Status Code: ${response.statusCode}');
+      print('Response Body: ${response.body}');
+
+      // Parse the response
+      final responseData = json.decode(response.body);
+
+      // Handle the response
       if (response.statusCode == 200) {
         return {
           'success': true,
@@ -119,11 +145,16 @@ class Web3FormsService {
       } else {
         return {
           'success': false,
-          'message': responseData['message'] ?? 'Failed to send feedback.'
+          'message': responseData['message'] ??
+              'Failed to send feedback. Please try again.'
         };
       }
     } catch (e) {
-      return {'success': false, 'message': 'Error: ${e.toString()}'};
+      print('Exception in sendFeedbackWithAttachments: $e');
+      return {
+        'success': false,
+        'message': 'Network error. Please check your connection and try again.'
+      };
     }
   }
 }

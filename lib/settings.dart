@@ -6,12 +6,14 @@ import 'package:leo_app_01/policy.dart';
 import 'package:leo_app_01/services/api_service.dart';
 import 'package:leo_app_01/services/socket_service.dart';
 import 'package:leo_app_01/splash.dart';
+import 'package:leo_app_01/widgets/profile_setting.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 import 'widgets/feedback_screen.dart';
 import 'widgets/helpcenter.dart';
+import 'widgets/privacy_setting.dart';
 
 class SettingsPage extends StatelessWidget {
   const SettingsPage({super.key});
@@ -45,13 +47,13 @@ class SettingsPage extends StatelessWidget {
             context,
             icon: Icons.person_outline,
             title: 'Profile Settings',
-            onTap: () => _navigateToPage(context, 'Profile Settings'),
+            onTap: () => _navigateToProfilePage(context, 'Profile Settings'),
           ),
           _buildSettingTile(
             context,
             icon: Icons.lock_outline,
             title: 'Privacy Settings',
-            onTap: () => _navigateToPage(context, 'Privacy Settings'),
+            onTap: () => _navigateToPrivacyPage(context, 'Privacy Settings'),
           ),
           _buildSettingTile(
             context,
@@ -630,6 +632,25 @@ class SettingsPage extends StatelessWidget {
         ),
       ),
       onTap: onTap,
+    );
+  }
+
+//_navigateToPrivacyPage
+  void _navigateToPrivacyPage(BuildContext context, String title) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => PrivacySetting(title: title),
+      ),
+    );
+  }
+
+  void _navigateToProfilePage(BuildContext context, String title) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => ProfileSetting(title: title),
+      ),
     );
   }
 

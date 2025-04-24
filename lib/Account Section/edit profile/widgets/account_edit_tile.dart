@@ -3,18 +3,20 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import '../../constants.dart';
 
 class AccountTile extends StatelessWidget {
-  const AccountTile({
+  AccountTile({
     super.key,
     required this.text,
     required this.icon,
     required this.endWidget,
     required this.onTap,
+    required this.isUpcomming,
   });
 
   final String text;
   final IconData icon;
   final Widget endWidget;
   final GestureTapCallback onTap;
+  bool isUpcomming = false;
 
   @override
   Widget build(BuildContext context) {
@@ -33,11 +35,9 @@ class AccountTile extends StatelessWidget {
               grade: 200,
               weight: 600,
             ),
-        
             SizedBox(
               width: 15.w,
             ),
-        
             Text(
               text,
               style: TextStyle(
@@ -46,9 +46,26 @@ class AccountTile extends StatelessWidget {
                 fontWeight: FontWeight.bold,
               ),
             ),
-        
+            SizedBox(
+              width: 15.w,
+            ),
+            if (isUpcomming)
+              Container(
+                height: 50,
+                width: 50,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(20),
+                  color: darkModeEnabled ? Colors.grey[800] : Colors.grey[200],
+                ),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(20),
+                  child: const Image(
+                    image: AssetImage('assets/comingzoon1.jpg'),
+                    fit: BoxFit.cover,
+                  ),
+                ),
+              ),
             const Spacer(),
-        
             endWidget,
           ],
         ),

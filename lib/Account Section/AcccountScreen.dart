@@ -6,6 +6,7 @@ import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../settings.dart';
 import '../widgets/feedback_screen.dart';
+import '../widgets/language_page.dart';
 import 'constants.dart';
 import 'edit profile/theme.dart';
 import 'edit profile/widgets/account_edit_tile.dart';
@@ -192,6 +193,7 @@ class _AccountScreen1State extends State<AccountScreen1> {
         child: Column(
           children: [
             AccountTile(
+              isUpcomming: false,
               icon: Icons.wallet,
               text: 'Wallet',
               onTap: () => _navigateToWallet(context),
@@ -199,6 +201,7 @@ class _AccountScreen1State extends State<AccountScreen1> {
             ),
             const Divider(color: Colors.black12, thickness: 0.3),
             AccountTile(
+              isUpcomming: true,
               icon: Icons.diamond_outlined,
               text: 'Earn diamond',
               onTap: () => _navigateToEarnDiamond(context),
@@ -252,6 +255,7 @@ class _AccountScreen1State extends State<AccountScreen1> {
         child: Column(
           children: [
             AccountTile(
+              isUpcomming: false,
               icon: Icons.leaderboard_outlined,
               text: 'Level',
               onTap: () => _navigateToLevel(context),
@@ -259,6 +263,7 @@ class _AccountScreen1State extends State<AccountScreen1> {
             ),
             const Divider(color: Colors.black12, thickness: 0.3),
             AccountTile(
+              isUpcomming: false,
               icon: Icons.wallet_giftcard_outlined,
               text: 'Nobel',
               onTap: () => _navigateToNobel(context),
@@ -266,6 +271,7 @@ class _AccountScreen1State extends State<AccountScreen1> {
             ),
             const Divider(color: Colors.black12, thickness: 0.3),
             AccountTile(
+              isUpcomming: true,
               icon: Icons.workspace_premium_outlined,
               text: 'Svip',
               onTap: () => _navigateToSVIP(context),
@@ -273,6 +279,7 @@ class _AccountScreen1State extends State<AccountScreen1> {
             ),
             const Divider(color: Colors.black12, thickness: 0.3),
             AccountTile(
+              isUpcomming: true,
               icon: Icons.favorite_border_rounded,
               text: 'Cp space',
               onTap: () => _navigateToCpSpace(context),
@@ -280,6 +287,7 @@ class _AccountScreen1State extends State<AccountScreen1> {
             ),
             const Divider(color: Colors.black12, thickness: 0.3),
             AccountTile(
+              isUpcomming: true,
               icon: Icons.family_restroom_rounded,
               text: 'Family',
               onTap: () => _navigateToFamily(context),
@@ -302,6 +310,7 @@ class _AccountScreen1State extends State<AccountScreen1> {
         child: Column(
           children: [
             AccountTile(
+              isUpcomming: false,
               icon: Icons.add_chart_outlined,
               text: 'Achievement',
               onTap: () => _navigateToAchievements(context),
@@ -309,6 +318,7 @@ class _AccountScreen1State extends State<AccountScreen1> {
             ),
             const Divider(color: Colors.black12, thickness: 0.3),
             AccountTile(
+              isUpcomming: false,
               icon: Icons.list,
               text: 'My items',
               onTap: () => _navigateToItems(context),
@@ -316,6 +326,7 @@ class _AccountScreen1State extends State<AccountScreen1> {
             ),
             const Divider(color: Colors.black12, thickness: 0.3),
             AccountTile(
+              isUpcomming: false,
               icon: Icons.group_add_outlined,
               text: 'Invited friends',
               onTap: () => _navigateToInviteFriends(context),
@@ -338,6 +349,7 @@ class _AccountScreen1State extends State<AccountScreen1> {
         child: Column(
           children: [
             AccountTile(
+              isUpcomming: false,
               icon: Icons.language_outlined,
               text: 'Language',
               onTap: () => _navigateToLanguage(context),
@@ -345,6 +357,7 @@ class _AccountScreen1State extends State<AccountScreen1> {
             ),
             const Divider(color: Colors.black12, thickness: 0.3),
             AccountTile(
+              isUpcomming: false,
               icon: Icons.feedback_outlined,
               text: 'Feedback',
               onTap: () => _navigateToFeedback(context),
@@ -352,6 +365,7 @@ class _AccountScreen1State extends State<AccountScreen1> {
             ),
             const Divider(color: Colors.black12, thickness: 0.3),
             AccountTile(
+              isUpcomming: false,
               icon: Icons.settings_outlined,
               text: 'Setting',
               onTap: () => _navigateToSettings(context),
@@ -413,7 +427,10 @@ class _AccountScreen1State extends State<AccountScreen1> {
   }
 
   void _navigateToLanguage(BuildContext context) {
-    // Implement language settings navigation
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const LanguagePage()),
+    );
   }
 
   void _navigateToFeedback(BuildContext context) {

@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:country_picker/country_picker.dart';
 import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:math';
+import '../HomeScreen.dart';
+import '../services/api_service.dart';
 import 'OtpScreen.dart';
 
 class PhoneNumberScreen extends StatefulWidget {
@@ -15,6 +18,7 @@ class _PhoneNumberScreenState extends State<PhoneNumberScreen> {
   String _selectedCountryCode = '+1';
   String _selectedCountryFlag = '🇺🇸';
   final TextEditingController _phoneController = TextEditingController();
+  bool _isLoading = false;
 
   @override
   Widget build(BuildContext context) {
@@ -134,54 +138,84 @@ class _PhoneNumberScreenState extends State<PhoneNumberScreen> {
                                 borderRadius: BorderRadius.circular(12),
                               ),
                             ),
+                            // Modify the onPressed method of your Next button in PhoneNumberScreen
                             onPressed: () async {
+                              // Show loading indicator
+                              setState(() {
+                                _isLoading = true;
+                              });
+
                               String fullPhoneNumber =
                                   '$_selectedCountryCode${_phoneController.text}';
-                              String otp = generateOTP();
-                              print(
-                                  'Generated OTP: $otp'); // Print OTP to console
-
-                              // Notify.lk API credentials (Replace these with your actual credentials)
-                              const String userId = '29316';
-                              const String apiKey = 'RH9L1weIpJJODyQkFfSe';
-                              const String senderId = 'NotifyDEMO';
-
-                              // Notify.lk API endpoint
-                              const String url =
-                                  'https://app.notify.lk/api/v1/send';
-
-                              // Prepare the message content
-                              String message =
-                                  'Your verification code is $otp. Please use this to verify your account.';
-
-                              // API call parameters
-                              final Map<String, String> queryParams = {
-                                'user_id': userId,
-                                'api_key': apiKey,
-                                'sender_id': senderId,
-                                'to': fullPhoneNumber.replaceAll('+',
-                                    ''), // Ensure the phone number is in 947XXXXXXXX format
-                                'message': message,
-                              };
-
+                              // Clean the phone number to match the format in the database
+                              String cleanedNumber = fullPhoneNumber.replaceAll(
+                                  RegExp(r'[^0-9]'), '');
+                              print('cleanedNumber: $cleanedNumber');
                               try {
-                                // Send OTP via Notify.lk API
-                                final response = await http.post(
-                                  Uri.parse(url)
-                                      .replace(queryParameters: queryParams),
+                                // Initialize the UserApiService
+                                final userApiService = UserApiService(
+                                  baseUrl:
+                                      'http://145.223.21.62:8090', // Replace with your actual base URL
                                 );
-                                print("response");
-                                print(response);
-                                // Handle API response
-                                if (response.statusCode == 200) {
-                                  final responseData = response.body;
-                                  print(
-                                      'Response from Notify.lk: $responseData');
 
-                                  // Check if OTP was sent successfully
-                                  if (responseData
-                                      .contains('"status":"success"')) {
-                                    print('otp: $otp');
+                                // Check if user exists
+                                final existingUser = await userApiService
+                                    .getUserByPhoneNumber(cleanedNumber);
+
+                                if (existingUser != null) {
+                                  final prefs =
+                                      await SharedPreferences.getInstance();
+
+                                  String userId = existingUser.id;
+                                  prefs.setString('userId', userId);
+                                  String username = existingUser.firstname;
+                                  print('Found user with ID: $userId');
+                                  print('Found user with username: $username');
+                                  // User exists, navigate directly to home
+                                  print(
+                                      'User found! Navigating to Home Screen');
+                                  Navigator.pushReplacement(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (context) => HomeScreen(
+                                        userId: userId,
+                                        username: username,
+                                      ),
+                                    ),
+                                  );
+                                } else {
+                                  // User doesn't exist, continue with OTP process
+                                  String otp = generateOTP();
+                                  print('Generated OTP: $otp'); // For debugging
+
+                                  // Continue with your existing OTP sending logic
+                                  const String userId = '29316';
+                                  const String apiKey = 'RH9L1weIpJJODyQkFfSe';
+                                  const String senderId = 'NotifyDEMO';
+                                  const String url =
+                                      'https://app.notify.lk/api/v1/send';
+
+                                  String message =
+                                      'Your verification code is $otp. Please use this to verify your account.';
+
+                                  final Map<String, String> queryParams = {
+                                    'user_id': userId,
+                                    'api_key': apiKey,
+                                    'sender_id': senderId,
+                                    'to':
+                                        cleanedNumber, // Using the cleaned number format
+                                    'message': message,
+                                  };
+
+                                  // Send OTP via Notify.lk API
+                                  final response = await http.post(
+                                    Uri.parse(url)
+                                        .replace(queryParameters: queryParams),
+                                  );
+
+                                  print("API Response: ${response.statusCode}");
+
+                                  if (response.statusCode == 200) {
                                     Navigator.pushReplacement(
                                       context,
                                       MaterialPageRoute(
@@ -191,42 +225,27 @@ class _PhoneNumberScreenState extends State<PhoneNumberScreen> {
                                         ),
                                       ),
                                     );
-                                    // Navigate to OTP screen on success
-                                    // Navigator.push(
-                                    //   context,
-                                    //   MaterialPageRoute(
-                                    //     builder: (context) => OtpScreen(
-                                    //       phoneNumber: fullPhoneNumber,
-                                    //       otp: otp,
-                                    //     ),
-                                    //   ),
-                                    // );
                                   } else {
-                                    // Display error if OTP failed to send
+                                    // Show error message
                                     ScaffoldMessenger.of(context).showSnackBar(
                                       const SnackBar(
                                           content: Text(
                                               'Failed to send OTP. Please try again.')),
                                     );
                                   }
-                                } else {
-                                  // Handle non-200 response
-                                  print(
-                                      'Failed to send OTP. Status code: ${response.statusCode}');
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(
-                                        content: Text(
-                                            'Failed to send OTP. Please try again later.')),
-                                  );
                                 }
                               } catch (e) {
-                                // Handle exceptions
-                                print('Error occurred while sending OTP: $e');
+                                // Handle error
+                                print('Error: $e');
                                 ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                      content: Text(
-                                          'An error occurred. Please try again later.')),
+                                  SnackBar(
+                                      content: Text('Error: ${e.toString()}')),
                                 );
+                              } finally {
+                                // Hide loading indicator
+                                setState(() {
+                                  _isLoading = false;
+                                });
                               }
                             },
                             child: const Text(

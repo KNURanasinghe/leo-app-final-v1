@@ -169,6 +169,33 @@ class UserApiService {
           'Failed to delete user with ID: $id. Status code: ${response.statusCode}');
     }
   }
+
+  Future<User?> getUserByPhoneNumber(String phoneNumber) async {
+    // Clean the phone number - remove any non-digit characters
+    String cleanedNumber = phoneNumber.replaceAll(RegExp(r'[^0-9]'), '');
+
+    final response = await http.get(
+      Uri.parse(
+          '$baseUrl/api/collections/users/records?filter=(phonenumber=$cleanedNumber)'),
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    );
+
+    if (response.statusCode == 200) {
+      final Map<String, dynamic> data = jsonDecode(response.body);
+      final List<dynamic> items = data['items'];
+
+      if (items.isNotEmpty) {
+        return User.fromJson(items[0]);
+      } else {
+        return null; // No user found with this phone number
+      }
+    } else {
+      throw Exception(
+          'Failed to check for phone number. Status code: ${response.statusCode}');
+    }
+  }
 }
 
 // Example usage:
