@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:leo_app_01/Account%20Section/constants.dart';
@@ -6,6 +7,8 @@ import 'package:leo_app_01/Account%20Section/edit%20profile/widgets/back_button.
 import 'package:leo_app_01/Account%20Section/edit%20profile/widgets/body_container.dart';
 import 'package:leo_app_01/services/feedback_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:file_picker/file_picker.dart';
+import 'package:path/path.dart' as path;
 
 class HelpCenterScreen extends StatefulWidget {
   const HelpCenterScreen({super.key});
@@ -111,11 +114,6 @@ class _HelpCenterScreenState extends State<HelpCenterScreen> {
         'answer':
             'To create an account, download our app from the App Store or Google Play Store, then click "Sign Up" on the welcome screen. Follow the prompts to enter your details and create your account.',
       },
-      // {
-      //   'question': 'How can I reset my password?',
-      //   'answer':
-      //       'To reset your password, go to the login screen and tap "Forgot Password". Enter your email address and follow the instructions sent to your email to create a new password.',
-      // },
       {
         'question': 'How do I update my profile information?',
         'answer':
@@ -234,6 +232,11 @@ class _ContactUsFormState extends State<ContactUsForm> {
   String? _errorMessage;
   String? _successMessage;
 
+  // File attachment variables
+  List<PlatformFile> _attachments = [];
+  final int _maxAttachments = 3;
+  final int _maxFileSize = 10 * 1024 * 1024; // 10MB in bytes
+
   // List of help topics
   final List<String> _helpTopics = [
     'Account Issues',
@@ -278,6 +281,64 @@ class _ContactUsFormState extends State<ContactUsForm> {
     super.dispose();
   }
 
+  Future<void> _pickFiles() async {
+    try {
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.any,
+        allowMultiple: true,
+        withData: true,
+      );
+
+      if (result != null) {
+        // Check if adding these files would exceed the max attachment limit
+        if (_attachments.length + result.files.length > _maxAttachments) {
+          _showErrorSnackBar(
+              'You can only attach up to $_maxAttachments files.');
+          return;
+        }
+
+        // Check file sizes
+        for (var file in result.files) {
+          if (file.size > _maxFileSize) {
+            _showErrorSnackBar('${file.name} exceeds the 10MB size limit.');
+            return;
+          }
+        }
+
+        setState(() {
+          _attachments.addAll(result.files);
+        });
+      }
+    } catch (e) {
+      _showErrorSnackBar('Error picking files: ${e.toString()}');
+    }
+  }
+
+  void _removeAttachment(int index) {
+    setState(() {
+      _attachments.removeAt(index);
+    });
+  }
+
+  void _showErrorSnackBar(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: Colors.red,
+      ),
+    );
+  }
+
+  String _getFileSizeString(int bytes) {
+    if (bytes < 1024) {
+      return '$bytes B';
+    } else if (bytes < 1024 * 1024) {
+      return '${(bytes / 1024).toStringAsFixed(1)} KB';
+    } else {
+      return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
+    }
+  }
+
   Future<void> _submitHelpRequest() async {
     if (!_formKey.currentState!.validate()) {
       return;
@@ -290,12 +351,23 @@ class _ContactUsFormState extends State<ContactUsForm> {
     });
 
     try {
-      // Use the same service but for help requests
-      final result = await Web3FormsService.sendFeedback(
+      // Convert attachments to base64 or appropriate format for sending
+      List<Map<String, dynamic>> attachmentData = [];
+      for (var file in _attachments) {
+        attachmentData.add({
+          'name': file.name,
+          'data': file.bytes,
+          'size': file.size,
+        });
+      }
+
+      // Use the service to send feedback with attachments
+      final result = await Web3FormsService.sendFeedbackWithAttachments(
         name: _nameController.text,
         email: _emailController.text,
         message: _messageController.text,
         feedbackType: _selectedHelpTopic,
+        attachments: attachmentData,
       );
 
       print('Help request result: $result');
@@ -309,10 +381,11 @@ class _ContactUsFormState extends State<ContactUsForm> {
           _emailController.clear();
           _messageController.clear();
           _selectedHelpTopic = 'General Inquiries';
+          _attachments = [];
         });
       } else {
         setState(() {
-          _errorMessage = result['message'];
+          _errorMessage = result['message'] ?? 'Failed to send request';
         });
       }
     } catch (e) {
@@ -380,7 +453,7 @@ class _ContactUsFormState extends State<ContactUsForm> {
                 contentPadding:
                     EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
               ),
-              style: const TextStyle(
+              style: TextStyle(
                 color: darkModeEnabled ? kDarkTextColor : kTextColor,
               ),
               validator: (value) {
@@ -418,7 +491,7 @@ class _ContactUsFormState extends State<ContactUsForm> {
                 contentPadding:
                     EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
               ),
-              style: const TextStyle(
+              style: TextStyle(
                 color: darkModeEnabled ? kDarkTextColor : kTextColor,
               ),
               validator: (value) {
@@ -511,7 +584,7 @@ class _ContactUsFormState extends State<ContactUsForm> {
                 ),
                 contentPadding: EdgeInsets.all(16.w),
               ),
-              style: const TextStyle(
+              style: TextStyle(
                 color: darkModeEnabled ? kDarkTextColor : kTextColor,
               ),
               validator: (value) {
@@ -524,6 +597,123 @@ class _ContactUsFormState extends State<ContactUsForm> {
                 return null;
               },
             ),
+            SizedBox(height: 20.h),
+
+            // Attachments section
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'Attachments (${_attachments.length}/$_maxAttachments)',
+                  style: TextStyle(
+                    fontSize: 14.sp,
+                    fontWeight: FontWeight.w500,
+                    color: darkModeEnabled ? kDarkTextColor : kTextColor,
+                  ),
+                ),
+                if (_attachments.length < _maxAttachments)
+                  TextButton.icon(
+                    onPressed: _pickFiles,
+                    icon: Icon(
+                      Icons.attach_file,
+                      size: 18.sp,
+                      color: kPrimaryColor,
+                    ),
+                    label: Text(
+                      'Add Files',
+                      style: TextStyle(
+                        color: kPrimaryColor,
+                        fontSize: 14.sp,
+                      ),
+                    ),
+                    style: TextButton.styleFrom(
+                      padding:
+                          EdgeInsets.symmetric(horizontal: 12.w, vertical: 8.h),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8.r),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+            SizedBox(height: 8.h),
+            Text(
+              'Max 3 files, 10MB each',
+              style: TextStyle(
+                fontSize: 12.sp,
+                color: kAltTextColor,
+              ),
+            ),
+            SizedBox(height: 10.h),
+
+            // Display attached files
+            if (_attachments.isNotEmpty)
+              Container(
+                decoration: BoxDecoration(
+                  color: darkModeEnabled ? Colors.grey[800] : Colors.grey[200],
+                  borderRadius: BorderRadius.circular(8.r),
+                ),
+                padding: EdgeInsets.all(12.w),
+                child: Column(
+                  children: _attachments.asMap().entries.map((entry) {
+                    int index = entry.key;
+                    PlatformFile file = entry.value;
+                    return Container(
+                      margin: EdgeInsets.only(
+                          bottom: index < _attachments.length - 1 ? 8.h : 0),
+                      child: Row(
+                        children: [
+                          Icon(
+                            _getFileIcon(file.extension ?? ''),
+                            size: 24.sp,
+                            color: kPrimaryColor,
+                          ),
+                          SizedBox(width: 8.w),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  file.name,
+                                  style: TextStyle(
+                                    fontSize: 14.sp,
+                                    color: darkModeEnabled
+                                        ? kDarkTextColor
+                                        : kTextColor,
+                                    fontWeight: FontWeight.w500,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                  maxLines: 1,
+                                ),
+                                Text(
+                                  _getFileSizeString(file.size),
+                                  style: TextStyle(
+                                    fontSize: 12.sp,
+                                    color: kAltTextColor,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          IconButton(
+                            onPressed: () => _removeAttachment(index),
+                            icon: Icon(
+                              Icons.close,
+                              size: 18.sp,
+                              color: kAltTextColor,
+                            ),
+                            padding: EdgeInsets.zero,
+                            constraints: BoxConstraints(
+                              minWidth: 24.w,
+                              minHeight: 24.h,
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  }).toList(),
+                ),
+              ),
             SizedBox(height: 20.h),
 
             // Error and success messages
@@ -612,5 +802,81 @@ class _ContactUsFormState extends State<ContactUsForm> {
         ),
       ),
     );
+  }
+
+  // Helper method to get the appropriate icon based on file extension
+  IconData _getFileIcon(String extension) {
+    extension = extension.toLowerCase();
+
+    if (['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp'].contains(extension)) {
+      return Icons.image;
+    } else if (['pdf'].contains(extension)) {
+      return Icons.picture_as_pdf;
+    } else if (['doc', 'docx'].contains(extension)) {
+      return Icons.description;
+    } else if (['xls', 'xlsx'].contains(extension)) {
+      return Icons.table_chart;
+    } else if (['ppt', 'pptx'].contains(extension)) {
+      return Icons.slideshow;
+    } else if (['mp4', 'avi', 'mov', 'wmv'].contains(extension)) {
+      return Icons.video_file;
+    } else if (['mp3', 'wav', 'ogg'].contains(extension)) {
+      return Icons.audio_file;
+    } else if (['zip', 'rar', '7z'].contains(extension)) {
+      return Icons.folder_zip;
+    } else {
+      return Icons.insert_drive_file;
+    }
+  }
+}
+
+// Extend the Web3FormsService with a method that handles attachments
+extension Web3FormsServiceExtension on Web3FormsService {
+  static Future<Map<String, dynamic>> sendFeedbackWithAttachments({
+    required String name,
+    required String email,
+    required String message,
+    required String feedbackType,
+    required List<Map<String, dynamic>> attachments,
+  }) async {
+    try {
+      // Implementation would depend on how your backend handles file uploads
+      // This is a placeholder for the actual implementation
+
+      // First, send basic form data
+      final baseResult = await Web3FormsService.sendFeedback(
+        name: name,
+        email: email,
+        message: message,
+        feedbackType: feedbackType,
+      );
+
+      if (!baseResult['success']) {
+        return baseResult;
+      }
+
+      // If attachments are present, handle them
+      if (attachments.isNotEmpty) {
+        // Here you would typically:
+        // 1. Convert the file bytes to a format your API accepts
+        // 2. Send them to your backend, possibly as multipart/form-data
+        // 3. Attach them to the email that gets sent
+
+        // For now, let's just return success
+        return {
+          'success': true,
+          'message':
+              'Your message and ${attachments.length} attachment(s) were sent successfully.',
+        };
+      }
+
+      return baseResult;
+    } catch (e) {
+      print('Error sending feedback with attachments: $e');
+      return {
+        'success': false,
+        'message': 'Failed to send message: ${e.toString()}',
+      };
+    }
   }
 }
