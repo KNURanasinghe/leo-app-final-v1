@@ -33,6 +33,42 @@ import 'media.dart';
 
 final navigatorKey = GlobalKey<NavigatorState>();
 
+class UserData {
+  final String id;
+  final String name;
+  final String avatarUrl;
+  final String? borderUrl;
+  final String? riveFileUrl;
+
+  UserData({
+    required this.id,
+    required this.name,
+    required this.avatarUrl,
+    this.borderUrl,
+    this.riveFileUrl,
+  });
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'name': name,
+      'avatarUrl': avatarUrl,
+      'borderUrl': borderUrl,
+      'riveFileUrl': riveFileUrl,
+    };
+  }
+
+  factory UserData.fromJson(Map<String, dynamic> json) {
+    return UserData(
+      id: json['id'],
+      name: json['name'],
+      avatarUrl: json['avatarUrl'],
+      borderUrl: json['borderUrl'],
+      riveFileUrl: json['riveFileUrl'],
+    );
+  }
+}
+
 // Add this class outside your LivePageState class
 class EmojiLayoutDelegate extends MultiChildLayoutDelegate {
   final List<String> users;
@@ -147,8 +183,9 @@ class LivePageState extends State<LivePage>
   bool _showWelcomeMessage = true;
   final String _welcomeMessage =
       "Welcome to Hapi! Please respect each other and talk politely. Abusing, third-party advertising, fake official information and politically sensitive topics are strictly prohibited. please report if you find these situations";
+  final Map<String, UserData> _userData = {};
 
-// Add this to your LivePageState class variables
+  // Add this to your LivePageState class variables
   final Map<String, String> _userRiveFiles = {};
   bool _loadingRiveFiles = false;
 
@@ -188,8 +225,8 @@ class LivePageState extends State<LivePage>
   File? _selectedBackgroundImage;
   bool _isRoomUpdating = false;
   final Map<String, String> _userBorders = {};
-
-// Method to handle room photo selection
+  final Map<int, Map<String, dynamic>> _seatOccupants = {};
+  // Method to handle room photo selection
   Future<void> _pickRoomPhoto() async {
     final picker = ImagePicker();
     final pickedFile = await picker.pickImage(source: ImageSource.gallery);
@@ -223,7 +260,7 @@ class LivePageState extends State<LivePage>
     }
   }
 
-// Method to handle background image selection
+  // Method to handle background image selection
   Future<void> _pickBackgroundImage() async {
     final picker = ImagePicker();
     final pickedFile = await picker.pickImage(source: ImageSource.gallery);
@@ -257,7 +294,7 @@ class LivePageState extends State<LivePage>
     }
   }
 
-// Update room name
+  // Update room name
   Future<void> _updateRoomName(String newName) async {
     if (newName.isEmpty) return;
 
@@ -304,7 +341,7 @@ class LivePageState extends State<LivePage>
     }
   }
 
-// Update room photo
+  // Update room photo
   Future<void> _updateRoomPhoto() async {
     if (_selectedRoomPhoto == null) return;
 
@@ -350,7 +387,7 @@ class LivePageState extends State<LivePage>
     }
   }
 
-// Update background image
+  // Update background image
   Future<void> _updateBackgroundImage() async {
     if (_selectedBackgroundImage == null) return;
 
@@ -423,7 +460,7 @@ class LivePageState extends State<LivePage>
     }
   }
 
-// Add a method to notify border change (to broadcast to others)
+  // Add a method to notify border change (to broadcast to others)
   // Helper to notify border change (to broadcast to others)
   void _notifyBorderChange(String borderUrl) {
     if (socket.connected) {
@@ -532,7 +569,7 @@ class LivePageState extends State<LivePage>
     print('===== END BORDER DEBUG INFO =====\n');
   }
 
-// Add this method to manually fetch and set border for a specific user
+  // Add this method to manually fetch and set border for a specific user
   Future<void> _forceFetchBorder(String userId) async {
     try {
       print('BORDER DEBUG: Manually fetching border for user: $userId');
@@ -658,7 +695,7 @@ class LivePageState extends State<LivePage>
         _loadUserRiveFiles();
       }
     });
-// Add this to your initState
+    // Add this to your initState
     Timer.periodic(const Duration(seconds: 10), (_) {
       if (mounted && _userRiveFiles.containsKey(widget.userId)) {
         // Resend our animation periodically
@@ -851,7 +888,7 @@ class LivePageState extends State<LivePage>
     });
   }
 
-// Add this debug helper method
+  // Add this debug helper method
   void _dumpRiveFilesMap() {
     print('==== RIVE FILES MAP DUMP ====');
     print('Total entries: ${_userRiveFiles.length}');
@@ -861,7 +898,7 @@ class LivePageState extends State<LivePage>
     print('===========================');
   }
 
-// Add this helper method to your LivePageState class to normalize user IDs
+  // Add this helper method to your LivePageState class to normalize user IDs
   String _normalizeUserId(String userId) {
     // Remove any prefixes/suffixes that might be added by Zego
     return userId.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '');
@@ -999,31 +1036,43 @@ class LivePageState extends State<LivePage>
     _resetAnimationState();
   }
 
-  // Fix 2: Properly implement the _fetchAnnouncement method
-  Future<void> _fetchAnnouncement(String roomId) async {
-    try {
-      // Use a direct and specific API endpoint for fetching
-      final response = await http.get(
-        Uri.parse('$POCKETBASE_URL/api/collections/voiceRooms/records/$roomId'),
-        headers: {'Content-Type': 'application/json'},
-      );
+// Add this to your LivePageState class
+  void _handleSeatTaken(String userId, int seatIndex) {
+    if (socket.connected) {
+      // Get the user details from your existing data
+      final userAvatar = _findUserAvatar(userId);
+      final userBorder = _userBorders[userId];
+      final userName = _findUserName(userId);
 
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        if (mounted) {
-          setState(() {
-            // Set the announcement state variable
-            _announcement = data['announcement'];
-            print('Fetched announcement: $_announcement'); // Debug log
-          });
-        }
-      } else {
-        print('Failed to fetch announcement: ${response.statusCode}');
-        print('Response body: ${response.body}');
-      }
-    } catch (e) {
-      print('Error fetching announcement: $e');
+      // Emit the seat taken event
+      socket.emit('seatTaken', {
+        'roomId': widget.roomID,
+        'userId': userId,
+        'seatIndex': seatIndex,
+        'userAvatar': userAvatar,
+        'userName': userName,
+        'borderUrl': userBorder
+      });
+
+      print('Emitted seatTaken event for user $userId in seat $seatIndex');
     }
+  }
+
+// Helper method to find a user's avatar URL
+  String? _findUserAvatar(String userId) {
+    // First check online users
+    for (final user in onlineUsers) {
+      if (user.id == userId) {
+        return user.avatarUrl;
+      }
+    }
+
+    // If current user
+    if (userId == widget.userId) {
+      return _userAvatarUrl;
+    }
+
+    return null;
   }
 
   Future<void> _loadUserRiveFiles() async {
@@ -1051,7 +1100,7 @@ class LivePageState extends State<LivePage>
     }
   }
 
-// Helper method for logging
+  // Helper method for logging
   void logDebug(String message) {
     print('[RIVE DEBUG] $message');
   }
@@ -1110,7 +1159,7 @@ class LivePageState extends State<LivePage>
     }
   }
 
-// 4. Add a method to show announcement edit dialog
+  // 4. Add a method to show announcement edit dialog
   void _showAnnouncementDialog(BuildContext context) {
     final TextEditingController announcementController =
         TextEditingController(text: _announcement ?? '');
@@ -1190,7 +1239,7 @@ class LivePageState extends State<LivePage>
     );
   }
 
-// 5. Add welcome and announcement widgets to the build method
+  // 5. Add welcome and announcement widgets to the build method
   Widget _buildWelcomeAndAnnouncement() {
     // Calculate the position based on welcome message visibility
     double bottomPosition = _showWelcomeMessage
@@ -1483,7 +1532,7 @@ class LivePageState extends State<LivePage>
 
         _handleEntryAnimation(riveFileUrl);
       }
-// Add this in your socket initialization
+      // Add this in your socket initialization
       socket.on('roomChange', (data) {
         if (!mounted) return;
 
@@ -1512,7 +1561,30 @@ class LivePageState extends State<LivePage>
         }
       });
 
-// Add this in your socket initialization (in _initializeSocket method)
+// Add this in your _initializeSocket method
+      socket.on('seatTaken', (data) {
+        if (!mounted) return;
+
+        final userId = data['userId'];
+        final seatIndex = data['seatIndex'];
+        final userAvatar = data['userAvatar'];
+        final userName = data['userName'];
+        final borderUrl = data['borderUrl'];
+
+        setState(() {
+          // Store this info in a map to track which user is in which seat
+          _seatOccupants[seatIndex] = {
+            'userId': userId,
+            'userAvatar': userAvatar,
+            'userName': userName,
+            'borderUrl': borderUrl
+          };
+        });
+
+        print('User $userId took seat $seatIndex');
+      });
+
+      // Add this in your socket initialization (in _initializeSocket method)
       socket.on('userBorders', (data) {
         if (!mounted) return;
 
@@ -1909,7 +1981,7 @@ class LivePageState extends State<LivePage>
     }
   }
 
-// Add a method to fetch a single user's rive file
+  // Add a method to fetch a single user's rive file
   Future<String> _fetchUserRiveFile(String userId) async {
     try {
       final itemsResponse = await http.get(
@@ -2393,7 +2465,7 @@ class LivePageState extends State<LivePage>
     }
   }
 
-// Modified _handleLogout function
+  // Modified _handleLogout function
   Future<void> _handleLogout() async {
     try {
       print(
@@ -2711,9 +2783,12 @@ class LivePageState extends State<LivePage>
     final borderUrl = _userBorders[widget.userId];
     // Check for Rive file with this user ID
     final riveFileUrl = _userRiveFiles[user.id];
-
+    final seatIndex = extraInfo['seatIndex'] as int?;
     final bool hasActiveAnimation = _activeAnimationSeats.containsKey(user.id);
 
+    print(
+        'SEAT DEBUG: Building foreground for user: ${user.id} in seat: $seatIndex');
+    print('user from foreg $user');
     print('BORDER DEBUG: Building foreground for user: ${user.id}');
     print('BORDER DEBUG: Normalized ID: $normalizedUserId');
     print('BORDER DEBUG: Has border? ${borderUrl != null}');
@@ -3073,7 +3148,7 @@ class LivePageState extends State<LivePage>
     );
   }
 
-// Add this method to show disband confirmation
+  // Add this method to show disband confirmation
   void _showDisbandConfirmation() {
     showDialog(
       context: context,
@@ -4602,7 +4677,7 @@ class LivePageState extends State<LivePage>
     );
   }
 
-// Modify the _showLogoutDialog method to use the new full black container
+  // Modify the _showLogoutDialog method to use the new full black container
   void _showLogoutDialog(BuildContext context) {
     _showFullBlackLogoutContainer(); // Replace the existing alert dialog
   }
@@ -5077,7 +5152,7 @@ class LivePageState extends State<LivePage>
     );
   }
 
-// Helper method to build member list item
+  // Helper method to build member list item
   Widget _buildMemberListItem(Map<String, dynamic> user) {
     return Container(
       height: 70,
@@ -5122,7 +5197,7 @@ class LivePageState extends State<LivePage>
     );
   }
 
-// Header Section
+  // Header Section
   Widget _buildHeader() {
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
@@ -5145,7 +5220,7 @@ class LivePageState extends State<LivePage>
     );
   }
 
-// Updated helper method for room tags
+  // Updated helper method for room tags
   Widget _buildRoomTags(String tags) {
     return ListView(
       scrollDirection: Axis.horizontal,
@@ -5174,7 +5249,7 @@ class LivePageState extends State<LivePage>
     );
   }
 
-// Helper Widgets
+  // Helper Widgets
 
   Widget _buildLevelProgress() {
     return Row(
@@ -5285,6 +5360,17 @@ class LivePageState extends State<LivePage>
           debugPrint(
             'on seats changed, taken seats:$takenSeats, untaken seats:$untakenSeats',
           );
+// Process taken seats
+          takenSeats.forEach((seatIndex, user) {
+            _handleSeatTaken(user.id, seatIndex);
+          });
+
+          // Process empty seats
+          for (var seatIndex in untakenSeats) {
+            setState(() {
+              _seatOccupants.remove(seatIndex);
+            });
+          }
         },
 
         /// WARNING: will override prebuilt logic
@@ -5479,12 +5565,30 @@ class LivePageState extends State<LivePage>
     if (user == null) return Container();
 
     final userId = widget.userId;
-    final normalizedId = _normalizeUserId(userId);
+    final normalizedUserId = _normalizeUserId(userId);
     final borderUrl = _userBorders[userId];
+    final seatIndex = extraInfo['seatIndex'] as int?;
+    String? avatarUrl;
+    if (seatIndex != null && _seatOccupants.containsKey(seatIndex)) {
+      avatarUrl = _seatOccupants[seatIndex]!['userAvatar'];
+    }
+    if (avatarUrl == null) {
+      for (final onlineUser in onlineUsers) {
+        if (onlineUser.id == userId || onlineUser.id == normalizedUserId) {
+          avatarUrl = onlineUser.avatarUrl;
+          break;
+        }
+      }
+    }
+
+    // If still not found and this is the current user, use current user's avatar
+    if (avatarUrl == null &&
+        (userId == widget.userId || normalizedUserId == widget.userId)) {
+      avatarUrl = _userAvatarUrl;
+    }
 
     // Debug log
-    print(
-        'AVATAR DEBUG: Building avatar for $userId (normalized: $normalizedId)');
+    print('AVATAR_DEBUG: Building avatar for $userId in seat $seatIndex');
     print('AVATAR DEBUG: Border URL: ${borderUrl ?? "none"}');
 
     return ClipRRect(
@@ -5503,9 +5607,9 @@ class LivePageState extends State<LivePage>
                   width: 2,
                 ),
               ),
-              child: _userAvatarUrl != null
+              child: avatarUrl != null
                   ? CachedNetworkImage(
-                      imageUrl: _userAvatarUrl!,
+                      imageUrl: avatarUrl,
                       width: size.width,
                       height: size.width,
                       fit: BoxFit.cover,
