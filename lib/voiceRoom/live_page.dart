@@ -1,7 +1,9 @@
 // Flutter imports:
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:rive/rive.dart' as rive;
 import '../services/rive_service.dart';
 import './gift/gift.dart';
@@ -140,7 +142,7 @@ class LivePageState extends State<LivePage>
   Offset? _emojiPosition;
   String? _currentEmoji;
   final Map<String, Widget> _activeEmojis = {};
-
+  String? _previousRoomId;
   String? _announcement;
   bool _showWelcomeMessage = true;
   final String _welcomeMessage =
@@ -179,12 +181,456 @@ class LivePageState extends State<LivePage>
       'http://145.223.21.62:8090'; // Replace with your actual PocketBase URL
   bool _isLoading = false;
   Timer? _riveRefreshTimer;
-
+  bool _hasShownInitialAnimation = false;
   bool _hasJoinedRoom = false;
+
+  File? _selectedRoomPhoto;
+  File? _selectedBackgroundImage;
+  bool _isRoomUpdating = false;
+  final Map<String, String> _userBorders = {};
+
+// Method to handle room photo selection
+  Future<void> _pickRoomPhoto() async {
+    final picker = ImagePicker();
+    final pickedFile = await picker.pickImage(source: ImageSource.gallery);
+
+    if (pickedFile != null) {
+      setState(() {
+        _selectedRoomPhoto = File(pickedFile.path);
+      });
+
+      // Preview the selected image
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Preview Room Photo'),
+          content: Image.file(_selectedRoomPhoto!),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () {
+                Navigator.pop(context);
+                _updateRoomPhoto();
+              },
+              child: const Text('Use This Photo'),
+            ),
+          ],
+        ),
+      );
+    }
+  }
+
+// Method to handle background image selection
+  Future<void> _pickBackgroundImage() async {
+    final picker = ImagePicker();
+    final pickedFile = await picker.pickImage(source: ImageSource.gallery);
+
+    if (pickedFile != null) {
+      setState(() {
+        _selectedBackgroundImage = File(pickedFile.path);
+      });
+
+      // Preview the selected image
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Preview Background Image'),
+          content: Image.file(_selectedBackgroundImage!),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () {
+                Navigator.pop(context);
+                _updateBackgroundImage();
+              },
+              child: const Text('Use This Background'),
+            ),
+          ],
+        ),
+      );
+    }
+  }
+
+// Update room name
+  Future<void> _updateRoomName(String newName) async {
+    if (newName.isEmpty) return;
+
+    setState(() {
+      _isRoomUpdating = true;
+    });
+
+    try {
+      final success = await HttpService.updateRoomSettings(
+        roomId: widget.roomID,
+        roomName: newName,
+      );
+
+      if (success) {
+        // Update local state
+        setState(() {
+          _voiceRoomName = newName;
+        });
+
+        // Notify other users via socket
+        socket.emit('roomSettingsUpdate', {
+          'roomId': widget.roomID,
+          'userId': widget.userId,
+          'settings': {'type': 'name', 'value': newName}
+        });
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Room name updated successfully')),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Failed to update room name')),
+        );
+      }
+    } catch (e) {
+      print('Error updating room name: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error: $e')),
+      );
+    } finally {
+      setState(() {
+        _isRoomUpdating = false;
+      });
+    }
+  }
+
+// Update room photo
+  Future<void> _updateRoomPhoto() async {
+    if (_selectedRoomPhoto == null) return;
+
+    setState(() {
+      _isRoomUpdating = true;
+    });
+
+    try {
+      final success = await HttpService.updateRoomSettings(
+        roomId: widget.roomID,
+        roomPhoto: _selectedRoomPhoto,
+      );
+
+      if (success) {
+        // Update local state with new photo URL
+        await _fetchVoiceRoomDetails(); // Re-fetch details including new URL
+
+        // Notify other users via socket
+        socket.emit('roomSettingsUpdate', {
+          'roomId': widget.roomID,
+          'userId': widget.userId,
+          'settings': {'type': 'photo', 'updated': true}
+        });
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Room photo updated successfully')),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Failed to update room photo')),
+        );
+      }
+    } catch (e) {
+      print('Error updating room photo: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error: $e')),
+      );
+    } finally {
+      setState(() {
+        _selectedRoomPhoto = null;
+        _isRoomUpdating = false;
+      });
+    }
+  }
+
+// Update background image
+  Future<void> _updateBackgroundImage() async {
+    if (_selectedBackgroundImage == null) return;
+
+    setState(() {
+      _isRoomUpdating = true;
+    });
+
+    try {
+      final success = await HttpService.updateRoomSettings(
+        roomId: widget.roomID,
+        backgroundImage: _selectedBackgroundImage,
+      );
+
+      if (success) {
+        // Update local state with new background URL
+        await _fetchVoiceRoomDetails(); // Re-fetch details including new URL
+
+        // Notify other users via socket
+        socket.emit('roomSettingsUpdate', {
+          'roomId': widget.roomID,
+          'userId': widget.userId,
+          'settings': {'type': 'background', 'updated': true}
+        });
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+              content: Text('Background image updated successfully')),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Failed to update background image')),
+        );
+      }
+    } catch (e) {
+      print('Error updating background image: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error: $e')),
+      );
+    } finally {
+      setState(() {
+        _selectedBackgroundImage = null;
+        _isRoomUpdating = false;
+      });
+    }
+  }
+
+  Future<void> _loadUserBorders() async {
+    try {
+      // Request all borders from the socket server
+      socket.emit('fetchUserBorders', {'roomId': widget.roomID});
+
+      print('BORDER DEBUG: Requested user borders from server');
+
+      // Additionally, fetch your own border directly
+      await _fetchOwnBorder();
+
+      // Log current border state
+      _debugBorderState();
+
+      // Fetch borders for all visible users directly via HTTP as a backup
+      // final zegoUsers = ZegoUIKit().getUser().allUsers;
+      // for (final user in zegoUsers) {
+      //   // Skip if we already have this user's border
+      //   if (_userBorders.containsKey(_normalizeUserId(user.id))) continue;
+
+      //   _forceFetchBorder(_normalizeUserId(user.id));
+      // }
+    } catch (e) {
+      print('Error loading user borders: $e');
+    }
+  }
+
+// Add a method to notify border change (to broadcast to others)
+  // Helper to notify border change (to broadcast to others)
+  void _notifyBorderChange(String borderUrl) {
+    if (socket.connected) {
+      print('BORDER DEBUG: Notifying border change: $borderUrl');
+      socket.emit('borderChange', {
+        'roomId': widget.roomID,
+        'userId': widget.userId,
+        'userName': widget.username1,
+        'borderUrl': borderUrl
+      });
+
+      // Update local state
+      setState(() {
+        _userBorders[widget.userId] = borderUrl;
+
+        // Also store with normalized ID
+        final normalizedId = _normalizeUserId(widget.userId);
+        if (normalizedId != widget.userId) {
+          _userBorders[normalizedId] = borderUrl;
+        }
+      });
+    } else {
+      print('BORDER DEBUG: Socket not connected, cannot notify border change');
+    }
+  }
+
+  Future<String?> _fetchOwnBorder() async {
+    try {
+      print('BORDER DEBUG: Fetching own border for user ${widget.userId}');
+
+      final response = await http.get(
+        Uri.parse('$POCKETBASE_URL/api/collections/myItems/records')
+            .replace(queryParameters: {
+          'filter': 'userId="${widget.userId}" && isborder_used=true',
+        }),
+        headers: {'Content-Type': 'application/json'},
+      );
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        final items = List<Map<String, dynamic>>.from(data['items']);
+
+        if (items.isNotEmpty && items[0]['border'] != null) {
+          final item = items[0];
+          final borderUrl =
+              '$POCKETBASE_URL/api/files/myItems/${item['id']}/${item['border']}';
+
+          print('BORDER DEBUG: Found own border: $borderUrl');
+
+          // Update local state
+          setState(() {
+            _userBorders[widget.userId] = borderUrl;
+
+            // Also store with normalized ID to ensure it's found
+            final normalizedId = _normalizeUserId(widget.userId);
+            if (normalizedId != widget.userId) {
+              _userBorders[normalizedId] = borderUrl;
+            }
+          });
+
+          // Notify others about our border
+          if (socket.connected) {
+            socket.emit('borderChange', {
+              'roomId': widget.roomID,
+              'userId': widget.userId,
+              'borderUrl': borderUrl
+            });
+            print('BORDER DEBUG: Notified others about our border');
+          }
+
+          return borderUrl;
+        } else {
+          print('BORDER DEBUG: No active border found for own user');
+        }
+      } else {
+        print(
+            'BORDER DEBUG: Failed to fetch own border: ${response.statusCode}');
+      }
+      return null;
+    } catch (e) {
+      print('Error fetching own border: $e');
+      return null;
+    }
+  }
+
+  void _debugBorderState() {
+    print('\n===== BORDER DEBUG INFO =====');
+    print('Total borders tracked: ${_userBorders.length}');
+
+    if (_userBorders.isEmpty) {
+      print('No borders are currently tracked');
+    } else {
+      print('Borders by user:');
+      _userBorders.forEach((userId, url) {
+        print('User $userId: $url');
+      });
+    }
+
+    // final zegoUsers = ZegoUIKit().getUser().allUsers;
+    // print('\nCurrently visible Zego users (${zegoUsers.length}):');
+    // for (final user in zegoUsers) {
+    //   final hasBorder = _userBorders.containsKey(_normalizeUserId(user.id));
+    //   print('User ${user.id} (${user.name}): ${hasBorder ? "Has border" : "No border"}');
+    // }
+
+    print('===== END BORDER DEBUG INFO =====\n');
+  }
+
+// Add this method to manually fetch and set border for a specific user
+  Future<void> _forceFetchBorder(String userId) async {
+    try {
+      print('BORDER DEBUG: Manually fetching border for user: $userId');
+
+      final response = await http.get(
+        Uri.parse('$POCKETBASE_URL/api/collections/myItems/records')
+            .replace(queryParameters: {
+          'filter': 'userId="$userId" AND isborder_used=true',
+        }),
+        headers: {'Content-Type': 'application/json'},
+      );
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        final items = List<Map<String, dynamic>>.from(data['items']);
+
+        if (items.isNotEmpty && items[0]['border'] != null) {
+          final item = items[0];
+          final borderUrl =
+              '$POCKETBASE_URL/api/files/myItems/${item['id']}/${item['border']}';
+
+          print('BORDER DEBUG: Found border for user $userId: $borderUrl');
+
+          // Update local state with both original and normalized IDs
+          setState(() {
+            _userBorders[userId] = borderUrl;
+
+            // Also store with normalized ID to ensure it's found
+            final normalizedId = _normalizeUserId(userId);
+            if (normalizedId != userId) {
+              _userBorders[normalizedId] = borderUrl;
+            }
+          });
+
+          // Force UI refresh
+          Future.delayed(const Duration(milliseconds: 100), () {
+            if (mounted) setState(() {});
+          });
+
+          return;
+        }
+
+        print('BORDER DEBUG: No active border found for user $userId');
+      } else {
+        print('BORDER DEBUG: Failed to fetch border: ${response.statusCode}');
+      }
+    } catch (e) {
+      print('Error in _forceFetchBorder: $e');
+    }
+  }
 
   @override
   void initState() {
     super.initState();
+    _initializeSocket();
+    _fetchOwnBorder();
+    Future.delayed(const Duration(seconds: 3), () {
+      if (mounted) {
+        _debugBorderState();
+        _forceFetchBorder(widget.userId);
+
+        // Try to force fetch borders for all visible users
+        // final zegoUsers = ZegoUIKit().getUser().allUsers;
+        // for (final user in zegoUsers) {
+        //   if (user.id != widget.userId) {
+        //     _forceFetchBorder(user.id);
+        //   }
+        // }
+      }
+    });
+
+    // Add periodic border debugging
+    Timer.periodic(const Duration(seconds: 10), (_) {
+      if (mounted) {
+        _debugBorderState();
+      }
+    });
+    // Fetch borders periodically
+    Timer.periodic(const Duration(seconds: 30), (_) {
+      if (mounted && socket.connected) {
+        _loadUserBorders();
+      }
+    });
+    print(
+        'ROOM_CHANGE: initState - _previousRoomId: $_previousRoomId, current roomID: ${widget.roomID}');
+    print(
+        'ROOM_CHANGE: Room change detected? ${_previousRoomId != null && _previousRoomId != widget.roomID}');
+    _hasJoinedRoom = false;
+    _hasShownInitialEntry = false;
+    final isRoomChange =
+        _previousRoomId != null && _previousRoomId != widget.roomID;
+
+    if (isRoomChange) {
+      print('Room change detected: from $_previousRoomId to ${widget.roomID}');
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _triggerRoomEntryAnimation();
+      });
+    }
 
     // Sync animations every 30 seconds
     Timer.periodic(const Duration(seconds: 30), (_) {
@@ -193,10 +639,10 @@ class LivePageState extends State<LivePage>
       }
     });
 
-    _initializeSocket();
     _resetAnimationState();
-
+    _hasShownInitialAnimation = false;
     _fetchOwnRiveFile().then((riveFileUrl) {
+      print('room id from init -${widget.roomID}');
       // Only trigger entry animation when joining a room for the first time
       if (socket.connected) {
         socket.emit('joinRoom', {
@@ -205,8 +651,9 @@ class LivePageState extends State<LivePage>
           'userName': widget.username1,
           'userAvatar': _userAvatarUrl,
           'riveFileUrl': _userRiveFiles[widget.userId], // Include Rive URL
+          'forceEntry': true,
         });
-
+        _hasShownInitialAnimation = true;
         _fetchInitialUsers();
         _loadUserRiveFiles();
       }
@@ -331,6 +778,54 @@ class LivePageState extends State<LivePage>
     //       count: 1
     //   ));
     // });
+    socket.on('roomSettingsUpdated', (data) {
+      if (!mounted) return;
+
+      final settings = data['settings'];
+      final type = settings['type'];
+
+      switch (type) {
+        case 'name':
+          setState(() {
+            _voiceRoomName = settings['value'];
+          });
+          break;
+
+        case 'photo':
+        case 'background':
+          // Re-fetch room details to get updated URLs
+          _fetchVoiceRoomDetails();
+          break;
+      }
+
+      // Show notification of the update
+      if (data['updatedBy'] != widget.userId) {
+        final message = type == 'name'
+            ? 'Room name has been updated'
+            : type == 'photo'
+                ? 'Room photo has been updated'
+                : 'Room background has been updated';
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(message)),
+        );
+      }
+    });
+  }
+
+  void _notifyRoomChange(String oldRoomId, String newRoomId) {
+    if (socket.connected) {
+      socket.emit('roomChange', {
+        'userId': widget.userId,
+        'userName': widget.username1,
+        'oldRoomId': oldRoomId,
+        'newRoomId': newRoomId,
+        'timestamp': DateTime.now().millisecondsSinceEpoch,
+      });
+
+      // Force local UI update
+      _triggerRoomEntryAnimation();
+    }
   }
 
   void _syncRiveAnimations() {
@@ -373,7 +868,7 @@ class LivePageState extends State<LivePage>
   }
 
   // Add this after fetching your own Rive file
-  Future<void> _fetchOwnRiveFile() async {
+  Future<String?> _fetchOwnRiveFile() async {
     try {
       print('RIVE DEBUG: About to fetch own Rive file');
       final riveFileUrl =
@@ -387,40 +882,94 @@ class LivePageState extends State<LivePage>
         });
 
         // Always trigger entry animation when we have a Rive file
-        // This should happen AFTER joining the room
+        // We will rely on room transitions to control when to show it
         if (socket.connected) {
           // IMPORTANT: Always call this for entry animation
           _handleEntryAnimation(riveFileUrl);
         }
+
+        return riveFileUrl;
       }
     } catch (e) {
       print('Error fetching own Rive file: $e');
     }
+    return null;
+  }
+
+  void _triggerRoomEntryAnimation() {
+    print('ROOM_CHANGE: Triggering room entry animation');
+    print(
+        'ROOM_CHANGE: Current Rive file available? ${_userRiveFiles[widget.userId] != null}');
+
+    // Make sure we have our Rive file URL
+    String? riveFileUrl = _userRiveFiles[widget.userId];
+    if (riveFileUrl == null || riveFileUrl.isEmpty) {
+      // Try to fetch it if we don't have it yet
+      _fetchOwnRiveFile().then((url) {
+        if (url != null && url.isNotEmpty) {
+          _forceRoomEntryAnimation(url);
+        }
+      });
+    } else {
+      _forceRoomEntryAnimation(riveFileUrl);
+    }
+  }
+
+  void _forceRoomEntryAnimation(String riveFileUrl) {
+    print('ROOM_CHANGE: In _forceRoomEntryAnimation');
+    print('ROOM_CHANGE: Setting active animation for ${widget.userId}');
+    print(
+        'ROOM_CHANGE: Emitting socket event userEntryAnimation with isRoomChange=true');
+
+    print('Forcing room entry animation for ${widget.userId}');
+
+    // Update local state to show animation
+    setState(() {
+      _activeAnimationSeats[widget.userId] = DateTime.now();
+    });
+
+    // Tell the server this is specifically a room change animation
+    if (socket.connected) {
+      socket.emit('userEntryAnimation', {
+        'roomId': widget.roomID,
+        'userId': widget.userId,
+        'userName': widget.username1,
+        'riveFileUrl': riveFileUrl,
+        'isEntry': true,
+        'isRoomChange': true, // Add a specific flag for room changes
+        'duration': 10000,
+        'timestamp': DateTime.now().millisecondsSinceEpoch,
+      });
+    }
+
+    // Auto-remove after 10 seconds
+    _emojiTimers[widget.userId] = Timer(const Duration(seconds: 10), () {
+      if (mounted) {
+        setState(() {
+          _activeAnimationSeats.remove(widget.userId);
+        });
+      }
+    });
   }
 
   void _handleEntryAnimation(String riveFileUrl, {bool isReconnect = false}) {
     if (riveFileUrl.isEmpty) return;
-
-    // Check if we recently showed this animation (within last 30 seconds)
-    final now = DateTime.now();
-    if (_lastEntryTime != null &&
-        now.difference(_lastEntryTime!) < const Duration(seconds: 30)) {
-      return;
-    }
-
+    _emojiTimers[widget.userId]?.cancel();
     print('Triggering entry animation for ${widget.userId}');
 
     // Update last entry time
-    _lastEntryTime = now;
+    _lastEntryTime = DateTime.now();
 
     // Update local state
     setState(() {
       _userRiveFiles[widget.userId] = riveFileUrl;
-      _activeAnimationSeats[widget.userId] = now;
+      _activeAnimationSeats[widget.userId] = DateTime.now();
     });
 
     // Broadcast to server
     if (socket.connected) {
+      print('Broadcasting entry animation for ${widget.userId}');
+      print('room id ${widget.roomID}');
       socket.emit('userEntryAnimation', {
         'roomId': widget.roomID,
         'userId': widget.userId,
@@ -429,7 +978,7 @@ class LivePageState extends State<LivePage>
         'isEntry': true,
         'isReconnect': isReconnect,
         'duration': 10000,
-        'timestamp': now.millisecondsSinceEpoch,
+        'timestamp': DateTime.now().millisecondsSinceEpoch,
       });
     }
 
@@ -443,7 +992,13 @@ class LivePageState extends State<LivePage>
     });
   }
 
-// 2. Add a method to fetch the announcement from PocketBase
+  void _resetRoomState() {
+    _hasJoinedRoom = false;
+    _hasShownInitialEntry = false;
+    _lastEntryTime = null;
+    _resetAnimationState();
+  }
+
   // Fix 2: Properly implement the _fetchAnnouncement method
   Future<void> _fetchAnnouncement(String roomId) async {
     try {
@@ -875,6 +1430,9 @@ class LivePageState extends State<LivePage>
     });
 
     socket.onConnect((_) async {
+      print('ROOM_CHANGE: Socket connected, checking for room change');
+      print(
+          'ROOM_CHANGE: previousRoomId=$_previousRoomId, currentRoomId=${widget.roomID}');
       print('Connected to Socket.IO server');
 
       // Reset connection state
@@ -885,21 +1443,30 @@ class LivePageState extends State<LivePage>
         setState(() => isConnecting = false);
       }
 
+      // Periodically refresh border data
+      Timer.periodic(const Duration(seconds: 30), (_) {
+        if (mounted && socket.connected) {
+          _loadUserBorders();
+        }
+      });
       // Always fetch fresh Rive file on connection
       await _fetchOwnRiveFile();
-
+      print('Fetched own 12: ${widget.roomID}');
       // Join room with forceEntry flag if it's a fresh connection
-      socket.emit('joinRoom', {
-        'roomId': widget.roomID,
-        'userId': widget.userId,
-        'userName': widget.username1,
-        'userAvatar': _userAvatarUrl,
-        'riveFileUrl': _userRiveFiles[widget.userId],
-        'forceEntry':
-            !_hasShownInitialEntry, // Only force entry animation first time
-        'isReconnect': isReconnecting,
-      });
-
+      if (!_hasShownInitialAnimation) {
+        socket.emit('joinRoom', {
+          'roomId': widget.roomID,
+          'userId': widget.userId,
+          'userName': widget.username1,
+          'userAvatar': _userAvatarUrl,
+          'riveFileUrl': _userRiveFiles[widget.userId],
+          'forceEntry': true,
+          'isRoomChange':
+              _previousRoomId != null && _previousRoomId != widget.roomID,
+        });
+        _hasShownInitialAnimation = true;
+      }
+      _previousRoomId = widget.roomID;
       _hasShownInitialEntry = true;
 
       // Rest of your connection logic...
@@ -916,6 +1483,79 @@ class LivePageState extends State<LivePage>
 
         _handleEntryAnimation(riveFileUrl);
       }
+// Add this in your socket initialization
+      socket.on('roomChange', (data) {
+        if (!mounted) return;
+
+        final userId = data['userId'];
+        final oldRoomId = data['oldRoomId'];
+        final newRoomId = data['newRoomId'];
+
+        print('User $userId changed rooms from $oldRoomId to $newRoomId');
+
+        // If this room is the new room, show the animation
+        if (newRoomId == widget.roomID) {
+          _fetchUserRiveFile(userId).then((riveFileUrl) {
+            setState(() {
+              _activeAnimationSeats[userId] = DateTime.now();
+            });
+
+            // Auto-remove after 10 seconds
+            _emojiTimers[userId] = Timer(const Duration(seconds: 10), () {
+              if (mounted) {
+                setState(() {
+                  _activeAnimationSeats.remove(userId);
+                });
+              }
+            });
+          });
+        }
+      });
+
+// Add this in your socket initialization (in _initializeSocket method)
+      socket.on('userBorders', (data) {
+        if (!mounted) return;
+
+        print('Received user borders: $data');
+        if (data is Map) {
+          setState(() {
+            data.forEach((userId, borderUrl) {
+              if (userId != null && borderUrl != null) {
+                final normalizedId = _normalizeUserId(userId.toString());
+                _userBorders[normalizedId] = borderUrl.toString();
+                print('Added border for user $userId: $borderUrl');
+              }
+            });
+          });
+
+          // Force UI refresh
+          Future.delayed(const Duration(milliseconds: 100), () {
+            if (mounted) setState(() {});
+          });
+        }
+      });
+
+      // In your socket initialization
+      socket.on('borderChange', (data) {
+        if (!mounted) return;
+
+        final userId = data['userId']?.toString();
+        final borderUrl = data['borderUrl']?.toString();
+
+        print('Received borderChange: $userId - $borderUrl');
+
+        if (userId != null && borderUrl != null) {
+          final normalizedId = _normalizeUserId(userId);
+          setState(() {
+            _userBorders[normalizedId] = borderUrl;
+          });
+
+          // Force UI refresh
+          Future.delayed(const Duration(milliseconds: 100), () {
+            if (mounted) setState(() {});
+          });
+        }
+      });
 
       // In your socket.onConnect handler:
       socket.on('userEntryAnimation', (data) {
@@ -923,6 +1563,12 @@ class LivePageState extends State<LivePage>
 
         final userId = data['userId'];
         final riveFileUrl = data['riveFileUrl'];
+        final isRoomChange = data['isRoomChange'] ?? false;
+        print('ROOM_CHANGE: Received userEntryAnimation event');
+        print(
+            'ROOM_CHANGE: userId: $userId, isRoomChange: ${data['isRoomChange']}');
+        print(
+            'Received userEntryAnimation: $userId, isRoomChange: $isRoomChange');
 
         if (userId != null && riveFileUrl != null) {
           setState(() {
@@ -935,6 +1581,8 @@ class LivePageState extends State<LivePage>
             if (mounted) setState(() {});
           });
         }
+
+        // Set timer to remove animation
         _emojiTimers[userId] = Timer(const Duration(seconds: 10), () {
           if (mounted) {
             setState(() {
@@ -943,10 +1591,9 @@ class LivePageState extends State<LivePage>
           }
         });
       });
-
+      socket.emit('fetchUserBorders', {'roomId': widget.roomID});
       socket.emit('fetchUserRiveFiles', {'roomId': widget.roomID});
-      // Send full user details when joining, including Rive file URL
-
+      await _fetchOwnBorder();
       // Also broadcast your own Rive file to ensure everyone has it
       if (riveFileUrl != null) {
         // Use entry animation for first join
@@ -1083,7 +1730,42 @@ class LivePageState extends State<LivePage>
       });
     });
 
+    socket.on('roomChanged', (data) {
+      if (!mounted) return;
+
+      final newRoomId = data['newRoomId'];
+      final userId = data['userId'];
+
+      if (userId == widget.userId) {
+        print('Received room change notification for current user');
+        _resetRoomState();
+        _triggerRoomEntryAnimation();
+      }
+    });
+
     socket.connect();
+  }
+
+  void _prepareForRoomChange() {
+    print('ROOM_CHANGE: Preparing for room change');
+    print('ROOM_CHANGE: Previous room ID being saved: ${widget.roomID}');
+    // Reset all flags
+    _hasJoinedRoom = false;
+    _hasShownInitialEntry = false;
+    _lastEntryTime = null;
+    _previousRoomId = widget.roomID;
+
+    // Clear animation state
+    _resetAnimationState();
+
+    // Reset other room-specific state
+    _announcement = null;
+    _showWelcomeMessage = true;
+    _activeEmojis.clear();
+
+    // Cancel any existing timers
+    _emojiTimers.forEach((key, timer) => timer.cancel());
+    _emojiTimers.clear();
   }
 
   void _notifyRiveAnimationChange(String riveFileUrl) {
@@ -1094,36 +1776,80 @@ class LivePageState extends State<LivePage>
     });
   }
 
-  void _handleReconnection() {
-    reconnectionTimer?.cancel();
+  void _triggerRoomChangeAnimation() {
+    // Get current Rive file URL
+    String? riveFileUrl = _userRiveFiles[widget.userId];
+    if (riveFileUrl == null || riveFileUrl.isEmpty) {
+      // Try to fetch if not available
+      _fetchOwnRiveFile().then((url) {
+        if (url != null && url.isNotEmpty) {
+          _emitRoomChangeEvent(url);
+        }
+      });
+    } else {
+      _emitRoomChangeEvent(riveFileUrl);
+    }
+  }
 
-    if (reconnectAttempts >= maxReconnectAttempts) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: const Text(
-                'Unable to reconnect. Please check your connection.'),
-            duration: const Duration(seconds: 5),
-            action: SnackBarAction(
-              label: 'Retry',
-              onPressed: () {
-                reconnectAttempts = 0;
-                socket.connect();
-              },
-            ),
-          ),
-        );
-      }
-      return;
+  void _emitRoomChangeEvent(String riveFileUrl) {
+    print(
+        'ROOM_CHANGE: Emitting roomChangeAnimation event for userId ${widget.userId}');
+    // This is a specific event just for room changes
+    if (socket.connected) {
+      socket.emit('roomChangeAnimation', {
+        'roomId': widget.roomID,
+        'userId': widget.userId,
+        'userName': widget.username1,
+        'riveFileUrl': riveFileUrl,
+        'timestamp': DateTime.now().millisecondsSinceEpoch,
+      });
     }
 
-    reconnectionTimer = Timer(const Duration(seconds: 2), () {
-      reconnectAttempts++;
-      if (!socket.connected) {
-        socket.connect();
+    // Update local UI state to show animation
+    setState(() {
+      _activeAnimationSeats[widget.userId] = DateTime.now();
+    });
+
+    // Auto-remove after 10 seconds
+    _emojiTimers[widget.userId] = Timer(const Duration(seconds: 10), () {
+      if (mounted) {
+        setState(() {
+          _activeAnimationSeats.remove(widget.userId);
+        });
       }
     });
   }
+
+  // void _handleReconnection() {
+  //   reconnectionTimer?.cancel();
+
+  //   if (reconnectAttempts >= maxReconnectAttempts) {
+  //     if (mounted) {
+  //       ScaffoldMessenger.of(context).showSnackBar(
+  //         SnackBar(
+  //           content: const Text(
+  //               'Unable to reconnect. Please check your connection.'),
+  //           duration: const Duration(seconds: 5),
+  //           action: SnackBarAction(
+  //             label: 'Retry',
+  //             onPressed: () {
+  //               reconnectAttempts = 0;
+  //               socket.connect();
+  //             },
+  //           ),
+  //         ),
+  //       );
+  //     }
+  //     return;
+  //   }
+
+  //   reconnectionTimer = Timer(const Duration(seconds: 2), () {
+  //     reconnectAttempts++;
+  //     if (!socket.connected) {
+  //       socket.connect();
+  //     }
+  //   });
+  // }
 
   void _updateUserList(Map<String, dynamic> data) {
     if (data['users'] != null) {
@@ -1184,7 +1910,7 @@ class LivePageState extends State<LivePage>
   }
 
 // Add a method to fetch a single user's rive file
-  Future<void> _fetchUserRiveFile(String userId) async {
+  Future<String> _fetchUserRiveFile(String userId) async {
     try {
       final itemsResponse = await http.get(
         Uri.parse(
@@ -1204,8 +1930,10 @@ class LivePageState extends State<LivePage>
           });
         }
       }
+      return _userRiveFiles[userId] ?? '';
     } catch (e) {
       print('Error fetching user rive file: $e');
+      return '';
     }
   }
 
@@ -1668,24 +2396,33 @@ class LivePageState extends State<LivePage>
 // Modified _handleLogout function
   Future<void> _handleLogout() async {
     try {
+      print(
+          'ROOM_CHANGE: Starting _handleLogout, current room: ${widget.roomID}');
+      print(
+          'ROOM_CHANGE: Is this a room change? ${_previousRoomId != widget.roomID}');
       // First, clean up all duplicate records
       await _deleteDuplicateOnlineUserRecords(widget.userId, widget.roomID);
-
+      final oldRoomId = widget.roomID;
+      _prepareForRoomChange();
       // Uninitialize ZEGO services
       ZegoGiftManager().service.uninit();
       await ZegoUIKit().leaveRoom();
 
       // Emit leave room event to socket
       socket.emit('leaveRoom', {
-        'roomId': widget.roomID,
+        'roomId': oldRoomId,
         'userId': widget.userId,
+        'isRoomChange': true,
+        'fullDisconnect':
+            false, // Add this parameter to indicate it's a room change, not a full disconnect
       });
 
       // Update end time for the session
-      await updateEndTime(widget.userId, widget.roomID);
+      await updateEndTime(widget.userId, oldRoomId);
 
-      // Disconnect socket
-      socket.disconnect();
+      // Reset the join flag to allow entry animation on next room
+      _hasJoinedRoom = false;
+      _hasShownInitialEntry = false;
 
       // Finally, navigate back
       if (mounted) {
@@ -1970,11 +2707,19 @@ class LivePageState extends State<LivePage>
     if (user == null || user.id.isEmpty) {
       return Container();
     }
-
+    final normalizedUserId = _normalizeUserId(user.id);
+    final borderUrl = _userBorders[widget.userId];
     // Check for Rive file with this user ID
     final riveFileUrl = _userRiveFiles[user.id];
+
     final bool hasActiveAnimation = _activeAnimationSeats.containsKey(user.id);
 
+    print('BORDER DEBUG: Building foreground for user: ${user.id}');
+    print('BORDER DEBUG: Normalized ID: $normalizedUserId');
+    print('BORDER DEBUG: Has border? ${borderUrl != null}');
+    if (borderUrl != null) {
+      print('BORDER DEBUG: Border URL: $borderUrl');
+    }
     return Stack(
       children: [
         // Highlight effect for entry animation
@@ -1994,6 +2739,19 @@ class LivePageState extends State<LivePage>
                   spreadRadius: 3,
                 ),
               ],
+            ),
+          ),
+
+        if (borderUrl != null)
+          Positioned.fill(
+            child: Container(
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                image: DecorationImage(
+                  image: CachedNetworkImageProvider(borderUrl),
+                  fit: BoxFit.cover,
+                ),
+              ),
             ),
           ),
 
@@ -2060,6 +2818,7 @@ class LivePageState extends State<LivePage>
 
   // 6. Modify the _showSettingsDialog() method to include announcement editing option
   void _showSettingsDialog() {
+    final roomNameController = TextEditingController(text: _voiceRoomName);
     showDialog(
       context: context,
       builder: (context) => Dialog(
@@ -2114,7 +2873,10 @@ class LivePageState extends State<LivePage>
                 ),
                 trailing:
                     const Icon(Icons.chevron_right, color: Colors.white54),
-                onTap: () => Navigator.pop(context),
+                onTap: () {
+                  Navigator.pop(context);
+                  _pickRoomPhoto();
+                },
               ),
 
               const Divider(color: Colors.white12, indent: 56),
@@ -2139,7 +2901,47 @@ class LivePageState extends State<LivePage>
                 ),
                 trailing:
                     const Icon(Icons.chevron_right, color: Colors.white54),
-                onTap: () => Navigator.pop(context),
+                onTap: () {
+                  // Show dialog to edit room name
+                  showDialog(
+                    context: context,
+                    builder: (context) => AlertDialog(
+                      backgroundColor: Colors.black.withOpacity(0.9),
+                      title: const Text(
+                        'Edit Room Name',
+                        style: TextStyle(color: Colors.white),
+                      ),
+                      content: TextField(
+                        controller: roomNameController,
+                        style: const TextStyle(color: Colors.white),
+                        decoration: InputDecoration(
+                          hintText: 'Enter new room name',
+                          hintStyle: TextStyle(color: Colors.grey[400]),
+                          filled: true,
+                          fillColor: Colors.white.withOpacity(0.1),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(10),
+                            borderSide: BorderSide.none,
+                          ),
+                        ),
+                      ),
+                      actions: [
+                        TextButton(
+                          onPressed: () => Navigator.pop(context),
+                          child: const Text('Cancel'),
+                        ),
+                        TextButton(
+                          onPressed: () {
+                            Navigator.pop(context);
+                            Navigator.pop(context);
+                            _updateRoomName(roomNameController.text);
+                          },
+                          child: const Text('Save'),
+                        ),
+                      ],
+                    ),
+                  );
+                },
               ),
 
               const Divider(color: Colors.white12, indent: 56),
@@ -2164,7 +2966,10 @@ class LivePageState extends State<LivePage>
                 ),
                 trailing:
                     const Icon(Icons.chevron_right, color: Colors.white54),
-                onTap: () => Navigator.pop(context),
+                onTap: () {
+                  Navigator.pop(context);
+                  _pickBackgroundImage();
+                },
               ),
 
               const Divider(color: Colors.white12, indent: 56),
@@ -2439,6 +3244,13 @@ class LivePageState extends State<LivePage>
   @override
   Widget build(BuildContext context) {
     print(
+        'ROOM_CHANGE: Building UI, activeAnimationSeats: ${_activeAnimationSeats.length}');
+    print(
+        'ROOM_CHANGE: Active animation keys: ${_activeAnimationSeats.keys.toList()}');
+    print(
+        'ROOM_CHANGE: User Rive file present? ${_userRiveFiles.containsKey(widget.userId)}');
+
+    print(
         'Build called, activeAnimationSeats: ${_activeAnimationSeats.length}, keys: ${_activeAnimationSeats.keys.toList()}');
     // Add this before your return statement
     if (_userRiveFiles.containsKey(widget.userId)) {
@@ -2451,6 +3263,8 @@ class LivePageState extends State<LivePage>
     if (_activeAnimationSeats.isNotEmpty) {
       print('Build: Active animations: ${_activeAnimationSeats.keys.toList()}');
     }
+    bool showOwnEntryAnimation =
+        _activeAnimationSeats.containsKey(widget.userId);
     return WillPopScope(
       onWillPop: () async {
         if (ZegoUIKitPrebuiltLiveAudioRoomController().minimize.isMinimizing) {
@@ -2628,39 +3442,8 @@ class LivePageState extends State<LivePage>
               events: events,
               config: config,
             ),
-            if (_userRiveFiles.containsKey(widget.userId))
-              Positioned(
-                top: 0,
-                left: 0,
-                right: 0,
-                bottom: 0,
-                child: Center(
-                  child: Container(
-                    width: MediaQuery.of(context).size.width * 0.7,
-                    height: MediaQuery.of(context).size.width * 0.7,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.2),
-                          blurRadius: 10,
-                          spreadRadius: 5,
-                        ),
-                      ],
-                    ),
-                    child: rive.RiveAnimation.network(
-                      _userRiveFiles[widget.userId]!,
-                      fit: BoxFit.cover,
-                      // artboard: 'Main',
-                      // animations: const ['idle'],
-                    ),
-                  ),
-                ),
-              ),
 
-            // Add this to your build method Stack
-            // Add this to your build method Stack
-            if (_activeAnimationSeats.isNotEmpty)
+            if (_activeAnimationSeats.isNotEmpty || showOwnEntryAnimation)
               Positioned.fill(
                 child: Container(
                   color: Colors.black.withOpacity(0.6), // Darken the background
@@ -4683,6 +5466,7 @@ class LivePageState extends State<LivePage>
       backgroundBuilder: backgroundBuilder,
       foregroundBuilder: foregroundBuilder,
       avatarBuilder: avatarBuilder,
+      showSoundWaveInAudioMode: true,
     );
   }
 
@@ -4692,6 +5476,17 @@ class LivePageState extends State<LivePage>
     ZegoUIKitUser? user,
     Map<String, dynamic> extraInfo,
   ) {
+    if (user == null) return Container();
+
+    final userId = widget.userId;
+    final normalizedId = _normalizeUserId(userId);
+    final borderUrl = _userBorders[userId];
+
+    // Debug log
+    print(
+        'AVATAR DEBUG: Building avatar for $userId (normalized: $normalizedId)');
+    print('AVATAR DEBUG: Border URL: ${borderUrl ?? "none"}');
+
     return ClipRRect(
       borderRadius: BorderRadius.circular(size.width / 2),
       child: SizedBox(
@@ -4724,7 +5519,19 @@ class LivePageState extends State<LivePage>
                       child: Icon(Icons.group, color: Colors.grey[400]),
                     ),
             ),
-
+            // Border overlay
+            // if (borderUrl != null)
+            //   Container(
+            //     width: size.width + 40,
+            //     height: size.width + 40,
+            //     decoration: BoxDecoration(
+            //       shape: BoxShape.circle,
+            //       image: DecorationImage(
+            //         image: CachedNetworkImageProvider(borderUrl),
+            //         fit: BoxFit.cover,
+            //       ),
+            //     ),
+            //   ),
             // Emoji overlay
           ],
         ),

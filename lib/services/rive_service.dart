@@ -1,5 +1,7 @@
 import 'dart:convert';
+import 'dart:io';
 import 'package:http/http.dart' as http;
+import 'package:http_parser/http_parser.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class HttpService {
@@ -328,6 +330,138 @@ class HttpService {
       return response.statusCode == 200;
     } catch (e) {
       print('Error checking Rive file exists: $e');
+      return false;
+    }
+  }
+
+  static Future<bool> updateRoomSettings({
+    required String roomId,
+    String? roomName,
+    File? roomPhoto,
+    File? backgroundImage,
+  }) async {
+    try {
+      // Create multipart request for updating the room
+      final uri =
+          Uri.parse('$baseUrl/api/collections/voiceRooms/records/$roomId');
+
+      final request = http.MultipartRequest('PATCH', uri);
+
+      // Add text fields if provided
+      if (roomName != null) {
+        request.fields['voice_room_name'] = roomName;
+      }
+
+      // Add room photo if provided
+      if (roomPhoto != null) {
+        request.files.add(await http.MultipartFile.fromPath(
+            'group_photo', roomPhoto.path,
+            contentType: MediaType('image', 'jpeg')));
+      }
+
+      // Add background image if provided
+      if (backgroundImage != null) {
+        request.files.add(await http.MultipartFile.fromPath(
+            'background_images', backgroundImage.path,
+            contentType: MediaType('image', 'jpeg')));
+      }
+
+      // Send request
+      final response = await request.send();
+      final responseBody = await response.stream.bytesToString();
+      print('response $responseBody');
+
+      return response.statusCode == 200;
+    } catch (e) {
+      print('Error updating room settings: $e');
+      return false;
+    }
+  }
+
+  static Future<Map<String, String>> fetchUsersBorders(String roomId) async {
+    const baseUrl = 'http://145.223.21.62:8090';
+    final borders = <String, String>{};
+
+    try {
+      // First get online users in this room
+      final onlineResponse = await http.get(
+        Uri.parse('$baseUrl/api/collections/online_users/records')
+            .replace(queryParameters: {
+          'filter': 'voiceRoomId="$roomId"',
+        }),
+      );
+
+      if (onlineResponse.statusCode != 200) {
+        return borders;
+      }
+
+      final onlineData = json.decode(onlineResponse.body);
+      final onlineUsers = onlineData['items'] as List;
+
+      // For each online user, fetch their active border
+      for (final user in onlineUsers) {
+        final userId = user['userId'];
+        final border = await getUserActiveBorder(userId);
+
+        if (border != null && border.isNotEmpty) {
+          borders[userId] = border;
+        }
+      }
+
+      return borders;
+    } catch (e) {
+      print('Error fetching borders: $e');
+      return borders;
+    }
+  }
+
+  static Future<String?> getUserActiveBorder(String userId) async {
+    const baseUrl = 'http://145.223.21.62:8090';
+
+    try {
+      // Use a more specific filter to get only active border
+      final filter = 'userId="$userId" AND isborder_used=true';
+      final encodedFilter = Uri.encodeComponent(filter);
+
+      final response = await http.get(
+        Uri.parse(
+            '$baseUrl/api/collections/myItems/records?filter=$encodedFilter'),
+        headers: {'Content-Type': 'application/json'},
+      );
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        if (data['items'] != null && data['items'].isNotEmpty) {
+          final borderItem = data['items'][0];
+          if (borderItem['border'] != null) {
+            return '$baseUrl/api/files/myItems/${borderItem['id']}/${borderItem['border']}';
+          }
+        }
+      }
+
+      return null;
+    } catch (e) {
+      print('Error fetching active border: $e');
+      return null;
+    }
+  }
+
+  static Future<bool> markBorderAsUsed(String itemId) async {
+    const baseUrl = 'http://145.223.21.62:8090';
+
+    try {
+      // First, unmark all other borders for this user
+      final response = await http.patch(
+        Uri.parse('$baseUrl/api/collections/myItems/records/$itemId'),
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode({
+          'isborder_used': true,
+        }),
+      );
+
+      return response.statusCode == 200;
+    } catch (e) {
+      print('Error marking border as used: $e');
       return false;
     }
   }
