@@ -1,4 +1,6 @@
 // settings_page.dart
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:leo_app_01/policy.dart';
 import 'package:leo_app_01/services/api_service.dart';
@@ -145,16 +147,119 @@ class SettingsPage extends StatelessWidget {
             context,
             icon: Icons.logout,
             title: 'Log Out',
-            onTap: () async {
-              final SharedPreferences prefs =
-                  await SharedPreferences.getInstance();
-              await prefs.remove('userId'); // Corrected from removeS to remove
+            onTap: () {
+              print('Logout button pressed');
+              // Show the logout confirmation dialog
+              showDialog(
+                context: context,
+                builder: (BuildContext context) {
+                  return Dialog(
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(15),
+                    ),
+                    backgroundColor: Colors.white.withOpacity(0.9),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          // Message
+                          const Padding(
+                            padding: EdgeInsets.symmetric(
+                                horizontal: 24, vertical: 8),
+                            child: Text(
+                              'Are you sure you want to log out of your current account?',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                fontSize: 18,
+                                color: Colors.black,
+                                height: 1.3,
+                              ),
+                            ),
+                          ),
 
-              // Optional: Add navigation to login screen or perform additional logout actions
-              Navigator.of(context).pushReplacement(
-                MaterialPageRoute(
-                    builder: (context) =>
-                        const SplashScreen()), // Replace with your login screen
+                          const SizedBox(height: 16),
+
+                          // Divider
+                          Divider(
+                            height: 1,
+                            color: Colors.grey.withOpacity(0.2),
+                          ),
+
+                          // Action Buttons
+                          IntrinsicHeight(
+                            child: Row(
+                              children: [
+                                // Cancel Button
+                                Expanded(
+                                  child: TextButton(
+                                    onPressed: () =>
+                                        Navigator.pop(context, false),
+                                    style: TextButton.styleFrom(
+                                      foregroundColor: Colors.white,
+                                      padding: const EdgeInsets.symmetric(
+                                          vertical: 12),
+                                      shape: const RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.only(
+                                          bottomLeft: Radius.circular(15),
+                                        ),
+                                      ),
+                                    ),
+                                    child: const Text(
+                                      'Cancel',
+                                      style: TextStyle(
+                                        fontSize: 17,
+                                        color: Colors.grey,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+
+                                // Vertical Divider
+                                VerticalDivider(
+                                  width: 1,
+                                  color: Colors.grey.withOpacity(0.2),
+                                ),
+
+                                // Confirm Button
+                                Expanded(
+                                  child: TextButton(
+                                    onPressed: () async {
+                                      final SharedPreferences prefs =
+                                          await SharedPreferences.getInstance();
+                                      await prefs.remove('userId');
+
+                                      // Navigate to splash screen and remove all previous routes
+                                      Navigator.of(context).pushAndRemoveUntil(
+                                        MaterialPageRoute(
+                                            builder: (context) =>
+                                                const SplashScreen()),
+                                        (Route<dynamic> route) => false,
+                                      );
+                                    },
+                                    style: TextButton.styleFrom(
+                                      foregroundColor: Colors.white,
+                                      padding: const EdgeInsets.symmetric(
+                                          vertical: 12),
+                                    ),
+                                    child: const Text(
+                                      'Confirm',
+                                      style: TextStyle(
+                                        fontSize: 17,
+                                        color: Colors.black,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                },
               );
             },
           ),
@@ -163,29 +268,204 @@ class SettingsPage extends StatelessWidget {
             icon: Icons.delete_forever,
             title: 'Delete Account',
             onTap: () async {
-              // Show confirmation dialog
+              // We'll use this to track whether the dialog is active
+              bool isDialogActive = true;
+
+              // Show styled confirmation dialog
               final confirmDelete = await showDialog<bool>(
                 context: context,
-                builder: (BuildContext context) {
-                  return AlertDialog(
-                    title: const Text('Delete Account'),
-                    content: const Text(
-                        'Are you sure you want to permanently delete your account? This action cannot be undone.'),
-                    actions: [
-                      TextButton(
-                        onPressed: () => Navigator.of(context).pop(false),
-                        child: const Text('Cancel'),
+                builder: (BuildContext dialogContext) {
+                  // Initialize countdown variables
+                  int remainingSeconds = 60;
+                  Timer? countdownTimer;
+
+                  // We need to use StatefulBuilder to update the countdown timer
+                  return StatefulBuilder(builder:
+                      (BuildContext context, StateSetter setDialogState) {
+                    // Function to start the countdown
+                    void startCountdown() {
+                      countdownTimer =
+                          Timer.periodic(const Duration(seconds: 1), (timer) {
+                        // Only update if dialog is still showing
+                        if (isDialogActive) {
+                          setDialogState(() {
+                            if (remainingSeconds > 0) {
+                              remainingSeconds--;
+                            } else {
+                              // Time's up, proceed with deletion
+                              timer.cancel();
+                              Navigator.of(dialogContext).pop(true);
+                            }
+                          });
+                        } else {
+                          timer.cancel();
+                        }
+                      });
+                    }
+
+                    // Start the timer when dialog is shown (only once)
+                    WidgetsBinding.instance.addPostFrameCallback((_) {
+                      if (countdownTimer == null) {
+                        startCountdown();
+                      }
+                    });
+
+                    return Dialog(
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(15),
                       ),
-                      TextButton(
-                        style:
-                            TextButton.styleFrom(foregroundColor: Colors.red),
-                        onPressed: () => Navigator.of(context).pop(true),
-                        child: const Text('Delete'),
+                      backgroundColor: Colors.white.withOpacity(0.9),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 8),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            // Message
+                            const Padding(
+                              padding: EdgeInsets.symmetric(
+                                  horizontal: 24, vertical: 8),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Center(
+                                    child: Text(
+                                      'Delete Account',
+                                      style: TextStyle(
+                                        fontSize: 18,
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.black,
+                                      ),
+                                    ),
+                                  ),
+                                  SizedBox(height: 12),
+                                  Text(
+                                    'Are you sure you want to delete your account ',
+                                    textAlign: TextAlign.center,
+                                    style: TextStyle(
+                                      fontSize: 15,
+                                      color: Colors.black,
+                                      height: 1.3,
+                                    ),
+                                  ),
+                                  SizedBox(height: 12),
+                                  Text(
+                                    ' Please note: ',
+                                    textAlign: TextAlign.start,
+                                    style: TextStyle(
+                                      fontSize: 15,
+                                      color: Colors.black,
+                                      fontWeight: FontWeight.w500,
+                                      height: 1.3,
+                                    ),
+                                  ),
+                                  SizedBox(height: 12),
+                                  Text(
+                                    ' All account-related data, including friends, followers, and chat history, will be deleted immediately.\n\nYour rank level, account balance, and any personal equity will be permanently removed.\n\nOnce deleted, the account cannot be recovered and you will no longer be able to log in.',
+                                    textAlign: TextAlign.start,
+                                    style: TextStyle(
+                                      fontSize: 15,
+                                      color: Colors.black,
+                                      height: 1.3,
+                                    ),
+                                  ),
+                                  SizedBox(height: 12),
+                                  Text(
+                                    'Do you still wish to continue?',
+                                    textAlign: TextAlign.start,
+                                    style: TextStyle(
+                                      fontSize: 15,
+                                      color: Colors.black,
+                                      fontWeight: FontWeight.w600,
+                                      height: 1.3,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+
+                            const SizedBox(height: 16),
+
+                            // Divider
+                            Divider(
+                              height: 1,
+                              color: Colors.grey.withOpacity(0.2),
+                            ),
+
+                            // Action Buttons
+                            IntrinsicHeight(
+                              child: Row(
+                                children: [
+                                  // Confirm Button with countdown incorporated into the button text
+                                  Expanded(
+                                    child: TextButton(
+                                      onPressed: () {
+                                        isDialogActive = false;
+                                        countdownTimer?.cancel();
+                                        Navigator.of(dialogContext).pop(true);
+                                      },
+                                      style: TextButton.styleFrom(
+                                        foregroundColor: Colors.white,
+                                        padding: const EdgeInsets.symmetric(
+                                            vertical: 12),
+                                      ),
+                                      child: Text(
+                                        'Confirm (${remainingSeconds}s)',
+                                        style: const TextStyle(
+                                          fontSize: 17,
+                                          color: Colors.grey,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+
+                                  // Vertical Divider
+                                  VerticalDivider(
+                                    width: 1,
+                                    color: Colors.grey.withOpacity(0.2),
+                                  ),
+
+                                  // Cancel Button
+                                  Expanded(
+                                    child: TextButton(
+                                      onPressed: () {
+                                        isDialogActive = false;
+                                        countdownTimer?.cancel();
+                                        Navigator.of(dialogContext).pop(false);
+                                      },
+                                      style: TextButton.styleFrom(
+                                        foregroundColor: Colors.white,
+                                        padding: const EdgeInsets.symmetric(
+                                            vertical: 12),
+                                        shape: const RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.only(
+                                            bottomLeft: Radius.circular(15),
+                                          ),
+                                        ),
+                                      ),
+                                      child: const Text(
+                                        'Cancel',
+                                        style: TextStyle(
+                                          fontSize: 17,
+                                          color: Colors.red,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
-                    ],
-                  );
+                    );
+                  });
                 },
-              );
+              ).then((result) {
+                // When dialog is closed, make sure we mark it as inactive
+                isDialogActive = false;
+                return result;
+              });
 
               // If user doesn't confirm, exit
               if (confirmDelete != true) return;
