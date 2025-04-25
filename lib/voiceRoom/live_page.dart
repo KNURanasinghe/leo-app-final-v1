@@ -186,7 +186,7 @@ class LivePageState extends State<LivePage>
   final Map<String, UserData> _userData = {};
 
   // Add this to your LivePageState class variables
-  final Map<String, String> _userRiveFiles = {};
+  Map<String, String> _userRiveFiles = {};
   bool _loadingRiveFiles = false;
 
   final Map<String, DateTime> _activeAnimationSeats = {};
@@ -621,11 +621,43 @@ class LivePageState extends State<LivePage>
     }
   }
 
+// 6. Add a method to force show an animation regardless of socket state:
+  void _forceShowAnimation(String userId, String riveFileUrl) {
+    // Cancel any existing timer
+    _emojiTimers[userId]?.cancel();
+
+    // Show the animation locally
+    safeSetState(() {
+      _activeAnimationSeats[userId] = DateTime.now();
+      _userRiveFiles[userId] = riveFileUrl;
+      _persistentRiveFiles[userId] = riveFileUrl;
+    });
+
+    // Auto-remove after 10 seconds
+    _emojiTimers[userId] = Timer(const Duration(seconds: 10), () {
+      safeSetState(() {
+        _activeAnimationSeats.remove(userId);
+      });
+    });
+  }
+
+// 8. Add a declaration for the persistent Rive files map:
+  Map<String, String> _persistentRiveFiles = {};
   @override
   void initState() {
     super.initState();
     _initializeSocket();
     _fetchOwnBorder();
+    Future.delayed(const Duration(seconds: 5), () {
+      if (mounted && !_hasShownInitialAnimation) {
+        _fetchOwnRiveFile().then((url) {
+          if (url != null) {
+            _forceShowAnimation(widget.userId, url);
+            _hasShownInitialAnimation = true;
+          }
+        });
+      }
+    });
     Future.delayed(const Duration(seconds: 3), () {
       if (mounted) {
         _debugBorderState();
@@ -935,15 +967,15 @@ class LivePageState extends State<LivePage>
 
   void _triggerRoomEntryAnimation() {
     print('ROOM_CHANGE: Triggering room entry animation');
-    print(
-        'ROOM_CHANGE: Current Rive file available? ${_userRiveFiles[widget.userId] != null}');
 
     // Make sure we have our Rive file URL
-    String? riveFileUrl = _userRiveFiles[widget.userId];
+    String? riveFileUrl =
+        _userRiveFiles[widget.userId] ?? _persistentRiveFiles[widget.userId];
+
     if (riveFileUrl == null || riveFileUrl.isEmpty) {
       // Try to fetch it if we don't have it yet
       _fetchOwnRiveFile().then((url) {
-        if (url != null && url.isNotEmpty) {
+        if (url != null && url.isNotEmpty && mounted) {
           _forceRoomEntryAnimation(url);
         }
       });
@@ -989,21 +1021,53 @@ class LivePageState extends State<LivePage>
     });
   }
 
-  void _handleEntryAnimation(String riveFileUrl, {bool isReconnect = false}) {
-    if (riveFileUrl.isEmpty) return;
+  void _initializeRiveFiles() {
+    // Store a persistent copy after loading
+    _persistentRiveFiles = Map<String, String>.from(_userRiveFiles);
+
+    // Set up a timer to refresh Rive files and check consistency
+    Timer.periodic(const Duration(seconds: 10), (_) {
+      if (mounted) {
+        _checkAndRestoreRiveFiles();
+      }
+    });
+  }
+
+  void _checkAndRestoreRiveFiles() {
+    // Restore any files that were accidentally cleared
+    if (_userRiveFiles.isEmpty && _persistentRiveFiles.isNotEmpty) {
+      safeSetState(() {
+        _userRiveFiles = Map<String, String>.from(_persistentRiveFiles);
+      });
+    }
+
+    // Ensure current user's Rive file is always present
+    if (!_userRiveFiles.containsKey(widget.userId) &&
+        _persistentRiveFiles.containsKey(widget.userId)) {
+      safeSetState(() {
+        _userRiveFiles[widget.userId] = _persistentRiveFiles[widget.userId]!;
+      });
+    }
+  }
+
+  void _handleEntryAnimation(String? riveFileUrl, {bool isReconnect = false}) {
+    if (riveFileUrl == null || riveFileUrl.isEmpty) return;
+
     _emojiTimers[widget.userId]?.cancel();
     print('Triggering entry animation for ${widget.userId}');
 
     // Update last entry time
     _lastEntryTime = DateTime.now();
 
-    // Update local state
-    setState(() {
+    // Update local state with safety check
+    safeSetState(() {
       _userRiveFiles[widget.userId] = riveFileUrl;
+      _persistentRiveFiles[widget.userId] =
+          riveFileUrl; // Store in persistent map
       _activeAnimationSeats[widget.userId] = DateTime.now();
     });
 
-    // Broadcast to server
+    // Broadcast to server only if connected
     if (socket.connected) {
       print('Broadcasting entry animation for ${widget.userId}');
       print('room id ${widget.roomID}');
@@ -1019,13 +1083,12 @@ class LivePageState extends State<LivePage>
       });
     }
 
-    // Remove after 10 seconds
+    // Remove after 10 seconds, with safety check
+    _emojiTimers[widget.userId]?.cancel(); // Cancel any existing timer
     _emojiTimers[widget.userId] = Timer(const Duration(seconds: 10), () {
-      if (mounted) {
-        setState(() {
-          _activeAnimationSeats.remove(widget.userId);
-        });
-      }
+      safeSetState(() {
+        _activeAnimationSeats.remove(widget.userId);
+      });
     });
   }
 
@@ -1636,6 +1699,7 @@ class LivePageState extends State<LivePage>
         final userId = data['userId'];
         final riveFileUrl = data['riveFileUrl'];
         final isRoomChange = data['isRoomChange'] ?? false;
+
         print('ROOM_CHANGE: Received userEntryAnimation event');
         print(
             'ROOM_CHANGE: userId: $userId, isRoomChange: ${data['isRoomChange']}');
@@ -1643,26 +1707,21 @@ class LivePageState extends State<LivePage>
             'Received userEntryAnimation: $userId, isRoomChange: $isRoomChange');
 
         if (userId != null && riveFileUrl != null) {
-          setState(() {
+          safeSetState(() {
             _activeAnimationSeats[userId] = DateTime.now();
             _userRiveFiles[userId] = riveFileUrl;
-          });
-
-          // Force UI refresh
-          Future.delayed(const Duration(milliseconds: 100), () {
-            if (mounted) setState(() {});
           });
         }
 
         // Set timer to remove animation
+        _emojiTimers[userId]?.cancel(); // Cancel any existing timer
         _emojiTimers[userId] = Timer(const Duration(seconds: 10), () {
-          if (mounted) {
-            setState(() {
-              _activeAnimationSeats.remove(userId);
-            });
-          }
+          safeSetState(() {
+            _activeAnimationSeats.remove(userId);
+          });
         });
       });
+
       socket.emit('fetchUserBorders', {'roomId': widget.roomID});
       socket.emit('fetchUserRiveFiles', {'roomId': widget.roomID});
       await _fetchOwnBorder();
@@ -1818,6 +1877,12 @@ class LivePageState extends State<LivePage>
     socket.connect();
   }
 
+  void safeSetState(Function setState) {
+    if (mounted) {
+      setState();
+    }
+  }
+
   void _prepareForRoomChange() {
     print('ROOM_CHANGE: Preparing for room change');
     print('ROOM_CHANGE: Previous room ID being saved: ${widget.roomID}');
@@ -1849,6 +1914,11 @@ class LivePageState extends State<LivePage>
   }
 
   void _triggerRoomChangeAnimation() {
+    print('triggered room change');
+    print('ANIMATION DEBUG: Triggering room change animation');
+    print(
+        'ANIMATION DEBUG: _userRiveFiles for current user: ${_userRiveFiles[widget.userId]}');
+    print('ANIMATION DEBUG: Socket connected: ${socket.connected}');
     // Get current Rive file URL
     String? riveFileUrl = _userRiveFiles[widget.userId];
     if (riveFileUrl == null || riveFileUrl.isEmpty) {
@@ -1858,6 +1928,7 @@ class LivePageState extends State<LivePage>
           _emitRoomChangeEvent(url);
         }
       });
+      print('triggered $riveFileUrl');
     } else {
       _emitRoomChangeEvent(riveFileUrl);
     }
@@ -2475,7 +2546,14 @@ class LivePageState extends State<LivePage>
       // First, clean up all duplicate records
       await _deleteDuplicateOnlineUserRecords(widget.userId, widget.roomID);
       final oldRoomId = widget.roomID;
+      final isRoomChange =
+          _previousRoomId != null && _previousRoomId != oldRoomId;
       _prepareForRoomChange();
+
+      if (isRoomChange) {
+        print('ROOM_CHANGE: Triggering room change animation');
+        _triggerRoomChangeAnimation();
+      }
       // Uninitialize ZEGO services
       ZegoGiftManager().service.uninit();
       await ZegoUIKit().leaveRoom();
@@ -2681,9 +2759,8 @@ class LivePageState extends State<LivePage>
       'roomId': widget.roomID,
       'userId': widget.userId,
     });
-    setState(() {
-      _activeAnimationSeats.clear();
-    });
+    _activeAnimationSeats.clear();
+    socket.disconnect();
     socket.dispose();
     // Only cleanup if not minimized
     if (!_isMinimized) {
@@ -5340,12 +5417,17 @@ class LivePageState extends State<LivePage>
   ZegoUIKitPrebuiltLiveAudioRoomEvents get events {
     return ZegoUIKitPrebuiltLiveAudioRoomEvents(
       user: ZegoLiveAudioRoomUserEvents(
-        onCountOrPropertyChanged: (List<ZegoUIKitUser> users) {
-          debugPrint(
-            'onUserCountOrPropertyChanged:${users.map((e) => e.toString())}',
-          );
-        },
-      ),
+          onCountOrPropertyChanged: (List<ZegoUIKitUser> users) {
+        debugPrint(
+          'onUserCountOrPropertyChanged:${users.map((e) => e.toString())}',
+        );
+      }, onEnter: (user) async {
+        print('new entered user: $user');
+        String? rivefile = await _fetchOwnRiveFile();
+        print('new entered rivefile: $rivefile');
+        _handleEntryAnimation(rivefile!);
+      }),
+
       seat: ZegoLiveAudioRoomSeatEvents(
         onClosed: () {
           debugPrint('on seat closed');
