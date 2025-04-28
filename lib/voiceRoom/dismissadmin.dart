@@ -6,7 +6,7 @@ import 'dart:convert';
 class DismissAdminScreen extends StatefulWidget {
   final String voiceRoomId;
 
-  const DismissAdminScreen({Key? key, required this.voiceRoomId}) : super(key: key);
+  const DismissAdminScreen({super.key, required this.voiceRoomId});
 
   @override
   _DismissAdminScreenState createState() => _DismissAdminScreenState();
@@ -32,18 +32,21 @@ class _DismissAdminScreenState extends State<DismissAdminScreen> {
 
       // Correct PocketBase filter syntax
       final response = await http.get(
-        Uri.parse('$baseUrl/api/collections/joined_users/records?filter=(voice_room_id="${widget.voiceRoomId}")'),
+        Uri.parse(
+            '$baseUrl/api/collections/joined_users/records?filter=(voice_room_id="${widget.voiceRoomId}")'),
       );
 
       if (response.statusCode == 200) {
         final joinedData = json.decode(response.body)['items'] as List;
         // Filter admins from the response
-        final joinedAdmins = joinedData.where((user) => user['admin_or_not'] == true).toList();
+        final joinedAdmins =
+            joinedData.where((user) => user['admin_or_not'] == true).toList();
 
         final userFutures = joinedAdmins.map((admin) async {
           try {
             final userResponse = await http.get(
-              Uri.parse('$baseUrl/api/collections/users/records/${admin['userid']}'),
+              Uri.parse(
+                  '$baseUrl/api/collections/users/records/${admin['userid']}'),
             );
 
             if (userResponse.statusCode == 200) {
@@ -87,7 +90,8 @@ class _DismissAdminScreenState extends State<DismissAdminScreen> {
       filteredAdmins = admins.where((admin) {
         final name = (admin['firstname'] ?? '').toLowerCase();
         final userId = (admin['userid'] ?? '').toLowerCase();
-        return name.contains(query.toLowerCase()) || userId.contains(query.toLowerCase());
+        return name.contains(query.toLowerCase()) ||
+            userId.contains(query.toLowerCase());
       }).toList();
     });
   }
@@ -95,7 +99,7 @@ class _DismissAdminScreenState extends State<DismissAdminScreen> {
   Future<void> _dismissAdmins() async {
     if (selectedAdminIds.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Please select at least one admin')),
+        const SnackBar(content: Text('Please select at least one admin')),
       );
       return;
     }
@@ -104,7 +108,7 @@ class _DismissAdminScreenState extends State<DismissAdminScreen> {
       showDialog(
         context: context,
         barrierDismissible: false,
-        builder: (context) => Center(
+        builder: (context) => const Center(
           child: Card(
             child: Padding(
               padding: EdgeInsets.all(20),
@@ -122,9 +126,11 @@ class _DismissAdminScreenState extends State<DismissAdminScreen> {
       );
 
       for (String adminId in selectedAdminIds) {
-        final adminRecord = admins.firstWhere((admin) => admin['userid'] == adminId);
+        final adminRecord =
+            admins.firstWhere((admin) => admin['userid'] == adminId);
         await http.patch(
-          Uri.parse('$baseUrl/api/collections/joined_users/records/${adminRecord['joinedId']}'),
+          Uri.parse(
+              '$baseUrl/api/collections/joined_users/records/${adminRecord['joinedId']}'),
           headers: {'Content-Type': 'application/json'},
           body: json.encode({'admin_or_not': false}),
         );
@@ -134,7 +140,7 @@ class _DismissAdminScreenState extends State<DismissAdminScreen> {
       Navigator.pop(context); // Return to previous screen
 
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
+        const SnackBar(
           content: Text('Admins dismissed successfully!'),
           backgroundColor: Colors.green,
         ),
@@ -142,7 +148,7 @@ class _DismissAdminScreenState extends State<DismissAdminScreen> {
     } catch (e) {
       Navigator.pop(context); // Close loading dialog
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
+        const SnackBar(
           content: Text('Failed to dismiss admins'),
           backgroundColor: Colors.red,
         ),
@@ -156,7 +162,7 @@ class _DismissAdminScreenState extends State<DismissAdminScreen> {
         : null;
 
     return Container(
-      margin: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
@@ -164,7 +170,7 @@ class _DismissAdminScreenState extends State<DismissAdminScreen> {
           BoxShadow(
             color: Colors.black.withOpacity(0.05),
             blurRadius: 10,
-            offset: Offset(0, 2),
+            offset: const Offset(0, 2),
           ),
         ],
       ),
@@ -198,7 +204,7 @@ class _DismissAdminScreenState extends State<DismissAdminScreen> {
         ),
         title: Text(
           admin['firstname'] ?? 'Unknown Admin',
-          style: TextStyle(
+          style: const TextStyle(
             fontWeight: FontWeight.bold,
             fontSize: 16,
           ),
@@ -221,7 +227,7 @@ class _DismissAdminScreenState extends State<DismissAdminScreen> {
       appBar: AppBar(
         elevation: 0,
         backgroundColor: Colors.white,
-        title: Text(
+        title: const Text(
           'Dismiss Admins',
           style: TextStyle(
             color: Colors.black,
@@ -229,7 +235,7 @@ class _DismissAdminScreenState extends State<DismissAdminScreen> {
           ),
         ),
         leading: IconButton(
-          icon: Icon(Icons.arrow_back_ios, color: Colors.black),
+          icon: const Icon(Icons.arrow_back_ios, color: Colors.black),
           onPressed: () => Navigator.pop(context),
         ),
       ),
@@ -237,7 +243,7 @@ class _DismissAdminScreenState extends State<DismissAdminScreen> {
         children: [
           Container(
             color: Colors.white,
-            padding: EdgeInsets.fromLTRB(16, 8, 16, 16),
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
             child: TextField(
               controller: searchController,
               decoration: InputDecoration(
@@ -250,43 +256,43 @@ class _DismissAdminScreenState extends State<DismissAdminScreen> {
                   borderRadius: BorderRadius.circular(12),
                   borderSide: BorderSide.none,
                 ),
-                contentPadding: EdgeInsets.symmetric(horizontal: 16),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 16),
               ),
               onChanged: _filterAdmins,
             ),
           ),
           Expanded(
             child: isLoading
-                ? Center(child: CircularProgressIndicator())
+                ? const Center(child: CircularProgressIndicator())
                 : filteredAdmins.isEmpty
-                ? Center(
-              child: Text(
-                'No admins found',
-                style: TextStyle(
-                  color: Colors.grey[600],
-                  fontSize: 16,
-                ),
-              ),
-            )
-                : ListView.builder(
-              padding: EdgeInsets.symmetric(vertical: 8),
-              itemCount: filteredAdmins.length,
-              itemBuilder: (context, index) {
-                return _buildAdminTile(filteredAdmins[index]);
-              },
-            ),
+                    ? Center(
+                        child: Text(
+                          'No admins found',
+                          style: TextStyle(
+                            color: Colors.grey[600],
+                            fontSize: 16,
+                          ),
+                        ),
+                      )
+                    : ListView.builder(
+                        padding: const EdgeInsets.symmetric(vertical: 8),
+                        itemCount: filteredAdmins.length,
+                        itemBuilder: (context, index) {
+                          return _buildAdminTile(filteredAdmins[index]);
+                        },
+                      ),
           ),
         ],
       ),
       bottomNavigationBar: Container(
-        padding: EdgeInsets.all(16),
+        padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
           color: Colors.white,
           boxShadow: [
             BoxShadow(
               color: Colors.black.withOpacity(0.05),
               blurRadius: 10,
-              offset: Offset(0, -2),
+              offset: const Offset(0, -2),
             ),
           ],
         ),
@@ -295,14 +301,14 @@ class _DismissAdminScreenState extends State<DismissAdminScreen> {
             onPressed: _dismissAdmins,
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.red,
-              padding: EdgeInsets.symmetric(vertical: 16),
+              padding: const EdgeInsets.symmetric(vertical: 16),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12),
               ),
             ),
             child: Text(
               'Dismiss ${selectedAdminIds.length} Admins',
-              style: TextStyle(
+              style: const TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.bold,
                 color: Colors.white,
