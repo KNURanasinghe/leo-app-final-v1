@@ -1,9 +1,12 @@
 // Flutter imports:
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:rive/rive.dart' as rive;
 
+import '../services/rive_service.dart';
 import './gift/gift.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
@@ -198,7 +201,10 @@ class LivePageState extends State<LivePage>
   static const String POCKETBASE_URL =
       'http://145.223.21.62:8090'; // Replace with your actual PocketBase URL
   bool _isLoading = false;
-
+  File? _selectedRoomPhoto;
+  File? _selectedBackgroundImage;
+  bool _isRoomUpdating = false;
+  String? _announcement;
   // In your LivePageState class
   final Map<String, Timer> _entryTimers = {};
   final Map<String, Widget> _activeEntries = {};
@@ -230,6 +236,214 @@ class LivePageState extends State<LivePage>
     } catch (e) {
       print('Error fetching user active item: $e');
       return null;
+    }
+  }
+
+// Method to handle room photo selection
+  Future<void> _pickRoomPhoto() async {
+    final picker = ImagePicker();
+    final pickedFile = await picker.pickImage(source: ImageSource.gallery);
+
+    if (pickedFile != null) {
+      setState(() {
+        _selectedRoomPhoto = File(pickedFile.path);
+      });
+
+      // Preview the selected image
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Preview Room Photo'),
+          content: Image.file(_selectedRoomPhoto!),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () {
+                Navigator.pop(context);
+                _updateRoomPhoto();
+              },
+              child: const Text('Use This Photo'),
+            ),
+          ],
+        ),
+      );
+    }
+  }
+
+  // Method to handle background image selection
+  Future<void> _pickBackgroundImage() async {
+    final picker = ImagePicker();
+    final pickedFile = await picker.pickImage(source: ImageSource.gallery);
+
+    if (pickedFile != null) {
+      setState(() {
+        _selectedBackgroundImage = File(pickedFile.path);
+      });
+
+      // Preview the selected image
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Preview Background Image'),
+          content: Image.file(_selectedBackgroundImage!),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () {
+                Navigator.pop(context);
+                _updateBackgroundImage();
+              },
+              child: const Text('Use This Background'),
+            ),
+          ],
+        ),
+      );
+    }
+  }
+
+  // Update room name
+  Future<void> _updateRoomName(String newName) async {
+    if (newName.isEmpty) return;
+
+    setState(() {
+      _isRoomUpdating = true;
+    });
+
+    try {
+      final success = await HttpService.updateRoomSettings(
+        roomId: widget.roomID,
+        roomName: newName,
+      );
+
+      if (success) {
+        // Update local state
+        setState(() {
+          _voiceRoomName = newName;
+        });
+
+        // Notify other users via socket
+        socket.emit('roomSettingsUpdate', {
+          'roomId': widget.roomID,
+          'userId': widget.userId,
+          'settings': {'type': 'name', 'value': newName}
+        });
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Room name updated successfully')),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Failed to update room name')),
+        );
+      }
+    } catch (e) {
+      print('Error updating room name: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error: $e')),
+      );
+    } finally {
+      setState(() {
+        _isRoomUpdating = false;
+      });
+    }
+  }
+
+  // Update room photo
+  Future<void> _updateRoomPhoto() async {
+    if (_selectedRoomPhoto == null) return;
+
+    setState(() {
+      _isRoomUpdating = true;
+    });
+
+    try {
+      final success = await HttpService.updateRoomSettings(
+        roomId: widget.roomID,
+        roomPhoto: _selectedRoomPhoto,
+      );
+
+      if (success) {
+        // Update local state with new photo URL
+        await _fetchVoiceRoomDetails(); // Re-fetch details including new URL
+
+        // Notify other users via socket
+        socket.emit('roomSettingsUpdate', {
+          'roomId': widget.roomID,
+          'userId': widget.userId,
+          'settings': {'type': 'photo', 'updated': true}
+        });
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Room photo updated successfully')),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Failed to update room photo')),
+        );
+      }
+    } catch (e) {
+      print('Error updating room photo: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error: $e')),
+      );
+    } finally {
+      setState(() {
+        _selectedRoomPhoto = null;
+        _isRoomUpdating = false;
+      });
+    }
+  }
+
+  // Update background image
+  Future<void> _updateBackgroundImage() async {
+    if (_selectedBackgroundImage == null) return;
+
+    setState(() {
+      _isRoomUpdating = true;
+    });
+
+    try {
+      final success = await HttpService.updateRoomSettings(
+        roomId: widget.roomID,
+        backgroundImage: _selectedBackgroundImage,
+      );
+
+      if (success) {
+        // Update local state with new background URL
+        await _fetchVoiceRoomDetails(); // Re-fetch details including new URL
+
+        // Notify other users via socket
+        socket.emit('roomSettingsUpdate', {
+          'roomId': widget.roomID,
+          'userId': widget.userId,
+          'settings': {'type': 'background', 'updated': true}
+        });
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+              content: Text('Background image updated successfully')),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Failed to update background image')),
+        );
+      }
+    } catch (e) {
+      print('Error updating background image: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error: $e')),
+      );
+    } finally {
+      setState(() {
+        _selectedBackgroundImage = null;
+        _isRoomUpdating = false;
+      });
     }
   }
 
@@ -1428,6 +1642,7 @@ class LivePageState extends State<LivePage>
   }
 
   void _showSettingsDialog() {
+    final roomNameController = TextEditingController(text: _voiceRoomName);
     showDialog(
       context: context,
       builder: (context) => Dialog(
@@ -1482,7 +1697,10 @@ class LivePageState extends State<LivePage>
                 ),
                 trailing:
                     const Icon(Icons.chevron_right, color: Colors.white54),
-                onTap: () => Navigator.pop(context),
+                onTap: () {
+                  Navigator.pop(context);
+                  _pickRoomPhoto();
+                },
               ),
 
               const Divider(color: Colors.white12, indent: 56),
@@ -1507,7 +1725,47 @@ class LivePageState extends State<LivePage>
                 ),
                 trailing:
                     const Icon(Icons.chevron_right, color: Colors.white54),
-                onTap: () => Navigator.pop(context),
+                onTap: () {
+                  // Show dialog to edit room name
+                  showDialog(
+                    context: context,
+                    builder: (context) => AlertDialog(
+                      backgroundColor: Colors.black.withOpacity(0.9),
+                      title: const Text(
+                        'Edit Room Name',
+                        style: TextStyle(color: Colors.white),
+                      ),
+                      content: TextField(
+                        controller: roomNameController,
+                        style: const TextStyle(color: Colors.white),
+                        decoration: InputDecoration(
+                          hintText: 'Enter new room name',
+                          hintStyle: TextStyle(color: Colors.grey[400]),
+                          filled: true,
+                          fillColor: Colors.white.withOpacity(0.1),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(10),
+                            borderSide: BorderSide.none,
+                          ),
+                        ),
+                      ),
+                      actions: [
+                        TextButton(
+                          onPressed: () => Navigator.pop(context),
+                          child: const Text('Cancel'),
+                        ),
+                        TextButton(
+                          onPressed: () {
+                            Navigator.pop(context);
+                            Navigator.pop(context);
+                            _updateRoomName(roomNameController.text);
+                          },
+                          child: const Text('Save'),
+                        ),
+                      ],
+                    ),
+                  );
+                },
               ),
 
               const Divider(color: Colors.white12, indent: 56),
@@ -1532,7 +1790,40 @@ class LivePageState extends State<LivePage>
                 ),
                 trailing:
                     const Icon(Icons.chevron_right, color: Colors.white54),
-                onTap: () => Navigator.pop(context),
+                onTap: () {
+                  Navigator.pop(context);
+                  _pickBackgroundImage();
+                },
+              ),
+
+              const Divider(color: Colors.white12, indent: 56),
+
+              // NEW: Announcement Setting
+              ListTile(
+                leading: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.amber.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Icon(Icons.campaign, color: Colors.amber[300]),
+                ),
+                title: const Text(
+                  'Room Announcement',
+                  style: TextStyle(color: Colors.white, fontSize: 16),
+                ),
+                subtitle: Text(
+                  _announcement != null && _announcement!.isNotEmpty
+                      ? 'Edit room announcement'
+                      : 'Add room announcement',
+                  style: const TextStyle(color: Colors.white70, fontSize: 12),
+                ),
+                trailing:
+                    const Icon(Icons.chevron_right, color: Colors.white54),
+                onTap: () {
+                  Navigator.pop(context);
+                  _showAnnouncementDialog(context);
+                },
               ),
 
               const SizedBox(height: 20),
@@ -1603,6 +1894,138 @@ class LivePageState extends State<LivePage>
           ),
         ),
       ),
+    );
+  }
+
+  Future<void> _updateAnnouncement(String roomId, String announcement) async {
+    try {
+      setState(() {
+        _isLoading = true;
+      });
+
+      final response = await http.patch(
+        Uri.parse('$POCKETBASE_URL/api/collections/voiceRooms/records/$roomId'),
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode({
+          'announcement': announcement,
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        setState(() {
+          _announcement = announcement;
+        });
+
+        // Show success message
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Announcement updated successfully')),
+          );
+        }
+      } else {
+        print('Failed to update announcement: ${response.statusCode}');
+        // Show error message
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Failed to update announcement')),
+          );
+        }
+      }
+
+      setState(() {
+        _isLoading = false;
+      });
+    } catch (e) {
+      print('Error updating announcement: $e');
+      setState(() {
+        _isLoading = false;
+      });
+
+      // Show error message
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e')),
+        );
+      }
+    }
+  }
+
+  void _showAnnouncementDialog(BuildContext context) {
+    final TextEditingController announcementController =
+        TextEditingController(text: _announcement ?? '');
+
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return Dialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          backgroundColor: Colors.black.withOpacity(0.9),
+          child: Padding(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text(
+                  'Room Announcement',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  ),
+                ),
+                const SizedBox(height: 20),
+                TextField(
+                  controller: announcementController,
+                  decoration: InputDecoration(
+                    hintText: 'Enter room announcement',
+                    hintStyle: TextStyle(color: Colors.grey[400]),
+                    filled: true,
+                    fillColor: Colors.white.withOpacity(0.1),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                      borderSide: BorderSide.none,
+                    ),
+                    contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 16, vertical: 12),
+                  ),
+                  style: const TextStyle(color: Colors.white),
+                  maxLines: 5,
+                ),
+                const SizedBox(height: 20),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(context),
+                      child: const Text(
+                        'Cancel',
+                        style: TextStyle(color: Colors.white70),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    ElevatedButton(
+                      onPressed: () {
+                        Navigator.pop(context);
+                        _updateAnnouncement(
+                            widget.roomID, announcementController.text);
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.blue,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                      ),
+                      child: const Text('Save'),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 
@@ -1944,9 +2367,9 @@ class LivePageState extends State<LivePage>
           children: [
             // Main Zego UIKit widget
             ZegoUIKitPrebuiltLiveAudioRoom(
-              appID: 2069292420,
+              appID: 50134611,
               appSign:
-                  '3b8893143a13c24f6d82dd7260b70a9d29814b99130e7bcebfe3e09dac8c0731',
+                  '3c478217fcd4ec348ae0783f6c12fb7171978dc4cc1399f5ca2f9f5234332d83',
               userID: localUserID,
               userName: widget.username1,
               roomID: widget.roomID,

@@ -12,9 +12,9 @@ class ZegoService {
 
   // ZegoCloud credentials
   // These should be stored securely and preferably fetched from your server
-  final int appID = 1244136023;
+  final int appID = 50134611;
   final String appSign =
-      '087a2a4ce49e2e91e175a2b0153b5638df2a65ce3d6b0a515cd743fbe62a6ea2';
+      '3c478217fcd4ec348ae0783f6c12fb7171978dc4cc1399f5ca2f9f5234332d83';
 
   bool _isInitialized = false;
 
