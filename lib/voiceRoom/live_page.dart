@@ -539,7 +539,26 @@ class LivePageState extends State<LivePage>
         _fetchOwnBorder();
       }
     });
+    socket.on('seatTaken', (data) {
+      if (mounted) {
+        setState(() {
+          _seatOccupants[data['seatIndex']] = {
+            'userId': data['userId'],
+            'userName': data['userName'],
+            'userAvatar': data['userAvatar'],
+            'borderUrl': data['borderUrl']
+          };
+        });
+      }
+    });
 
+    socket.on('seatReleased', (data) {
+      if (mounted) {
+        setState(() {
+          _seatOccupants.remove(data['seatIndex']);
+        });
+      }
+    });
     socket.on('seatStatusUpdate', (data) {
       if (mounted) {
         setState(() {
@@ -597,13 +616,12 @@ class LivePageState extends State<LivePage>
             });
           }
         });
-
-        Future.delayed(const Duration(seconds: 5), () {
-          if (mounted) {
-            setState(() {
-              _showWelcomeMessage = false;
-            });
-          }
+      }
+    });
+    Future.delayed(const Duration(seconds: 5), () {
+      if (mounted) {
+        setState(() {
+          _showWelcomeMessage = false;
         });
       }
     });
@@ -692,6 +710,39 @@ class LivePageState extends State<LivePage>
           'timestamp': DateTime.now().millisecondsSinceEpoch
         });
       });
+    });
+    socket.on('roomSettingsUpdated', (data) {
+      if (!mounted) return;
+
+      final settings = data['settings'];
+      final type = settings['type'];
+
+      switch (type) {
+        case 'name':
+          setState(() {
+            _voiceRoomName = settings['value'];
+          });
+          break;
+
+        case 'photo':
+        case 'background':
+          // Re-fetch room details to get updated URLs
+          _fetchVoiceRoomDetails();
+          break;
+      }
+
+      // Show notification of the update
+      if (data['updatedBy'] != widget.userId) {
+        final message = type == 'name'
+            ? 'Room name has been updated'
+            : type == 'photo'
+                ? 'Room photo has been updated'
+                : 'Room background has been updated';
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(message)),
+        );
+      }
     });
   }
 
