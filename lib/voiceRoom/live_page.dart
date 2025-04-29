@@ -209,6 +209,88 @@ class LivePageState extends State<LivePage>
   final Map<String, Timer> _entryTimers = {};
   final Map<String, Widget> _activeEntries = {};
 
+  final Map<String, String> _userBorders = {};
+  final Map<int, Map<String, dynamic>> _seatOccupants = {};
+  final Map<int, String> _activeSeatFrames = {};
+
+  bool _showWelcomeMessage = true;
+  final String _welcomeMessage =
+      "Welcome to Hapi! Please respect each other and talk politely. Abusing, third-party advertising, fake official information and politically sensitive topics are strictly prohibited. please report if you find these situations";
+
+  Future<String?> _fetchOwnBorder() async {
+    try {
+      print('BORDER DEBUG: Fetching own border for user ${widget.userId}');
+
+      final response = await http.get(
+        Uri.parse('$POCKETBASE_URL/api/collections/myItems/records')
+            .replace(queryParameters: {
+          'filter': 'userId="${widget.userId}" && isborder_used=true',
+        }),
+        headers: {'Content-Type': 'application/json'},
+      );
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        final items = List<Map<String, dynamic>>.from(data['items']);
+
+        if (items.isNotEmpty && items[0]['border'] != null) {
+          final item = items[0];
+          final borderUrl =
+              '$POCKETBASE_URL/api/files/myItems/${item['id']}/${item['border']}';
+
+          print('BORDER DEBUG: Found own border: $borderUrl');
+
+          // Update local state
+          setState(() {
+            _userBorders[widget.userId] = borderUrl;
+          });
+
+          // Notify others about our border
+          if (socket.connected) {
+            socket.emit('borderChange', {
+              'roomId': widget.roomID,
+              'userId': widget.userId,
+              'borderUrl': borderUrl
+            });
+            print('BORDER DEBUG: Notified others about our border');
+          }
+
+          return borderUrl;
+        } else {
+          print('BORDER DEBUG: No active border found for own user');
+        }
+      } else {
+        print(
+            'BORDER DEBUG: Failed to fetch own border: ${response.statusCode}');
+      }
+      return null;
+    } catch (e) {
+      print('Error fetching own border: $e');
+      return null;
+    }
+  }
+
+  void _handleSeatTaken(String userId, int seatIndex) {
+    if (socket.connected) {
+      // Get the user details from your existing data
+      //final userAvatar = _findUserAvatar(userId);
+      final userBorder = _userBorders[userId];
+      //final userName = _findUserName(userId);
+
+      // Emit the seat taken event
+      socket.emit('seatTaken', {
+        'roomId': widget.roomID,
+        'userId': userId,
+        'seatIndex': seatIndex,
+        'userAvatar': _userAvatarUrl,
+        'userName': widget.username1,
+        'borderUrl': userBorder
+      });
+
+      print('Emitted seatTaken event for user $userId in seat $seatIndex');
+    }
+  }
+
   Future<String?> _fetchUserActiveItem(String userId) async {
     try {
       final uri = Uri.parse('$POCKETBASE_URL/api/collections/myItems/records')
@@ -452,6 +534,46 @@ class LivePageState extends State<LivePage>
     super.initState();
     _initializeSocket();
     _fetchInitialUsers();
+    Timer.periodic(const Duration(seconds: 30), (_) {
+      if (mounted && socket.connected) {
+        _fetchOwnBorder();
+      }
+    });
+
+    socket.on('seatStatusUpdate', (data) {
+      if (mounted) {
+        setState(() {
+          // Store which seats are taken and their border information
+          if (data['isTaken']) {
+            _seatOccupants[data['seatIndex']] = {
+              'userId': data['userId'],
+              'userName': data['userName'],
+              'userAvatar': data['userAvatar'],
+              'borderUrl': data['borderUrl']
+            };
+          } else {
+            // Remove seat occupant data when seat is released
+            _seatOccupants.remove(data['seatIndex']);
+          }
+        });
+      }
+    });
+
+    socket.on('borderChange', (data) {
+      if (mounted && data['userId'] != null && data['borderUrl'] != null) {
+        setState(() {
+          _userBorders[data['userId']] = data['borderUrl'];
+
+          // Update any active seats this user might be in
+          _seatOccupants.forEach((seatIndex, userInfo) {
+            if (userInfo['userId'] == data['userId']) {
+              userInfo['borderUrl'] = data['borderUrl'];
+            }
+          });
+        });
+      }
+    });
+
 // In your initState() method
     socket.on('userEntry', (data) {
       print('Received user entry: $data');
@@ -472,6 +594,14 @@ class LivePageState extends State<LivePage>
           if (mounted) {
             setState(() {
               _activeEntries.remove(data['userId']);
+            });
+          }
+        });
+
+        Future.delayed(const Duration(seconds: 5), () {
+          if (mounted) {
+            setState(() {
+              _showWelcomeMessage = false;
             });
           }
         });
@@ -648,6 +778,143 @@ class LivePageState extends State<LivePage>
     );
   }
 
+  Widget _buildWelcomeAndAnnouncement() {
+    // Calculate the position based on welcome message visibility
+    double bottomPosition = _showWelcomeMessage
+        ? MediaQuery.of(context).size.height *
+            0.3 // Original position when welcome is visible
+        : MediaQuery.of(context).size.height * 0.3 +
+            16; // Move up when welcome is hidden
+
+    return Positioned(
+      bottom: bottomPosition,
+      left: 16,
+      right: 16,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Welcome message (visible for 5 seconds)
+          if (_showWelcomeMessage)
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.black.withOpacity(0.3),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      const Icon(
+                        Icons.waving_hand,
+                        color: Colors.lightGreen,
+                        size: 18,
+                      ),
+                      const SizedBox(width: 8),
+                      const Text(
+                        'Welcome!',
+                        style: TextStyle(
+                          color: Colors.lightGreen,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14,
+                          decoration: TextDecoration.none,
+                        ),
+                      ),
+                      const Spacer(),
+                      GestureDetector(
+                        onTap: () {
+                          setState(() {
+                            _showWelcomeMessage = false;
+                          });
+                        },
+                        child: const Icon(
+                          Icons.close,
+                          color: Colors.white70,
+                          size: 16,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    _welcomeMessage,
+                    style: const TextStyle(
+                      color: Colors.lightGreen,
+                      fontSize: 12,
+                      decoration: TextDecoration.none,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+          // Only add spacing if welcome message is visible
+          if (_showWelcomeMessage) const SizedBox(height: 16),
+
+          // Announcement - always shown but position depends on welcome message visibility
+          if (_announcement != null && _announcement!.isNotEmpty)
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.black.withOpacity(0.3),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: Colors.amber.withOpacity(0.4),
+                  width: 1,
+                ),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      const Icon(
+                        Icons.campaign,
+                        color: Colors.amber,
+                        size: 18,
+                      ),
+                      const SizedBox(width: 8),
+                      const Text(
+                        'Announcement',
+                        style: TextStyle(
+                          color: Colors.amber,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14,
+                          decoration: TextDecoration.none,
+                        ),
+                      ),
+                      const Spacer(),
+                      if (isAdmin)
+                        GestureDetector(
+                          onTap: () {
+                            _showAnnouncementDialog(context);
+                          },
+                          child: const Icon(
+                            Icons.edit,
+                            color: Colors.white70,
+                            size: 16,
+                          ),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    _announcement!,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 12,
+                      decoration: TextDecoration.none,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
   Future<void> _checkAdminStatus() async {
     try {
       final response = await http.get(
@@ -762,7 +1029,7 @@ class LivePageState extends State<LivePage>
 
       // Send full user details when joining
       await _fetchAndSetUserAvatar(); // Make sure we have avatar URL
-
+      await _fetchOwnBorder();
       socket.emit('joinRoom', {
         'roomId': widget.roomID,
         'userId': widget.userId,
@@ -1592,10 +1859,35 @@ class LivePageState extends State<LivePage>
 
   Widget foregroundBuilder(
       BuildContext context, Size size, ZegoUIKitUser? user, Map extraInfo) {
+    // If user is null, this is an empty seat - don't show any border
+    if (user == null || user.id.isEmpty) {
+      return Container();
+    }
+
+    final borderUrl = _userBorders[widget.userId];
+
+    final seatIndex = extraInfo['seatIndex'] as int?;
+
+    print(
+        'Border URL: $borderUrl, seatIndex: $seatIndex, user.id: ${user.id}, widget.userId: ${widget.userId}');
     return Stack(
       children: [
+        // Custom border, if applicable
+        if (borderUrl != null)
+          Positioned.fill(
+            child: Container(
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                image: DecorationImage(
+                  image: CachedNetworkImageProvider(borderUrl),
+                  fit: BoxFit.cover,
+                ),
+              ),
+            ),
+          ),
+
         // Username text
-        if (user?.name != null && user!.name.isNotEmpty)
+        if (user.name.isNotEmpty)
           Positioned(
             bottom: 0,
             left: 0,
@@ -2418,7 +2710,7 @@ class LivePageState extends State<LivePage>
                 ),
               ),
             ),
-
+            _buildWelcomeAndAnnouncement(),
             if (_activeEmojis.isNotEmpty)
               SizedBox(
                 width: double.infinity,
@@ -4142,6 +4434,26 @@ class LivePageState extends State<LivePage>
     });
   }
 
+  void _updateSeatFrame(int seatIndex, String? frameUrl) {
+    if (socket.connected) {
+      socket.emit('seatFrameUpdate', {
+        'roomId': widget.roomID,
+        'seatIndex': seatIndex,
+        'frameUrl': frameUrl,
+        'timestamp': DateTime.now().millisecondsSinceEpoch
+      });
+
+      // Also update local state immediately
+      setState(() {
+        if (frameUrl != null) {
+          _activeSeatFrames[seatIndex] = frameUrl;
+        } else {
+          _activeSeatFrames.remove(seatIndex);
+        }
+      });
+    }
+  }
+
   ZegoUIKitPrebuiltLiveAudioRoomEvents get events {
     return ZegoUIKitPrebuiltLiveAudioRoomEvents(
       user: ZegoLiveAudioRoomUserEvents(
@@ -4169,6 +4481,17 @@ class LivePageState extends State<LivePage>
           debugPrint(
             'on seats changed, taken seats:$takenSeats, untaken seats:$untakenSeats',
           );
+          takenSeats.forEach((seatIndex, user) {
+            _handleSeatTaken(user.id, seatIndex);
+          });
+
+          // Process empty seats
+          for (var seatIndex in untakenSeats) {
+            _updateSeatFrame(seatIndex, null);
+            setState(() {
+              _seatOccupants.remove(seatIndex);
+            });
+          }
         },
 
         /// WARNING: will override prebuilt logic
