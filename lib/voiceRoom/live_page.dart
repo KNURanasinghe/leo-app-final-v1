@@ -1921,7 +1921,7 @@ class LivePageState extends State<LivePage>
 
   Widget foregroundBuilder(
       BuildContext context, Size size, ZegoUIKitUser? user, Map extraInfo) {
-    // Get the seat index from the 'index' key instead of 'seatIndex'
+    // Get the seat index from the 'index' key
     final seatIndex = extraInfo['index'] as int?;
     print('Seat index: $seatIndex, User: ${user?.name}');
 
@@ -1931,102 +1931,86 @@ class LivePageState extends State<LivePage>
     // Check if we have socket-based data for this seat
     final seatData = _seatOccupants[seatIndex];
     print('seat data $seatData');
-    // Is this seat empty according to Zego?
-    final bool isEmptySeat = user == null || user.id.isEmpty;
 
     // If we have seat data from sockets, use that (takes precedence)
     if (seatData != null) {
-      return Stack(
-        children: [
-          // Avatar from socket data
-          if (seatData['userAvatar'] != null)
-            ClipRRect(
-              borderRadius: BorderRadius.circular(size.width / 2),
-              child: CachedNetworkImage(
-                imageUrl: seatData['userAvatar'],
-                width: size.width,
-                height: size.height - 20, // Leave space for the name
-                fit: BoxFit.cover,
-                placeholder: (context, url) => Container(
-                  color: Colors.grey[300],
-                  child: const Icon(Icons.person, color: Colors.grey),
-                ),
-                errorWidget: (context, url, error) => Container(
-                  color: Colors.grey[300],
-                  child: const Icon(Icons.person, color: Colors.grey),
-                ),
-              ),
-            ),
+      // Create a larger container for the entire seat area to allow border to expand
+      const double nameLabelHeight = 20;
+      final double avatarSize =
+          size.width * 0.6; // Make avatar 60% of seat width
 
-          // Border from socket data (if available)
-          if (seatData['borderUrl'] != null)
-            Positioned.fill(
-              bottom: 20, // Leave space for the name
-              child: Container(
-                decoration: const BoxDecoration(shape: BoxShape.circle),
-                child: SVGASimpleImage(resUrl: seatData['borderUrl']),
-              ),
+      return Column(
+        children: [
+          Container(
+            height: size.height - nameLabelHeight,
+            width: size.width,
+            // Remove any constraints that might clip the border
+            clipBehavior: Clip.none,
+            child: Stack(
+              clipBehavior: Clip.none, // Allow content to overflow
+              alignment: Alignment.center,
+              children: [
+                // Avatar on top of border
+                if (seatData['userAvatar'] != null)
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(avatarSize / 2),
+                    child: Container(
+                      width: avatarSize,
+                      height: avatarSize,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: Colors.white,
+                          width: 1,
+                        ),
+                      ),
+                      child: CachedNetworkImage(
+                        imageUrl: seatData['userAvatar'],
+                        fit: BoxFit.cover,
+                        placeholder: (context, url) => Container(
+                          color: Colors.grey[300],
+                          child: const Icon(Icons.person, color: Colors.grey),
+                        ),
+                        errorWidget: (context, url, error) => Container(
+                          color: Colors.grey[300],
+                          child: const Icon(Icons.person, color: Colors.grey),
+                        ),
+                      ),
+                    ),
+                  ),
+                // Border behind avatar - rendered first in stack
+                if (seatData['borderUrl'] != null)
+                  Positioned.fill(
+                    // Expand beyond container bounds
+                    left: 0,
+                    right: 0,
+                    top: 0,
+                    bottom: 0, // Slight adjustment for name label
+                    child: Container(
+                      decoration: const BoxDecoration(shape: BoxShape.circle),
+                      child: SVGASimpleImage(resUrl: seatData['borderUrl']),
+                    ),
+                  ),
+              ],
             ),
+          ),
 
           // Username from socket data
           if (seatData['userName'] != null)
-            Positioned(
-              bottom: 0,
-              left: 0,
-              right: 0,
-              child: Container(
-                color: Colors.blueAccent,
-                padding: const EdgeInsets.symmetric(vertical: 2),
-                child: Text(
-                  " ${seatData['userName']}  ",
-                  overflow: TextOverflow.ellipsis,
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 9,
-                    fontWeight: FontWeight.w600,
-                    decoration: TextDecoration.none,
-                  ),
-                ),
-              ),
-            ),
-        ],
-      );
-    }
-
-    // If we don't have socket data but we have a Zego user, show their info
-    if (!isEmptySeat) {
-      return Stack(
-        children: [
-          // Border if user has one
-          if (_userBorders[user.id] != null)
-            Positioned.fill(
-              bottom: 20, // Leave space for the name
-              child: Container(
-                decoration: const BoxDecoration(shape: BoxShape.circle),
-                child: SVGASimpleImage(resUrl: _userBorders[user.id]!),
-              ),
-            ),
-
-          // User name at the bottom
-          if (user.name.isNotEmpty)
-            Positioned(
-              bottom: 0,
-              left: 0,
-              right: 0,
-              child: Container(
-                color: Colors.blueAccent,
-                padding: const EdgeInsets.symmetric(vertical: 2),
-                child: Text(
-                  " ${user.name}  ",
-                  overflow: TextOverflow.ellipsis,
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 9,
-                    fontWeight: FontWeight.w600,
-                    decoration: TextDecoration.none,
-                  ),
+            Container(
+              height: nameLabelHeight,
+              width: size.width,
+              color: Colors.blueAccent,
+              padding: const EdgeInsets.symmetric(vertical: 2),
+              child: Text(
+                "${seatData['userName']}",
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 9,
+                  fontWeight: FontWeight.w600,
+                  decoration: TextDecoration.none,
                 ),
               ),
             ),
