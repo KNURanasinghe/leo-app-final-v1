@@ -1937,7 +1937,7 @@ class LivePageState extends State<LivePage>
       // Create a larger container for the entire seat area to allow border to expand
       const double nameLabelHeight = 20;
       final double avatarSize =
-          size.width * 0.6; // Make avatar 60% of seat width
+          size.width * 0.65; // Make avatar 60% of seat width
 
       return Column(
         children: [
@@ -1982,10 +1982,10 @@ class LivePageState extends State<LivePage>
                 if (seatData['borderUrl'] != null)
                   Positioned.fill(
                     // Expand beyond container bounds
-                    left: 0,
-                    right: 0,
-                    top: 0,
-                    bottom: 0, // Slight adjustment for name label
+                    left: -4,
+                    right: -4,
+                    top: -28,
+                    bottom: -34, // Slight adjustment for name label
                     child: Container(
                       decoration: const BoxDecoration(shape: BoxShape.circle),
                       child: SVGASimpleImage(resUrl: seatData['borderUrl']),
@@ -1994,14 +1994,11 @@ class LivePageState extends State<LivePage>
               ],
             ),
           ),
-
+          const SizedBox(height: 5),
           // Username from socket data
           if (seatData['userName'] != null)
-            Container(
-              height: nameLabelHeight,
-              width: size.width,
-              color: Colors.blueAccent,
-              padding: const EdgeInsets.symmetric(vertical: 2),
+            Positioned.fill(
+              bottom: 5,
               child: Text(
                 "${seatData['userName']}",
                 overflow: TextOverflow.ellipsis,
@@ -4800,7 +4797,7 @@ class LivePageState extends State<LivePage>
     return ZegoLiveAudioRoomSeatConfig(
       backgroundBuilder: backgroundBuilder,
       foregroundBuilder: foregroundBuilder,
-      avatarBuilder: avatarBuilder,
+      // avatarBuilder: avatarBuilder,
     );
   }
 
