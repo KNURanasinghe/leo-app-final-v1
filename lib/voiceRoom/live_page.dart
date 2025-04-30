@@ -3,8 +3,10 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/svg.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:rive/rive.dart' as rive;
+import 'package:svgaplayer_flutter/svgaplayer_flutter.dart';
 
 import '../services/rive_service.dart';
 import './gift/gift.dart';
@@ -272,22 +274,29 @@ class LivePageState extends State<LivePage>
 
   void _handleSeatTaken(String userId, int seatIndex) {
     if (socket.connected) {
-      // Get the user details from your existing data
-      //final userAvatar = _findUserAvatar(userId);
-      final userBorder = _userBorders[userId];
-      //final userName = _findUserName(userId);
+      print('Handling seat taken: User $userId taking seat $seatIndex');
 
-      // Emit the seat taken event
+      // Emit the seat taken event with complete information
       socket.emit('seatTaken', {
         'roomId': widget.roomID,
-        'userId': userId,
+        'userId': widget.userId,
         'seatIndex': seatIndex,
         'userAvatar': _userAvatarUrl,
         'userName': widget.username1,
-        'borderUrl': userBorder
+        'borderUrl': _userBorders[userId]
       });
 
-      print('Emitted seatTaken event for user $userId in seat $seatIndex');
+      // Update our local state immediately for responsive UI
+      setState(() {
+        _seatOccupants[seatIndex] = {
+          'userId': userId,
+          'userName': widget.username1,
+          'userAvatar': _userAvatarUrl,
+          'borderUrl': _userBorders[userId]
+        };
+      });
+
+      print('Updated seat occupants: $_seatOccupants');
     }
   }
 
@@ -540,6 +549,8 @@ class LivePageState extends State<LivePage>
       }
     });
     socket.on('seatTaken', (data) {
+      print(
+          'seat taken ${data['seatIndex']} ${data['userId']} ${data['userName']} ${data['userAvatar']} ${data['borderUrl']}');
       if (mounted) {
         setState(() {
           _seatOccupants[data['seatIndex']] = {
@@ -1910,57 +1921,121 @@ class LivePageState extends State<LivePage>
 
   Widget foregroundBuilder(
       BuildContext context, Size size, ZegoUIKitUser? user, Map extraInfo) {
-    // If user is null, this is an empty seat - don't show any border
-    if (user == null || user.id.isEmpty) {
-      return Container();
+    // Get the seat index from the 'index' key instead of 'seatIndex'
+    final seatIndex = extraInfo['index'] as int?;
+    print('Seat index: $seatIndex, User: ${user?.name}');
+
+    // If no seat index is provided, return empty container
+    if (seatIndex == null) return Container();
+
+    // Check if we have socket-based data for this seat
+    final seatData = _seatOccupants[seatIndex];
+    print('seat data $seatData');
+    // Is this seat empty according to Zego?
+    final bool isEmptySeat = user == null || user.id.isEmpty;
+
+    // If we have seat data from sockets, use that (takes precedence)
+    if (seatData != null) {
+      return Stack(
+        children: [
+          // Avatar from socket data
+          if (seatData['userAvatar'] != null)
+            ClipRRect(
+              borderRadius: BorderRadius.circular(size.width / 2),
+              child: CachedNetworkImage(
+                imageUrl: seatData['userAvatar'],
+                width: size.width,
+                height: size.height - 20, // Leave space for the name
+                fit: BoxFit.cover,
+                placeholder: (context, url) => Container(
+                  color: Colors.grey[300],
+                  child: const Icon(Icons.person, color: Colors.grey),
+                ),
+                errorWidget: (context, url, error) => Container(
+                  color: Colors.grey[300],
+                  child: const Icon(Icons.person, color: Colors.grey),
+                ),
+              ),
+            ),
+
+          // Border from socket data (if available)
+          if (seatData['borderUrl'] != null)
+            Positioned.fill(
+              bottom: 20, // Leave space for the name
+              child: Container(
+                decoration: const BoxDecoration(shape: BoxShape.circle),
+                child: SVGASimpleImage(resUrl: seatData['borderUrl']),
+              ),
+            ),
+
+          // Username from socket data
+          if (seatData['userName'] != null)
+            Positioned(
+              bottom: 0,
+              left: 0,
+              right: 0,
+              child: Container(
+                color: Colors.blueAccent,
+                padding: const EdgeInsets.symmetric(vertical: 2),
+                child: Text(
+                  " ${seatData['userName']}  ",
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 9,
+                    fontWeight: FontWeight.w600,
+                    decoration: TextDecoration.none,
+                  ),
+                ),
+              ),
+            ),
+        ],
+      );
     }
 
-    final borderUrl = _userBorders[widget.userId];
+    // If we don't have socket data but we have a Zego user, show their info
+    if (!isEmptySeat) {
+      return Stack(
+        children: [
+          // Border if user has one
+          if (_userBorders[user.id] != null)
+            Positioned.fill(
+              bottom: 20, // Leave space for the name
+              child: Container(
+                decoration: const BoxDecoration(shape: BoxShape.circle),
+                child: SVGASimpleImage(resUrl: _userBorders[user.id]!),
+              ),
+            ),
 
-    final seatIndex = extraInfo['seatIndex'] as int?;
-
-    print(
-        'Border URL: $borderUrl, seatIndex: $seatIndex, user.id: ${user.id}, widget.userId: ${widget.userId}');
-    return Stack(
-      children: [
-        // Custom border, if applicable
-        if (borderUrl != null)
-          Positioned.fill(
-            child: Container(
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                image: DecorationImage(
-                  image: CachedNetworkImageProvider(borderUrl),
-                  fit: BoxFit.cover,
+          // User name at the bottom
+          if (user.name.isNotEmpty)
+            Positioned(
+              bottom: 0,
+              left: 0,
+              right: 0,
+              child: Container(
+                color: Colors.blueAccent,
+                padding: const EdgeInsets.symmetric(vertical: 2),
+                child: Text(
+                  " ${user.name}  ",
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 9,
+                    fontWeight: FontWeight.w600,
+                    decoration: TextDecoration.none,
+                  ),
                 ),
               ),
             ),
-          ),
+        ],
+      );
+    }
 
-        // Username text
-        if (user.name.isNotEmpty)
-          Positioned(
-            bottom: 0,
-            left: 0,
-            right: 0,
-            child: Container(
-              color: Colors.blueAccent,
-              padding: const EdgeInsets.symmetric(vertical: 2),
-              child: Text(
-                " ${user.name}  ",
-                overflow: TextOverflow.ellipsis,
-                textAlign: TextAlign.center,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 9,
-                  fontWeight: FontWeight.w600,
-                  decoration: TextDecoration.none,
-                ),
-              ),
-            ),
-          ),
-      ],
-    );
+    // Empty seat
+    return Container();
   }
 
   // First, add a method to fetch joined users count
@@ -4532,16 +4607,34 @@ class LivePageState extends State<LivePage>
           debugPrint(
             'on seats changed, taken seats:$takenSeats, untaken seats:$untakenSeats',
           );
-          takenSeats.forEach((seatIndex, user) {
-            _handleSeatTaken(user.id, seatIndex);
-          });
+          {
+            debugPrint(
+              'on seats changed, taken seats:$takenSeats, untaken seats:$untakenSeats',
+            );
 
-          // Process empty seats
-          for (var seatIndex in untakenSeats) {
-            _updateSeatFrame(seatIndex, null);
-            setState(() {
-              _seatOccupants.remove(seatIndex);
+            // Handle seat taken events for our own user
+            takenSeats.forEach((index, user) {
+              if (user.id == localUserID) {
+                _handleSeatTaken(user.id, index);
+              }
             });
+
+            // Process seat releases
+            for (var index in untakenSeats) {
+              if (_seatOccupants.containsKey(index)) {
+                // Release the seat in our custom system
+                if (socket.connected) {
+                  socket.emit('seatReleased', {
+                    'roomId': widget.roomID,
+                    'seatIndex': index,
+                  });
+
+                  setState(() {
+                    _seatOccupants.remove(index);
+                  });
+                }
+              }
+            }
           }
         },
 
