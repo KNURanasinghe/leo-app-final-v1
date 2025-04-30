@@ -620,7 +620,7 @@ class LivePageState extends State<LivePage>
 
         // Remove after 3 seconds
         _entryTimers[data['userId']]?.cancel();
-        _entryTimers[data['userId']] = Timer(const Duration(seconds: 7), () {
+        _entryTimers[data['userId']] = Timer(const Duration(seconds: 15), () {
           if (mounted) {
             setState(() {
               _activeEntries.remove(data['userId']);
@@ -1937,7 +1937,7 @@ class LivePageState extends State<LivePage>
       // Create a larger container for the entire seat area to allow border to expand
       const double nameLabelHeight = 20;
       final double avatarSize =
-          size.width * 0.65; // Make avatar 60% of seat width
+          size.width * 0.755; // Make avatar 60% of seat width
 
       return Column(
         children: [
@@ -2794,6 +2794,8 @@ class LivePageState extends State<LivePage>
                   }).toList(),
                 ),
               ),
+
+              
             // Power/Logout button
             Positioned(
               top: MediaQuery.of(context).padding.top + 2,
@@ -4539,26 +4541,6 @@ class LivePageState extends State<LivePage>
       'userItem': userItemUrl,
       'timestamp': DateTime.now().millisecondsSinceEpoch
     });
-  }
-
-  void _updateSeatFrame(int seatIndex, String? frameUrl) {
-    if (socket.connected) {
-      socket.emit('seatFrameUpdate', {
-        'roomId': widget.roomID,
-        'seatIndex': seatIndex,
-        'frameUrl': frameUrl,
-        'timestamp': DateTime.now().millisecondsSinceEpoch
-      });
-
-      // Also update local state immediately
-      setState(() {
-        if (frameUrl != null) {
-          _activeSeatFrames[seatIndex] = frameUrl;
-        } else {
-          _activeSeatFrames.remove(seatIndex);
-        }
-      });
-    }
   }
 
   ZegoUIKitPrebuiltLiveAudioRoomEvents get events {
