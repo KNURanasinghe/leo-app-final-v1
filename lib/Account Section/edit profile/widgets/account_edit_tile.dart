@@ -49,22 +49,22 @@ class AccountTile extends StatelessWidget {
             SizedBox(
               width: 15.w,
             ),
-            if (isUpcomming)
-              Container(
-                height: 50,
-                width: 50,
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(20),
-                  color: darkModeEnabled ? Colors.grey[800] : Colors.grey[200],
-                ),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(20),
-                  child: const Image(
-                    image: AssetImage('assets/comingzoon1.jpg'),
-                    fit: BoxFit.cover,
-                  ),
-                ),
-              ),
+            // if (isUpcomming)
+            //   Container(
+            //     height: 50,
+            //     width: 50,
+            //     decoration: BoxDecoration(
+            //       borderRadius: BorderRadius.circular(20),
+            //       color: darkModeEnabled ? Colors.grey[800] : Colors.grey[200],
+            //     ),
+            //     child: ClipRRect(
+            //       borderRadius: BorderRadius.circular(20),
+            //       child: const Image(
+            //         image: AssetImage('assets/comingzoon1.jpg'),
+            //         fit: BoxFit.cover,
+            //       ),
+            //     ),
+            //   ),
             const Spacer(),
             endWidget,
           ],

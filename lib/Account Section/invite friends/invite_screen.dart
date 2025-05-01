@@ -3,18 +3,18 @@ import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 class InviteFriendsPage extends StatelessWidget {
-  const InviteFriendsPage({Key? key}) : super(key: key);
+  const InviteFriendsPage({super.key});
 
   void _showInviteDialog(BuildContext context) {
-    final inviteUrl = "https://example.com/invite"; // Your invite URL
+    const inviteUrl = "https://example.com/invite"; // Your invite URL
 
     showDialog(
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
           backgroundColor: Colors.blue.shade50,
-          title: Text("Invite Friends"),
-          content: Column(
+          title: const Text("Invite Friends"),
+          content: const Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               Text(
@@ -28,13 +28,13 @@ class InviteFriendsPage extends StatelessWidget {
           actions: [
             TextButton(
               onPressed: () {
-                Clipboard.setData(ClipboardData(text: inviteUrl));
+                Clipboard.setData(const ClipboardData(text: inviteUrl));
                 ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text("Link copied to clipboard")),
+                  const SnackBar(content: Text("Link copied to clipboard")),
                 );
                 Navigator.of(context).pop();
               },
-              child: Text(
+              child: const Text(
                 "Copy Link",
                 style: TextStyle(color: Colors.blue),
               ),
@@ -45,12 +45,12 @@ class InviteFriendsPage extends StatelessWidget {
                   await launch(inviteUrl);
                 } else {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text("Could not launch URL")),
+                    const SnackBar(content: Text("Could not launch URL")),
                   );
                 }
                 Navigator.of(context).pop();
               },
-              child: Text(
+              child: const Text(
                 "Open Link",
                 style: TextStyle(color: Colors.blue),
               ),
@@ -96,10 +96,10 @@ class InviteFriendsPage extends StatelessWidget {
             children: [
               // Header section
               Container(
-                padding: EdgeInsets.only(top: 16),
+                padding: const EdgeInsets.only(top: 16),
                 child: Column(
                   children: [
-                    SizedBox(height: 5),
+                    const SizedBox(height: 5),
                     Image.asset(
                       'assets/images/invite.png',
                       height: 250,
@@ -114,7 +114,7 @@ class InviteFriendsPage extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
-                    Text(
+                    const Text(
                       'Reward rules',
                       style: TextStyle(
                         fontSize: 24,
@@ -122,29 +122,35 @@ class InviteFriendsPage extends StatelessWidget {
                         color: Colors.white,
                       ),
                     ),
-                    SizedBox(height: 16),
-                    RewardRuleItem(
+                    const SizedBox(height: 16),
+                    const RewardRuleItem(
                       step: 1,
                       description: 'Invite 1 friend',
                       reward: 'Get 5000 Coins',
                     ),
-                    RewardRuleItem(
+                    const RewardRuleItem(
                       step: 2,
                       description: "Friend's first recharge",
                       reward: 'Get 5000 Coins',
                     ),
-                    RewardRuleItem(
+                    const RewardRuleItem(
                       step: 3,
                       description: 'Friends send gifts',
                       reward: 'Get 5% Coins',
                     ),
-                    SizedBox(height: 16),
+                    const SizedBox(height: 16),
                     Center(
                       child: ElevatedButton(
                         onPressed: () {
                           _showInviteDialog(context);
                         },
-                        child: Row(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(
+                              vertical: 16, horizontal: 32),
+                          textStyle: const TextStyle(fontSize: 16),
+                        ),
+                        child: const Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             Text(
@@ -158,12 +164,6 @@ class InviteFriendsPage extends StatelessWidget {
                             //   style: TextStyle(color: Colors.white, fontSize: 20),
                             // ),
                           ],
-                        ),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.white,
-                          padding: EdgeInsets.symmetric(
-                              vertical: 16, horizontal: 32),
-                          textStyle: TextStyle(fontSize: 16),
                         ),
                       ),
                     ),
@@ -183,7 +183,8 @@ class RewardRuleItem extends StatelessWidget {
   final String description;
   final String reward;
 
-  RewardRuleItem({
+  const RewardRuleItem({
+    super.key,
     required this.step,
     required this.description,
     required this.reward,
@@ -192,8 +193,8 @@ class RewardRuleItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      margin: EdgeInsets.symmetric(vertical: 8),
-      padding: EdgeInsets.all(16),
+      margin: const EdgeInsets.symmetric(vertical: 8),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(8),
@@ -204,17 +205,18 @@ class RewardRuleItem extends StatelessWidget {
             backgroundColor: Colors.blue,
             child: Text(
               step.toString(),
-              style: TextStyle(color: Colors.white),
+              style: const TextStyle(color: Colors.white),
             ),
           ),
-          SizedBox(width: 16),
+          const SizedBox(width: 16),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   description,
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                  style: const TextStyle(
+                      fontSize: 16, fontWeight: FontWeight.bold),
                 ),
                 Text(
                   reward,
@@ -223,7 +225,7 @@ class RewardRuleItem extends StatelessWidget {
               ],
             ),
           ),
-          Icon(Icons.arrow_forward_ios, size: 20, color: Colors.blue),
+          const Icon(Icons.arrow_forward_ios, size: 20, color: Colors.blue),
         ],
       ),
     );

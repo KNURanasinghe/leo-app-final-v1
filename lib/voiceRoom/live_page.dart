@@ -828,10 +828,7 @@ class LivePageState extends State<LivePage>
                 child: SizedBox(
                   width: 80, // Larger size for better visibility
                   height: 80,
-                  child: rive.RiveAnimation.network(
-                    itemUrl,
-                    fit: BoxFit.contain,
-                  ),
+                  child: SVGASimpleImage(resUrl: itemUrl),
                 ),
               ),
             ),
@@ -1904,7 +1901,7 @@ class LivePageState extends State<LivePage>
     }
 
     return Positioned(
-      top: -6,
+      top: -7,
       left: 0,
       child: Container(
         width: size.width,
@@ -1994,21 +1991,31 @@ class LivePageState extends State<LivePage>
               ],
             ),
           ),
-          const SizedBox(height: 5),
+          const SizedBox(height: 4),
           // Username from socket data
           if (seatData['userName'] != null)
             Positioned.fill(
               bottom: 5,
-              child: Text(
-                "${seatData['userName']}",
-                overflow: TextOverflow.ellipsis,
-                textAlign: TextAlign.center,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 9,
-                  fontWeight: FontWeight.w600,
-                  decoration: TextDecoration.none,
-                ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  if (isAdmin)
+                    const Icon(Icons.person, size: 16, color: Colors.yellow),
+                  const SizedBox(
+                    width: 3,
+                  ),
+                  Text(
+                    "${seatData['userName']}",
+                    overflow: TextOverflow.ellipsis,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 10,
+                      fontWeight: FontWeight.w600,
+                      decoration: TextDecoration.none,
+                    ),
+                  ),
+                ],
               ),
             ),
         ],
@@ -2795,7 +2802,6 @@ class LivePageState extends State<LivePage>
                 ),
               ),
 
-              
             // Power/Logout button
             Positioned(
               top: MediaQuery.of(context).padding.top + 2,

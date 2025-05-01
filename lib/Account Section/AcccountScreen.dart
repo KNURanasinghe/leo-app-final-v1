@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:http/http.dart' as http;
+import 'package:leo_app_01/Account%20Section/upcomming_screen.dart';
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../settings.dart';
@@ -381,6 +382,8 @@ class _AccountScreen1State extends State<AccountScreen1> {
 
   void _navigateToEarnDiamond(BuildContext context) {
     // Implement earn diamond navigation
+    Navigator.of(context).push(MaterialPageRoute(
+        builder: (_) => const ComingSoonScreen(screenTitle: "Earn Diamond")));
   }
 
   void _navigateToLevel(BuildContext context) async {
@@ -399,14 +402,20 @@ class _AccountScreen1State extends State<AccountScreen1> {
 
   void _navigateToSVIP(BuildContext context) {
     // Implement SVIP navigation
+    Navigator.of(context).push(MaterialPageRoute(
+        builder: (_) => const ComingSoonScreen(screenTitle: "SVIP")));
   }
 
   void _navigateToCpSpace(BuildContext context) {
     // Implement CP space navigation
+    Navigator.of(context).push(MaterialPageRoute(
+        builder: (_) => const ComingSoonScreen(screenTitle: "Cp Space")));
   }
 
   void _navigateToFamily(BuildContext context) {
     // Implement family navigation
+    Navigator.of(context).push(MaterialPageRoute(
+        builder: (_) => const ComingSoonScreen(screenTitle: "Family")));
   }
 
   void _navigateToItems(BuildContext context) {
