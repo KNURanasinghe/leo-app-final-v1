@@ -5,6 +5,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/svg.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:just_audio/just_audio.dart';
 import 'package:rive/rive.dart' as rive;
 import 'package:svgaplayer_flutter/svgaplayer_flutter.dart';
 
@@ -213,11 +214,324 @@ class LivePageState extends State<LivePage>
 
   final Map<String, String> _userBorders = {};
   final Map<int, Map<String, dynamic>> _seatOccupants = {};
-  final Map<int, String> _activeSeatFrames = {};
 
   bool _showWelcomeMessage = true;
   final String _welcomeMessage =
       "Welcome to Hapi! Please respect each other and talk politely. Abusing, third-party advertising, fake official information and politically sensitive topics are strictly prohibited. please report if you find these situations";
+
+  List<IconData> customIcons = [
+    Icons.message_outlined,
+    Icons.mic,
+    Icons.volume_up,
+    Icons.emoji_emotions,
+    Icons.mail,
+    Icons.open_with_sharp,
+    Icons.lock_outline,
+  ];
+
+  bool _isMusicPlaying = false;
+  String? _currentSongName;
+
+  void _showMusicPlayerSheet(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return Container(
+              height: MediaQuery.of(context).size.height * 0.6,
+              decoration: BoxDecoration(
+                color: Colors.black.withOpacity(0.9),
+                borderRadius: const BorderRadius.only(
+                  topLeft: Radius.circular(20),
+                  topRight: Radius.circular(20),
+                ),
+              ),
+              child: Column(
+                children: [
+                  // Handle bar
+                  Container(
+                    width: 40,
+                    height: 4,
+                    margin: const EdgeInsets.only(top: 12),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.3),
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+
+                  // Title
+                  Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text(
+                          'Music Player',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.close, color: Colors.white),
+                          onPressed: () => Navigator.pop(context),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  // Now playing section
+                  Container(
+                    padding: const EdgeInsets.all(20),
+                    margin:
+                        const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [
+                          Colors.blue.withOpacity(0.2),
+                          Colors.purple.withOpacity(0.2),
+                        ],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: Column(
+                      children: [
+                        const Text(
+                          'Now Playing',
+                          style: TextStyle(
+                            color: Colors.white70,
+                            fontSize: 14,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          _currentSongName ?? 'No song playing',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 20),
+
+                        // Playback controls
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            IconButton(
+                              icon: Icon(
+                                _isMusicPlaying
+                                    ? Icons.pause_circle_filled
+                                    : Icons.play_circle_filled,
+                                color: Colors.white,
+                                size: 50,
+                              ),
+                              onPressed: () {
+                                if (_isMusicPlaying) {
+                                  ZegoUIKitPrebuiltLiveAudioRoomController()
+                                      .media
+                                      .pause();
+                                  setState(() {
+                                    _isMusicPlaying = false;
+                                  });
+                                } else {
+                                  if (_currentSongName != null) {
+                                    ZegoUIKitPrebuiltLiveAudioRoomController()
+                                        .media
+                                        .resume();
+                                    setState(() {
+                                      _isMusicPlaying = true;
+                                    });
+                                  }
+                                }
+                              },
+                            ),
+                            const SizedBox(width: 20),
+                            IconButton(
+                              icon: const Icon(
+                                Icons.stop_circle,
+                                color: Colors.white,
+                                size: 50,
+                              ),
+                              onPressed: () {
+                                ZegoUIKitPrebuiltLiveAudioRoomController()
+                                    .media
+                                    .stop();
+                                setState(() {
+                                  _isMusicPlaying = false;
+                                  _currentSongName = null;
+                                });
+                              },
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  // Music selection list
+                  Expanded(
+                    child: ListView(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      children: [
+                        _buildMusicListTile(
+                          setState,
+                          'Relaxing Background Music',
+                          'https://assets.mixkit.co/music/preview/mixkit-relaxing-in-nature-522.mp3',
+                          'assets/images/music_note.png',
+                        ),
+                        _buildMusicListTile(
+                          setState,
+                          'Happy Acoustic',
+                          'https://assets.mixkit.co/music/preview/mixkit-spirit-of-the-morning-river-221.mp3',
+                          'assets/images/music_note.png',
+                        ),
+                        _buildMusicListTile(
+                          setState,
+                          'Chill Lofi Beat',
+                          'https://assets.mixkit.co/music/preview/mixkit-hip-hop-02-621.mp3',
+                          'assets/images/music_note.png',
+                        ),
+                        _buildMusicListTile(
+                          setState,
+                          'Upbeat Dance',
+                          'https://assets.mixkit.co/music/preview/mixkit-sun-and-his-daughter-580.mp3',
+                          'assets/images/music_note.png',
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  // Link to pick custom file
+                  Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child: InkWell(
+                      onTap: () async {
+                        Navigator.pop(context);
+                        _pickAndPlayAudioFile(context);
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(25),
+                          border: Border.all(color: Colors.blue),
+                        ),
+                        child: const Center(
+                          child: Text(
+                            'Pick Music From Device',
+                            style: TextStyle(
+                              color: Colors.blue,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildMusicListTile(
+      StateSetter setState, String title, String url, String imagePath) {
+    final bool isPlaying = _isMusicPlaying && _currentSongName == title;
+
+    return ListTile(
+      contentPadding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+      leading: Container(
+        width: 50,
+        height: 50,
+        decoration: BoxDecoration(
+          color: Colors.white.withOpacity(0.1),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Center(
+          child: Icon(
+            Icons.music_note,
+            color: isPlaying ? Colors.blue : Colors.white,
+          ),
+        ),
+      ),
+      title: Text(
+        title,
+        style: TextStyle(
+          color: Colors.white,
+          fontWeight: isPlaying ? FontWeight.bold : FontWeight.normal,
+        ),
+      ),
+      trailing: IconButton(
+        icon: Icon(
+          isPlaying ? Icons.pause_circle_outline : Icons.play_circle_outline,
+          color: isPlaying ? Colors.blue : Colors.white,
+        ),
+        onPressed: () {
+          if (isPlaying) {
+            ZegoUIKitPrebuiltLiveAudioRoomController().media.pause();
+            setState(() {
+              _isMusicPlaying = false;
+            });
+          } else {
+            ZegoUIKitPrebuiltLiveAudioRoomController().media.stop();
+            ZegoUIKitPrebuiltLiveAudioRoomController().media.play(
+                  filePathOrURL: url,
+                  enableRepeat: true,
+                );
+            setState(() {
+              _isMusicPlaying = true;
+              _currentSongName = title;
+            });
+          }
+        },
+      ),
+    );
+  }
+
+  Future<void> _pickAndPlayAudioFile(BuildContext context) async {
+    try {
+      ZegoUIKitPrebuiltLiveAudioRoomController()
+          .media
+          .pickPureAudioFile()
+          .then((files) {
+        if (files.isEmpty) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('No file selected')),
+          );
+        } else {
+          final mediaFile = files.first;
+          final targetPathOrURL = mediaFile.path ?? '';
+          if (targetPathOrURL.isNotEmpty) {
+            ZegoUIKitPrebuiltLiveAudioRoomController().media.play(
+                  filePathOrURL: targetPathOrURL,
+                  enableRepeat: true,
+                );
+            setState(() {
+              _isMusicPlaying = true;
+              _currentSongName = mediaFile.name;
+            });
+
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('Playing: ${mediaFile.name}')),
+            );
+          }
+        }
+      });
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error selecting audio file: $e')),
+      );
+    }
+  }
 
   Future<String?> _fetchOwnBorder() async {
     try {
@@ -548,6 +862,7 @@ class LivePageState extends State<LivePage>
         _fetchOwnBorder();
       }
     });
+
     socket.on('seatTaken', (data) {
       print(
           'seat taken ${data['seatIndex']} ${data['userId']} ${data['userName']} ${data['userAvatar']} ${data['borderUrl']}');
@@ -720,8 +1035,28 @@ class LivePageState extends State<LivePage>
           'userItem': userItemUrl,
           'timestamp': DateTime.now().millisecondsSinceEpoch
         });
+        if (mounted) {
+          setState(() {
+            _activeEntries[widget.userId] = _buildEntryAnimation(
+              widget.username1,
+              _userAvatarUrl,
+              userItemUrl,
+            );
+          });
+
+          // Remove after specified duration
+          _entryTimers[widget.userId]?.cancel();
+          _entryTimers[widget.userId] = Timer(const Duration(seconds: 15), () {
+            if (mounted) {
+              setState(() {
+                _activeEntries.remove(widget.userId);
+              });
+            }
+          });
+        }
       });
     });
+
     socket.on('roomSettingsUpdated', (data) {
       if (!mounted) return;
 
@@ -762,78 +1097,90 @@ class LivePageState extends State<LivePage>
     final bool isSelf = userName == widget.username1;
     print('itemurl: $itemUrl');
 
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: isSelf
-              ? [
-                  Colors.purple.shade600,
-                  Colors.purple.shade900
-                ] // Special color for self
-              : [Colors.blue.shade600, Colors.blue.shade900],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.3),
-            blurRadius: 10,
-            spreadRadius: 2,
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        // Welcome message container
+        Container(
+          width: MediaQuery.of(context).size.width * 0.6,
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: Colors.black.withOpacity(0.5),
+            borderRadius: BorderRadius.circular(12),
           ),
-        ],
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          // Top row with avatar and name
-          Row(
-            mainAxisSize: MainAxisSize.min,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              if (avatarUrl != null && avatarUrl.isNotEmpty)
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(15),
-                  child: CachedNetworkImage(
-                    imageUrl: avatarUrl,
-                    width: 30,
-                    height: 30,
-                    fit: BoxFit.cover,
-                    placeholder: (context, url) => Container(
-                      color: Colors.grey.shade200,
-                      child: const Icon(Icons.person,
-                          size: 20, color: Colors.grey),
+              Row(
+                children: [
+                  if (avatarUrl != null && avatarUrl.isNotEmpty)
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(15),
+                      child: CachedNetworkImage(
+                        imageUrl: avatarUrl,
+                        width: 30,
+                        height: 30,
+                        fit: BoxFit.cover,
+                        placeholder: (context, url) => Container(
+                          color: Colors.grey.shade200,
+                          child: const Icon(Icons.person,
+                              size: 20, color: Colors.grey),
+                        ),
+                        errorWidget: (context, error, stackTrace) => const Icon(
+                            Icons.person,
+                            size: 20,
+                            color: Colors.white),
+                      ),
                     ),
-                    errorWidget: (context, error, stackTrace) =>
-                        const Icon(Icons.person, size: 20, color: Colors.white),
+                  const SizedBox(width: 8),
+                  const Text(
+                    'Welcome',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                      decoration: TextDecoration.none,
+                    ),
                   ),
-                ),
-              const SizedBox(width: 8),
-              Text(
-                isSelf ? "Welcome to the room!" : "$userName just joined!",
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 16,
-                ),
+                  const SizedBox(width: 3),
+                  Text(
+                    userName,
+                    style: const TextStyle(
+                      color: Colors.yellow,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                      decoration: TextDecoration.none,
+                    ),
+                  ),
+                  const Flexible(
+                    child: Text(
+                      ' entered room',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                        decoration: TextDecoration.none,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
+        ),
 
-          // Rive animation centered below
-          if (itemUrl != null && itemUrl.isNotEmpty)
-            Padding(
-              padding: const EdgeInsets.only(top: 8),
-              child: Center(
-                child: SizedBox(
-                  width: 80, // Larger size for better visibility
-                  height: 80,
-                  child: SVGASimpleImage(resUrl: itemUrl),
-                ),
-              ),
+        // SVG Animation below the message
+        if (itemUrl != null && itemUrl.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.only(top: 12),
+            child: SizedBox(
+              width: 100, // Adjust size as needed
+              height: 100,
+              child: SVGASimpleImage(resUrl: itemUrl),
             ),
-        ],
-      ),
+          ),
+      ],
     );
   }
 
@@ -856,6 +1203,7 @@ class LivePageState extends State<LivePage>
           if (_showWelcomeMessage)
             Container(
               padding: const EdgeInsets.all(12),
+              width: MediaQuery.of(context).size.width * 0.6,
               decoration: BoxDecoration(
                 color: Colors.black.withOpacity(0.3),
                 borderRadius: BorderRadius.circular(12),
@@ -865,21 +1213,6 @@ class LivePageState extends State<LivePage>
                 children: [
                   Row(
                     children: [
-                      const Icon(
-                        Icons.waving_hand,
-                        color: Colors.lightGreen,
-                        size: 18,
-                      ),
-                      const SizedBox(width: 8),
-                      const Text(
-                        'Welcome!',
-                        style: TextStyle(
-                          color: Colors.lightGreen,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 14,
-                          decoration: TextDecoration.none,
-                        ),
-                      ),
                       const Spacer(),
                       GestureDetector(
                         onTap: () {
@@ -898,8 +1231,8 @@ class LivePageState extends State<LivePage>
                   const SizedBox(height: 8),
                   Text(
                     _welcomeMessage,
-                    style: const TextStyle(
-                      color: Colors.lightGreen,
+                    style: TextStyle(
+                      color: Colors.blue[400],
                       fontSize: 12,
                       decoration: TextDecoration.none,
                     ),
@@ -914,45 +1247,38 @@ class LivePageState extends State<LivePage>
           // Announcement - always shown but position depends on welcome message visibility
           if (_announcement != null && _announcement!.isNotEmpty)
             Container(
+              width: MediaQuery.of(context).size.width * 0.6,
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
                 color: Colors.black.withOpacity(0.3),
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(
-                  color: Colors.amber.withOpacity(0.4),
-                  width: 1,
-                ),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Row(
                     children: [
-                      const Icon(
-                        Icons.campaign,
-                        color: Colors.amber,
-                        size: 18,
-                      ),
-                      const SizedBox(width: 8),
                       const Text(
-                        'Announcement',
+                        'Announcement:',
                         style: TextStyle(
-                          color: Colors.amber,
+                          color: Colors.white,
                           fontWeight: FontWeight.bold,
-                          fontSize: 14,
+                          fontSize: 16,
                           decoration: TextDecoration.none,
                         ),
                       ),
-                      const Spacer(),
+                      const SizedBox(
+                        width: 3,
+                      ),
                       if (isAdmin)
                         GestureDetector(
                           onTap: () {
                             _showAnnouncementDialog(context);
                           },
                           child: const Icon(
-                            Icons.edit,
-                            color: Colors.white70,
-                            size: 16,
+                            Icons.edit_note,
+                            color: Colors.white,
+                            size: 20,
                           ),
                         ),
                     ],
@@ -1698,7 +2024,8 @@ class LivePageState extends State<LivePage>
       final uri = Uri.parse(
               '$POCKETBASE_URL/api/collections/voiceRooms/records/${widget.roomID}')
           .replace(queryParameters: {
-        'fields': 'voice_room_name,background_images,group_photo,voiceRoom_id'
+        'fields':
+            'voice_room_name,background_images,group_photo,voiceRoom_id,announcement'
       });
 
       final response = await http.get(
@@ -1708,6 +2035,7 @@ class LivePageState extends State<LivePage>
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
+        print('roomdata $data');
         setState(() {
           _voiceRoomName = data['voice_room_name'];
           _voiceroomid = data['voiceRoom_id'];
@@ -1716,9 +2044,15 @@ class LivePageState extends State<LivePage>
                 '$POCKETBASE_URL/api/files/voiceRooms/${widget.roomID}/${data['background_images']}';
             _groupPhotoUrl =
                 '$POCKETBASE_URL/api/files/voiceRooms/${widget.roomID}/${data['group_photo']}';
+            if (data['announcement'] != null) {
+              _announcement = data['announcement'];
+              print('announce $_announcement');
+              print('announce api ${data['announcement']}');
+            }
           }
 
           if (data['group_photo'] != null) {}
+
           print(
               "-----------------------------------------------------------------");
           print(_groupPhotoUrl);
@@ -1856,6 +2190,7 @@ class LivePageState extends State<LivePage>
   @override
   void dispose() {
     reconnectionTimer?.cancel();
+
     socket.emit('leaveRoom', {
       'roomId': widget.roomID,
       'userId': widget.userId,
@@ -2603,6 +2938,75 @@ class LivePageState extends State<LivePage>
         : const SizedBox.shrink();
   }
 
+  Widget _buildMusicPlayingIndicator() {
+    if (!_isMusicPlaying || _currentSongName == null) {
+      return const SizedBox.shrink();
+    }
+
+    return Positioned(
+      bottom: MediaQuery.of(context).size.height *
+          0.16, // Position above other controls
+      left: 16,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          color: Colors.black.withOpacity(0.6),
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.music_note, color: Colors.blue, size: 16),
+            const SizedBox(width: 8),
+            Text(
+              _currentSongName!,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 12,
+              ),
+            ),
+            const SizedBox(width: 8),
+            GestureDetector(
+              onTap: () {
+                if (_isMusicPlaying) {
+                  ZegoUIKitPrebuiltLiveAudioRoomController().media.pause();
+                  setState(() {
+                    _isMusicPlaying = false;
+                  });
+                } else {
+                  ZegoUIKitPrebuiltLiveAudioRoomController().media.resume();
+                  setState(() {
+                    _isMusicPlaying = true;
+                  });
+                }
+              },
+              child: Icon(
+                _isMusicPlaying ? Icons.pause : Icons.play_arrow,
+                color: Colors.white,
+                size: 16,
+              ),
+            ),
+            const SizedBox(width: 4),
+            GestureDetector(
+              onTap: () {
+                ZegoUIKitPrebuiltLiveAudioRoomController().media.stop();
+                setState(() {
+                  _isMusicPlaying = false;
+                  _currentSongName = null;
+                });
+              },
+              child: const Icon(
+                Icons.stop,
+                color: Colors.white,
+                size: 16,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return WillPopScope(
@@ -2826,6 +3230,7 @@ class LivePageState extends State<LivePage>
               ),
             ),
             _buildWelcomeAndAnnouncement(),
+
             if (_activeEmojis.isNotEmpty)
               SizedBox(
                 width: double.infinity,
@@ -2926,126 +3331,126 @@ class LivePageState extends State<LivePage>
                 ),
               ),
             ),
-
+            _buildMusicPlayingIndicator(),
             // Emoji bottom sheet
-            Positioned(
-              bottom:
-                  MediaQuery.of(context).size.height * 0.02, // 2% from bottom
-              left: MediaQuery.of(context).size.width * 0.32, // 35% from left
-              child: Container(
-                width: 35, // Reduced from 30
-                height: 35, // Reduced from 30
-                decoration: BoxDecoration(
-                  color: Colors.black.withOpacity(0.6),
-                  shape: BoxShape.circle,
-                ),
-                child: IconButton(
-                  padding: EdgeInsets.zero, // Remove default padding
-                  constraints:
-                      const BoxConstraints(), // Remove default constraints
-                  onPressed: () {
-                    showModalBottomSheet(
-                      context: context,
-                      backgroundColor: Colors.transparent,
-                      isScrollControlled: true,
-                      builder: (BuildContext context) {
-                        return Container(
-                          height: MediaQuery.of(context).size.height *
-                              0.4, // Reduced from 0.5
-                          decoration: BoxDecoration(
-                            color: Colors.black.withOpacity(0.9),
-                            borderRadius: const BorderRadius.only(
-                              topLeft: Radius.circular(20),
-                              topRight: Radius.circular(20),
-                            ),
-                          ),
-                          child: Column(
-                            children: [
-                              // Handle bar
-                              Container(
-                                width: 40, // Reduced from 40
-                                height: 4, // Reduced from 4
-                                margin: const EdgeInsets.only(
-                                    top: 8), // Reduced from 12
-                                decoration: BoxDecoration(
-                                  color: Colors.white.withOpacity(0.3),
-                                  borderRadius: BorderRadius.circular(1.5),
-                                ),
-                              ),
+            // Positioned(
+            //   bottom:
+            //       MediaQuery.of(context).size.height * 0.02, // 2% from bottom
+            //   left: MediaQuery.of(context).size.width * 0.32, // 35% from left
+            //   child: Container(
+            //     width: 40, // Reduced from 30
+            //     height: 40, // Reduced from 30
+            //     decoration: BoxDecoration(
+            //       color: Colors.black.withOpacity(0.6),
+            //       shape: BoxShape.circle,
+            //     ),
+            //     child: IconButton(
+            //       padding: EdgeInsets.zero, // Remove default padding
+            //       constraints:
+            //           const BoxConstraints(), // Remove default constraints
+            //       onPressed: () {
+            // showModalBottomSheet(
+            //   context: context,
+            //   backgroundColor: Colors.transparent,
+            //   isScrollControlled: true,
+            //   builder: (BuildContext context) {
+            //     return Container(
+            //       height: MediaQuery.of(context).size.height *
+            //           0.4, // Reduced from 0.5
+            //       decoration: BoxDecoration(
+            //         color: Colors.black.withOpacity(0.9),
+            //         borderRadius: const BorderRadius.only(
+            //           topLeft: Radius.circular(20),
+            //           topRight: Radius.circular(20),
+            //         ),
+            //       ),
+            //       child: Column(
+            //         children: [
+            //           // Handle bar
+            //           Container(
+            //             width: 40, // Reduced from 40
+            //             height: 4, // Reduced from 4
+            //             margin: const EdgeInsets.only(
+            //                 top: 8), // Reduced from 12
+            //             decoration: BoxDecoration(
+            //               color: Colors.white.withOpacity(0.3),
+            //               borderRadius: BorderRadius.circular(1.5),
+            //             ),
+            //           ),
 
-                              // Close button
-                              Align(
-                                alignment: Alignment.topRight,
-                                child: IconButton(
-                                  icon: const Icon(Icons.close,
-                                      color: Colors.white70, size: 20),
-                                  padding: const EdgeInsets.all(12),
-                                  onPressed: () => Navigator.pop(context),
-                                ),
-                              ),
+            //           // Close button
+            //           Align(
+            //             alignment: Alignment.topRight,
+            //             child: IconButton(
+            //               icon: const Icon(Icons.close,
+            //                   color: Colors.white70, size: 20),
+            //               padding: const EdgeInsets.all(12),
+            //               onPressed: () => Navigator.pop(context),
+            //             ),
+            //           ),
 
-                              // Emoji grid
-                              Expanded(
-                                child: GridView.count(
-                                  crossAxisCount: 5,
-                                  mainAxisSpacing: 8, // Added spacing
-                                  crossAxisSpacing: 8, // Added spacing
-                                  padding: const EdgeInsets.symmetric(
-                                      horizontal: 12),
-                                  childAspectRatio:
-                                      1.1, // Adjust aspect ratio for better fit
-                                  children: [
-                                    // Happy faces
-                                    _buildEmojiButton('😊'),
-                                    _buildEmojiButton('😄'),
-                                    _buildEmojiButton('😃'),
-                                    _buildEmojiButton('😁'),
-                                    _buildEmojiButton('😅'),
+            //           // Emoji grid
+            //           Expanded(
+            //             child: GridView.count(
+            //               crossAxisCount: 5,
+            //               mainAxisSpacing: 8, // Added spacing
+            //               crossAxisSpacing: 8, // Added spacing
+            //               padding: const EdgeInsets.symmetric(
+            //                   horizontal: 12),
+            //               childAspectRatio:
+            //                   1.1, // Adjust aspect ratio for better fit
+            //               children: [
+            //                 // Happy faces
+            //                 _buildEmojiButton('😊'),
+            //                 _buildEmojiButton('😄'),
+            //                 _buildEmojiButton('😃'),
+            //                 _buildEmojiButton('😁'),
+            //                 _buildEmojiButton('😅'),
 
-                                    // Love faces
-                                    _buildEmojiButton('😍'),
-                                    _buildEmojiButton('🥰'),
-                                    _buildEmojiButton('😘'),
-                                    _buildEmojiButton('😗'),
-                                    _buildEmojiButton('🤗'),
+            //                 // Love faces
+            //                 _buildEmojiButton('😍'),
+            //                 _buildEmojiButton('🥰'),
+            //                 _buildEmojiButton('😘'),
+            //                 _buildEmojiButton('😗'),
+            //                 _buildEmojiButton('🤗'),
 
-                                    // Fun faces
-                                    _buildEmojiButton('😜'),
-                                    _buildEmojiButton('😝'),
-                                    _buildEmojiButton('😋'),
-                                    _buildEmojiButton('😂'),
-                                    _buildEmojiButton('🤣'),
+            //                 // Fun faces
+            //                 _buildEmojiButton('😜'),
+            //                 _buildEmojiButton('😝'),
+            //                 _buildEmojiButton('😋'),
+            //                 _buildEmojiButton('😂'),
+            //                 _buildEmojiButton('🤣'),
 
-                                    // Cool faces
-                                    _buildEmojiButton('😎'),
-                                    _buildEmojiButton('🤩'),
-                                    _buildEmojiButton('🥳'),
-                                    _buildEmojiButton('😏'),
-                                    _buildEmojiButton('😌'),
+            //                 // Cool faces
+            //                 _buildEmojiButton('😎'),
+            //                 _buildEmojiButton('🤩'),
+            //                 _buildEmojiButton('🥳'),
+            //                 _buildEmojiButton('😏'),
+            //                 _buildEmojiButton('😌'),
 
-                                    // Reaction faces
-                                    _buildEmojiButton('😮'),
-                                    _buildEmojiButton('🤔'),
-                                    _buildEmojiButton('😳'),
-                                    _buildEmojiButton('🥺'),
-                                    _buildEmojiButton('😇'),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          ),
-                        );
-                      },
-                    );
-                  },
-                  icon: const Icon(
-                    Icons.emoji_emotions,
-                    color: Colors.white,
-                    size: 20, // Reduced from 24
-                  ),
-                ),
-              ),
-            ),
+            //                 // Reaction faces
+            //                 _buildEmojiButton('😮'),
+            //                 _buildEmojiButton('🤔'),
+            //                 _buildEmojiButton('😳'),
+            //                 _buildEmojiButton('🥺'),
+            //                 _buildEmojiButton('😇'),
+            //               ],
+            //             ),
+            //           ),
+            //         ],
+            //       ),
+            //     );
+            //   },
+            // );
+            //       },
+            //       icon: const Icon(
+            //         Icons.emoji_emotions,
+            //         color: Colors.white,
+            //         size: 20, // Reduced from 24
+            //       ),
+            //     ),
+            //   ),
+            // ),
 
             if (isAdmin)
               Positioned(
@@ -4531,10 +4936,459 @@ class LivePageState extends State<LivePage>
       ..mediaPlayer.supportTransparent = true
       ..foreground = giftForeground()
       ..emptyAreaBuilder = mediaPlayer
+      ..backgroundMedia.path = widget.isHost ? 'https://xxx.com/xxx.mp3' : ''
       // ..topMenuBar.buttons = [
       //   ZegoLiveAudioRoomMenuBarButtonName.minimizingButton, // Keep only this button
       // ]
-      ..userAvatarUrl = _userAvatarUrl;
+      ..userAvatarUrl = _userAvatarUrl
+      ..bottomMenuBar = ZegoLiveAudioRoomBottomMenuBarConfig(
+        maxCount: 7,
+        hostButtons: [
+          // ZegoLiveAudioRoomMenuBarButtonName.soundEffectButton,
+          // ZegoLiveAudioRoomMenuBarButtonName.toggleMicrophoneButton,
+          //ZegoLiveAudioRoomMenuBarButtonName.closeSeatButton,
+        ],
+        hostExtendButtons: [
+          // Use a single container with a custom row to control spacing
+          SizedBox(
+            width: MediaQuery.of(context).size.width, // Adjust width as needed
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                // Group 1: First 4 icons without spacing
+                _buildCustomButton(0, customIcons[0]),
+                _buildCustomButton(1, customIcons[1]),
+                _buildCustomButton(2, customIcons[2]),
+                _buildCustomButton(3, customIcons[3]),
+
+                // Space between groups - explicit width
+                const SizedBox(width: 60),
+
+                // Group 2: Mail icon
+                _buildCustomButton(4, customIcons[4]),
+
+                // Another space
+
+                AnimatedBuilder(
+                  animation: _glowAnimation,
+                  builder: (context, child) {
+                    return InkWell(
+                      onTap: () {
+                        showGiftListSheet(context, widget.roomID);
+                      },
+                      child: Container(
+                        width: 48,
+                        height: 48,
+                        decoration: BoxDecoration(
+                          shape: BoxShape
+                              .circle, // Makes the glow round around the image
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.yellowAccent.withOpacity(
+                                  0.7), // Glow color (you can change it)
+                              spreadRadius: 6 *
+                                  _glowAnimation
+                                      .value, // Animated spread size of the glow
+                              blurRadius: 15 *
+                                  _glowAnimation
+                                      .value, // Animated blur size of the glow
+                              offset: const Offset(0,
+                                  0), // Position of the glow (centered around the image)
+                            ),
+                          ],
+                        ),
+                        child: Image.asset(
+                          'assets/images/gift.png',
+                          width: 28,
+                          height: 28,
+                        ),
+                      ),
+                    );
+                  },
+                ),
+                // if (widget.isHost) _buildCustomButton(6, customIcons[6]),
+                // Group 3: Open with icon
+                _buildCustomButton(5, customIcons[5]),
+              ],
+            ),
+          ),
+        ],
+        speakerButtons: [
+          //ZegoLiveAudioRoomMenuBarButtonName.toggleMicrophoneButton,
+          //ZegoLiveAudioRoomMenuBarButtonName.showMemberListButton,
+        ],
+      );
+  }
+
+// Helper method to build custom buttons with consistent styling
+  Widget _buildCustomButton(int index, IconData icon) {
+    if (icon == Icons.mic) {
+      return _buildMicrophoneButton();
+    }
+    return Padding(
+      padding: const EdgeInsets.all(5.0),
+      child: ElevatedButton(
+        style: ElevatedButton.styleFrom(
+          fixedSize: const Size(40, 40),
+          backgroundColor: const Color(0xff2C2F3E).withOpacity(0.6),
+          iconColor: Colors.white,
+          shape: const CircleBorder(),
+          padding: EdgeInsets.zero, // Remove internal padding
+          elevation: 0, // Remove shadow
+          tapTargetSize:
+              MaterialTapTargetSize.shrinkWrap, // Minimize tap target padding
+          minimumSize: const Size(40, 40), // Enforce minimum size
+        ),
+        onPressed: () => _handleCustomButtonTap(index),
+        child: Center(child: Icon(icon, size: 20)),
+      ),
+    );
+  }
+
+// Add this method to handle button taps
+  void _handleCustomButtonTap(int index) {
+    switch (customIcons[index]) {
+      case Icons.emoji_emotions:
+        _showEmojiBottomSheet(context);
+        break;
+      case Icons.mic:
+        _toggleMicrophone();
+        break;
+      case Icons.message_outlined:
+        _showMessageDialog(context);
+        break;
+      case Icons.open_with_sharp:
+        _showMoreOptionsBottomSheet(context);
+        break;
+      case Icons.lock_outline: // Add case for the padlock icon
+        // _showSeatLockOptions(context);
+        break;
+      // Handle other icons as needed
+      default:
+        // Default action
+        break;
+    }
+  }
+
+  void _showMoreOptionsBottomSheet(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (context) {
+        return Container(
+          decoration: BoxDecoration(
+            color: Colors.black.withOpacity(0.9),
+            borderRadius: const BorderRadius.only(
+              topLeft: Radius.circular(20),
+              topRight: Radius.circular(20),
+            ),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Handle bar at the top of the bottom sheet
+              Container(
+                width: 40,
+                height: 4,
+                margin: const EdgeInsets.only(top: 12, bottom: 16),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.3),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+
+              // Play Music row
+              Padding(
+                padding:
+                    const EdgeInsets.symmetric(vertical: 16, horizontal: 20),
+                child: InkWell(
+                  onTap: () {
+                    Navigator.pop(context);
+                    _showMusicPlayerSheet(context);
+                  },
+                  child: Row(
+                    children: [
+                      // Music icon
+                      Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: Colors.blue.withOpacity(0.3),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: const Icon(
+                          Icons.music_note,
+                          color: Colors.blue,
+                          size: 24,
+                        ),
+                      ),
+
+                      const SizedBox(width: 16),
+
+                      // Text
+                      const Text(
+                        'Play Music',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+
+                      const Spacer(),
+
+                      // Arrow indicator
+                      Icon(
+                        Icons.arrow_forward_ios,
+                        color: Colors.white.withOpacity(0.7),
+                        size: 16,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+
+              // You can add more options here
+
+              const SizedBox(height: 20),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  bool get _isMicMuted =>
+      !ZegoUIKit().getMicrophoneStateNotifier(localUserID).value;
+  void _toggleMicrophone() {
+    // The correct way to toggle microphone in ZegoUIKit
+    final currentMicState =
+        ZegoUIKit().getMicrophoneStateNotifier(localUserID).value;
+    ZegoUIKit().turnMicrophoneOn(!currentMicState);
+
+    // Optional: Show a notification
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+            currentMicState ? 'Microphone turned off' : 'Microphone turned on'),
+        duration: const Duration(seconds: 1),
+      ),
+    );
+
+    // The UI will update automatically since we're using a ValueListenableBuilder
+  }
+
+  Widget _buildMicrophoneButton() {
+    return ValueListenableBuilder<bool>(
+      valueListenable: ZegoUIKit().getMicrophoneStateNotifier(localUserID),
+      builder: (context, isMicOn, _) {
+        return Padding(
+          padding: const EdgeInsets.all(5.0),
+          child: ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              fixedSize: const Size(40, 40),
+              backgroundColor: const Color(0xff2C2F3E).withOpacity(0.6),
+              iconColor: Colors.white,
+              shape: const CircleBorder(),
+              padding: EdgeInsets.zero,
+              elevation: 0,
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              minimumSize: const Size(40, 40),
+            ),
+            onPressed: _toggleMicrophone,
+            child: Center(
+              child: Icon(
+                isMicOn ? Icons.mic : Icons.mic_off,
+                color: isMicOn ? Colors.white : Colors.red,
+                size: 20,
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  void _showMessageDialog(BuildContext context) {
+    final TextEditingController messageController = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (context) => Dialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+        ),
+        backgroundColor: Colors.black.withOpacity(0.9),
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text(
+                'Send Message',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                ),
+              ),
+              const SizedBox(height: 20),
+              TextField(
+                controller: messageController,
+                style: const TextStyle(color: Colors.white),
+                decoration: InputDecoration(
+                  hintText: 'Type your message...',
+                  hintStyle: TextStyle(color: Colors.grey[400]),
+                  filled: true,
+                  fillColor: Colors.white.withOpacity(0.1),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide: BorderSide.none,
+                  ),
+                  contentPadding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                ),
+                maxLines: 3,
+              ),
+              const SizedBox(height: 20),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(context),
+                    child: const Text(
+                      'Cancel',
+                      style: TextStyle(color: Colors.white70),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  ElevatedButton(
+                    onPressed: () {
+                      // Get the message text
+                      final message = messageController.text.trim();
+                      if (message.isNotEmpty) {
+                        // Emit message to socket
+                        socket.emit('roomMessage', {
+                          'roomId': widget.roomID,
+                          'userId': widget.userId,
+                          'userName': widget.username1,
+                          'message': message,
+                          'timestamp': DateTime.now().millisecondsSinceEpoch
+                        });
+
+                        // Show a notification or handle message sent
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Message sent')),
+                        );
+                      }
+                      Navigator.pop(context);
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.blue,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                    child: const Text('Send'),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showEmojiBottomSheet(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (BuildContext context) {
+        return Container(
+          height: MediaQuery.of(context).size.height * 0.4, // Reduced from 0.5
+          decoration: BoxDecoration(
+            color: Colors.black.withOpacity(0.9),
+            borderRadius: const BorderRadius.only(
+              topLeft: Radius.circular(20),
+              topRight: Radius.circular(20),
+            ),
+          ),
+          child: Column(
+            children: [
+              // Handle bar
+              Container(
+                width: 40, // Reduced from 40
+                height: 4, // Reduced from 4
+                margin: const EdgeInsets.only(top: 8), // Reduced from 12
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.3),
+                  borderRadius: BorderRadius.circular(1.5),
+                ),
+              ),
+
+              // Close button
+              Align(
+                alignment: Alignment.topRight,
+                child: IconButton(
+                  icon:
+                      const Icon(Icons.close, color: Colors.white70, size: 20),
+                  padding: const EdgeInsets.all(12),
+                  onPressed: () => Navigator.pop(context),
+                ),
+              ),
+
+              // Emoji grid
+              Expanded(
+                child: GridView.count(
+                  crossAxisCount: 5,
+                  mainAxisSpacing: 8, // Added spacing
+                  crossAxisSpacing: 8, // Added spacing
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  childAspectRatio: 1.1, // Adjust aspect ratio for better fit
+                  children: [
+                    // Happy faces
+                    _buildEmojiButton('😊'),
+                    _buildEmojiButton('😄'),
+                    _buildEmojiButton('😃'),
+                    _buildEmojiButton('😁'),
+                    _buildEmojiButton('😅'),
+
+                    // Love faces
+                    _buildEmojiButton('😍'),
+                    _buildEmojiButton('🥰'),
+                    _buildEmojiButton('😘'),
+                    _buildEmojiButton('😗'),
+                    _buildEmojiButton('🤗'),
+
+                    // Fun faces
+                    _buildEmojiButton('😜'),
+                    _buildEmojiButton('😝'),
+                    _buildEmojiButton('😋'),
+                    _buildEmojiButton('😂'),
+                    _buildEmojiButton('🤣'),
+
+                    // Cool faces
+                    _buildEmojiButton('😎'),
+                    _buildEmojiButton('🤩'),
+                    _buildEmojiButton('🥳'),
+                    _buildEmojiButton('😏'),
+                    _buildEmojiButton('😌'),
+
+                    // Reaction faces
+                    _buildEmojiButton('😮'),
+                    _buildEmojiButton('🤔'),
+                    _buildEmojiButton('😳'),
+                    _buildEmojiButton('🥺'),
+                    _buildEmojiButton('😇'),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
   }
 
   void _handleUserEntry(ZegoUIKitUser user) async {
@@ -4704,60 +5558,62 @@ class LivePageState extends State<LivePage>
         //     ),
         //   ),
         // ),
+
+        //gift box
         Positioned(
-          bottom: 165, // Adjusted position
+          bottom: MediaQuery.of(context).size.width * 0.8, // Adjusted position
           right: 16, // Adjusted position
           child: SizedBox(
             width: 70, // Vertical rectangle width
-            height: 190, // Vertical rectangle height
+            height: 150, // Vertical rectangle height
             child: ImageCarouselSlider(
               items: imageList,
-              imageHeight: 180, // Matches the container height
+              imageHeight: 140, // Matches the container height
               dotColor: Colors.black, // Dot color for indicators
             ),
           ),
         ),
-        Positioned(
-          bottom: 70,
-          right: 16,
-          child: AnimatedBuilder(
-            animation: _glowAnimation,
-            builder: (context, child) {
-              return InkWell(
-                onTap: () {
-                  showGiftListSheet(context, widget.roomID);
-                },
-                child: Container(
-                  width: 48,
-                  height: 48,
-                  decoration: BoxDecoration(
-                    shape: BoxShape
-                        .circle, // Makes the glow round around the image
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.yellowAccent
-                            .withOpacity(0.7), // Glow color (you can change it)
-                        spreadRadius: 6 *
-                            _glowAnimation
-                                .value, // Animated spread size of the glow
-                        blurRadius: 15 *
-                            _glowAnimation
-                                .value, // Animated blur size of the glow
-                        offset: const Offset(0,
-                            0), // Position of the glow (centered around the image)
-                      ),
-                    ],
-                  ),
-                  child: Image.asset(
-                    'assets/images/gift.png',
-                    width: 48,
-                    height: 48,
-                  ),
-                ),
-              );
-            },
-          ),
-        )
+        // Positioned(
+        //   bottom: 10,
+        //   right: 77,
+        //   child: AnimatedBuilder(
+        //     animation: _glowAnimation,
+        //     builder: (context, child) {
+        //       return InkWell(
+        //         onTap: () {
+        //           showGiftListSheet(context, widget.roomID);
+        //         },
+        //         child: Container(
+        //           width: 48,
+        //           height: 48,
+        //           decoration: BoxDecoration(
+        //             shape: BoxShape
+        //                 .circle, // Makes the glow round around the image
+        //             boxShadow: [
+        //               BoxShadow(
+        //                 color: Colors.yellowAccent
+        //                     .withOpacity(0.7), // Glow color (you can change it)
+        //                 spreadRadius: 6 *
+        //                     _glowAnimation
+        //                         .value, // Animated spread size of the glow
+        //                 blurRadius: 15 *
+        //                     _glowAnimation
+        //                         .value, // Animated blur size of the glow
+        //                 offset: const Offset(0,
+        //                     0), // Position of the glow (centered around the image)
+        //               ),
+        //             ],
+        //           ),
+        //           child: Image.asset(
+        //             'assets/images/gift.png',
+        //             width: 28,
+        //             height: 28,
+        //           ),
+        //         ),
+        //       );
+        //     },
+        //   ),
+        // )
       ],
     );
   }
