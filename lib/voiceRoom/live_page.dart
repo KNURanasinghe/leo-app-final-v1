@@ -220,13 +220,13 @@ class LivePageState extends State<LivePage>
       "Welcome to Hapi! Please respect each other and talk politely. Abusing, third-party advertising, fake official information and politically sensitive topics are strictly prohibited. please report if you find these situations";
 
   List<IconData> customIcons = [
-    Icons.message_outlined,
+    // Icons.message_outlined,
     Icons.mic,
     Icons.volume_up,
     Icons.emoji_emotions,
     Icons.mail,
     Icons.open_with_sharp,
-    Icons.lock_outline,
+    //Icons.lock_outline,
   ];
 
   bool _isMusicPlaying = false;
@@ -1113,7 +1113,9 @@ class LivePageState extends State<LivePage>
             children: [
               Row(
                 children: [
-                  if (avatarUrl != null && avatarUrl.isNotEmpty)
+                  if (avatarUrl != null &&
+                      avatarUrl.isNotEmpty &&
+                      !isSelf) //TODO is self added here if not show entry for me remove
                     ClipRRect(
                       borderRadius: BorderRadius.circular(15),
                       child: CachedNetworkImage(
@@ -3505,150 +3507,164 @@ class LivePageState extends State<LivePage>
 
             // Room Info Overlay
             Positioned(
-              top: MediaQuery.of(context).padding.top - 15, // Moved higher up
-              left: 10,
-              child: LayoutBuilder(
-                builder: (context, constraints) {
-                  return Container(
-                    constraints: BoxConstraints(
-                      maxWidth: MediaQuery.of(context).size.width * 0.5,
-                      minHeight: 60,
-                      maxHeight: 60,
-                    ),
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [
-                          Colors.grey.withOpacity(0.2),
-                          Colors.grey.withOpacity(0.1),
-                        ],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
+              top: MediaQuery.of(context).padding.top - 8, // Moved higher up
+              left: 0,
+              child: Container(
+                width: MediaQuery.of(context).size.width * 0.5,
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Colors.black.withOpacity(0.5),
+                  borderRadius: const BorderRadius.only(
+                      bottomRight: Radius.circular(45),
+                      topRight: Radius.circular(45)),
+                ),
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    return Container(
+                      constraints: BoxConstraints(
+                        maxWidth: MediaQuery.of(context).size.width * 0.5,
+                        minHeight: 60,
+                        maxHeight: 60,
                       ),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        // Room Image
-                        GestureDetector(
-                          onTap: () async {
-                            if (_isLoading) return; // Prevent tap if loading
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 8),
+                      // decoration: BoxDecoration(
+                      //   gradient: LinearGradient(
+                      //     colors: [
+                      //       Colors.grey.withOpacity(0.2),
+                      //       Colors.grey.withOpacity(0.1),
+                      //     ],
+                      //     begin: Alignment.topLeft,
+                      //     end: Alignment.bottomRight,
+                      //   ),
+                      // ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          // Room Image
+                          GestureDetector(
+                            onTap: () async {
+                              if (_isLoading) return; // Prevent tap if loading
 
-                            final now = DateTime.now();
-                            if (_lastTapTime != null &&
-                                now.difference(_lastTapTime!) <
-                                    const Duration(milliseconds: 500)) {
-                              return;
-                            }
-                            _lastTapTime = now;
-
-                            setState(() {
-                              _isLoading = true;
-                            });
-
-                            try {
-                              await _showBottomSheet(context, widget.roomID);
-                            } finally {
-                              if (mounted) {
-                                setState(() {
-                                  _isLoading = false;
-                                });
+                              final now = DateTime.now();
+                              if (_lastTapTime != null &&
+                                  now.difference(_lastTapTime!) <
+                                      const Duration(milliseconds: 500)) {
+                                return;
                               }
-                            }
-                          },
-                          child: Container(
-                            width: 44,
-                            height: 44,
-                            decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(10),
-                              border: Border.all(
-                                color: Colors.white.withOpacity(0.2),
-                                width: 1,
+                              _lastTapTime = now;
+
+                              setState(() {
+                                _isLoading = true;
+                              });
+
+                              try {
+                                await _showBottomSheet(context, widget.roomID);
+                              } finally {
+                                if (mounted) {
+                                  setState(() {
+                                    _isLoading = false;
+                                  });
+                                }
+                              }
+                            },
+                            child: Container(
+                              width: 44,
+                              height: 44,
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(10),
+                                border: Border.all(
+                                  color: Colors.white.withOpacity(0.2),
+                                  width: 1,
+                                ),
                               ),
-                            ),
-                            child: ClipRRect(
-                              borderRadius: BorderRadius.circular(10),
-                              child: _groupPhotoUrl != null
-                                  ? Image.network(
-                                      _groupPhotoUrl!,
-                                      fit: BoxFit.cover,
-                                      errorBuilder:
-                                          (context, error, stackTrace) =>
-                                              const Center(
+                              child: ClipRRect(
+                                borderRadius: BorderRadius.circular(10),
+                                child: _groupPhotoUrl != null
+                                    ? Image.network(
+                                        _groupPhotoUrl!,
+                                        fit: BoxFit.cover,
+                                        errorBuilder:
+                                            (context, error, stackTrace) =>
+                                                const Center(
+                                          child: Icon(
+                                            Icons.image,
+                                            size: 24,
+                                            color: Colors.white70,
+                                          ),
+                                        ),
+                                      )
+                                    : const Center(
                                         child: Icon(
                                           Icons.image,
                                           size: 24,
                                           color: Colors.white70,
                                         ),
                                       ),
-                                    )
-                                  : const Center(
-                                      child: Icon(
-                                        Icons.image,
-                                        size: 24,
-                                        color: Colors.white70,
-                                      ),
-                                    ),
+                              ),
                             ),
                           ),
-                        ),
 
-                        const SizedBox(width: 12),
+                          const SizedBox(width: 12),
 
-                        // Room Info Column
-                        Expanded(
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              // Room Name
-                              Text(
-                                _voiceRoomName ?? "Voice Room",
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w600,
-                                  letterSpacing: 0.2,
-                                ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-
-                              const SizedBox(height: 4),
-
-                              // Room ID
-                              Row(
-                                children: [
-                                  Text(
-                                    "ID: ",
-                                    style: TextStyle(
-                                      color: Colors.white.withOpacity(0.7),
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.w500,
-                                    ),
+                          // Room Info Column
+                          Expanded(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                // Room Name
+                                Text(
+                                  _voiceRoomName ?? "Voice Room",
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w600,
+                                    letterSpacing: 0.2,
+                                    decoration: TextDecoration.none,
                                   ),
-                                  Expanded(
-                                    child: Text(
-                                      "$_voiceroomid",
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+
+                                const SizedBox(height: 4),
+
+                                // Room ID
+                                Row(
+                                  children: [
+                                    Text(
+                                      "ID: ",
                                       style: TextStyle(
-                                        color: Colors.white.withOpacity(0.9),
+                                        color: Colors.white.withOpacity(0.7),
                                         fontSize: 12,
                                         fontWeight: FontWeight.w500,
+                                        decoration: TextDecoration.none,
                                       ),
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
                                     ),
-                                  ),
-                                ],
-                              ),
-                            ],
+                                    Expanded(
+                                      child: Text(
+                                        "$_voiceroomid",
+                                        style: TextStyle(
+                                          color: Colors.white.withOpacity(0.9),
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w500,
+                                          decoration: TextDecoration.none,
+                                        ),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
                           ),
-                        ),
-                      ],
-                    ),
-                  );
-                },
+                        ],
+                      ),
+                    );
+                  },
+                ),
               ),
             ),
 
@@ -4943,11 +4959,6 @@ class LivePageState extends State<LivePage>
       ..userAvatarUrl = _userAvatarUrl
       ..bottomMenuBar = ZegoLiveAudioRoomBottomMenuBarConfig(
         maxCount: 7,
-        hostButtons: [
-          // ZegoLiveAudioRoomMenuBarButtonName.soundEffectButton,
-          // ZegoLiveAudioRoomMenuBarButtonName.toggleMicrophoneButton,
-          //ZegoLiveAudioRoomMenuBarButtonName.closeSeatButton,
-        ],
         hostExtendButtons: [
           // Use a single container with a custom row to control spacing
           SizedBox(
@@ -4959,14 +4970,13 @@ class LivePageState extends State<LivePage>
                 _buildCustomButton(0, customIcons[0]),
                 _buildCustomButton(1, customIcons[1]),
                 _buildCustomButton(2, customIcons[2]),
-                _buildCustomButton(3, customIcons[3]),
 
                 // Space between groups - explicit width
                 const SizedBox(width: 60),
 
                 // Group 2: Mail icon
-                _buildCustomButton(4, customIcons[4]),
 
+                _buildCustomButton(3, customIcons[3]),
                 // Another space
 
                 AnimatedBuilder(
@@ -5008,14 +5018,29 @@ class LivePageState extends State<LivePage>
                 ),
                 // if (widget.isHost) _buildCustomButton(6, customIcons[6]),
                 // Group 3: Open with icon
-                _buildCustomButton(5, customIcons[5]),
+                //_buildCustomButton(5, customIcons[5]),
+                _buildCustomButton(4, customIcons[4]),
               ],
             ),
           ),
         ],
-        speakerButtons: [
-          //ZegoLiveAudioRoomMenuBarButtonName.toggleMicrophoneButton,
-          //ZegoLiveAudioRoomMenuBarButtonName.showMemberListButton,
+        hostButtons: [],
+        speakerButtons: [],
+        audienceButtons: [],
+        audienceExtendButtons: [
+          SizedBox(
+            width: MediaQuery.of(context).size.width -
+                20, // Adjust width as needed
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                // Group 1: First 4 icons without spacing
+                _buildCustomButton(0, customIcons[0]),
+
+                _buildCustomButton(1, customIcons[1]),
+              ],
+            ),
+          ),
         ],
       );
   }
@@ -5165,14 +5190,14 @@ class LivePageState extends State<LivePage>
         ZegoUIKit().getMicrophoneStateNotifier(localUserID).value;
     ZegoUIKit().turnMicrophoneOn(!currentMicState);
 
-    // Optional: Show a notification
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-            currentMicState ? 'Microphone turned off' : 'Microphone turned on'),
-        duration: const Duration(seconds: 1),
-      ),
-    );
+    // // Optional: Show a notification
+    // ScaffoldMessenger.of(context).showSnackBar(
+    //   SnackBar(
+    //     content: Text(
+    //         currentMicState ? 'Microphone turned off' : 'Microphone turned on'),
+    //     duration: const Duration(seconds: 1),
+    //   ),
+    // );
 
     // The UI will update automatically since we're using a ValueListenableBuilder
   }
@@ -5198,7 +5223,7 @@ class LivePageState extends State<LivePage>
             child: Center(
               child: Icon(
                 isMicOn ? Icons.mic : Icons.mic_off,
-                color: isMicOn ? Colors.white : Colors.red,
+                color: isMicOn ? Colors.white : Colors.white,
                 size: 20,
               ),
             ),
@@ -5641,6 +5666,7 @@ class LivePageState extends State<LivePage>
     return ZegoLiveAudioRoomSeatConfig(
       backgroundBuilder: backgroundBuilder,
       foregroundBuilder: foregroundBuilder,
+      closeWhenJoining: false,
       // avatarBuilder: avatarBuilder,
     );
   }
