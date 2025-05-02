@@ -49,6 +49,7 @@ class MyApp extends StatelessWidget {
             debugShowCheckedModeBanner: false,
             title: 'ZEGOCLOUD Chat App',
             theme: ThemeData(
+              fontFamily: 'Poppins',
               primarySwatch: Colors.blue,
               scaffoldBackgroundColor: Colors.white,
             ),

@@ -1197,7 +1197,7 @@ class LivePageState extends State<LivePage>
         16; // Move up when welcome is hidden
 
     return Positioned(
-      bottom: bottomPosition,
+      bottom: bottomPosition + 26,
       left: 16,
       right: 16,
       child: Column(
@@ -1246,7 +1246,7 @@ class LivePageState extends State<LivePage>
             ),
 
           // Only add spacing if welcome message is visible
-          if (_showWelcomeMessage) const SizedBox(height: 26),
+          if (_showWelcomeMessage) const SizedBox(height: 46),
           const SizedBox(height: 36),
           // Announcement - always shown but position depends on welcome message visibility
           if (_announcement != null && _announcement!.isNotEmpty)
@@ -1267,6 +1267,7 @@ class LivePageState extends State<LivePage>
                         style: TextStyle(
                           color: Colors.white,
                           fontWeight: FontWeight.bold,
+                          fontFamily: 'poppins',
                           fontSize: 16,
                           decoration: TextDecoration.none,
                         ),
@@ -1291,6 +1292,7 @@ class LivePageState extends State<LivePage>
                   Text(
                     _announcement!,
                     style: const TextStyle(
+                      fontFamily: 'poppins',
                       color: Colors.white,
                       fontSize: 12,
                       decoration: TextDecoration.none,
@@ -2348,6 +2350,7 @@ class LivePageState extends State<LivePage>
                     overflow: TextOverflow.ellipsis,
                     textAlign: TextAlign.center,
                     style: const TextStyle(
+                      fontFamily: 'poppins',
                       color: Colors.white,
                       fontSize: 10,
                       fontWeight: FontWeight.w600,
@@ -2408,6 +2411,7 @@ class LivePageState extends State<LivePage>
                   const Text(
                     'Room Settings',
                     style: TextStyle(
+                      fontFamily: 'poppins',
                       fontSize: 22,
                       fontWeight: FontWeight.bold,
                       color: Colors.white,
@@ -2434,11 +2438,19 @@ class LivePageState extends State<LivePage>
                 ),
                 title: const Text(
                   'Change Room Photo',
-                  style: TextStyle(color: Colors.white, fontSize: 16),
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 16,
+                    fontFamily: 'poppins',
+                  ),
                 ),
                 subtitle: const Text(
                   'Update room profile picture',
-                  style: TextStyle(color: Colors.white70, fontSize: 12),
+                  style: TextStyle(
+                    color: Colors.white70,
+                    fontSize: 12,
+                    fontFamily: 'poppins',
+                  ),
                 ),
                 trailing:
                     const Icon(Icons.chevron_right, color: Colors.white54),
@@ -2462,11 +2474,19 @@ class LivePageState extends State<LivePage>
                 ),
                 title: const Text(
                   'Edit Room Name',
-                  style: TextStyle(color: Colors.white, fontSize: 16),
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 16,
+                    fontFamily: 'poppins',
+                  ),
                 ),
                 subtitle: const Text(
                   'Change room display name',
-                  style: TextStyle(color: Colors.white70, fontSize: 12),
+                  style: TextStyle(
+                    color: Colors.white70,
+                    fontSize: 12,
+                    fontFamily: 'poppins',
+                  ),
                 ),
                 trailing:
                     const Icon(Icons.chevron_right, color: Colors.white54),
@@ -2478,14 +2498,23 @@ class LivePageState extends State<LivePage>
                       backgroundColor: Colors.black.withOpacity(0.9),
                       title: const Text(
                         'Edit Room Name',
-                        style: TextStyle(color: Colors.white),
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontFamily: 'poppins',
+                        ),
                       ),
                       content: TextField(
                         controller: roomNameController,
-                        style: const TextStyle(color: Colors.white),
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontFamily: 'poppins',
+                        ),
                         decoration: InputDecoration(
                           hintText: 'Enter new room name',
-                          hintStyle: TextStyle(color: Colors.grey[400]),
+                          hintStyle: TextStyle(
+                            color: Colors.grey[400],
+                            fontFamily: 'poppins',
+                          ),
                           filled: true,
                           fillColor: Colors.white.withOpacity(0.1),
                           border: OutlineInputBorder(
@@ -2527,11 +2556,19 @@ class LivePageState extends State<LivePage>
                 ),
                 title: const Text(
                   'Change Background',
-                  style: TextStyle(color: Colors.white, fontSize: 16),
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 16,
+                    fontFamily: 'poppins',
+                  ),
                 ),
                 subtitle: const Text(
                   'Customize room background',
-                  style: TextStyle(color: Colors.white70, fontSize: 12),
+                  style: TextStyle(
+                    color: Colors.white70,
+                    fontSize: 12,
+                    fontFamily: 'poppins',
+                  ),
                 ),
                 trailing:
                     const Icon(Icons.chevron_right, color: Colors.white54),
@@ -2555,13 +2592,21 @@ class LivePageState extends State<LivePage>
                 ),
                 title: const Text(
                   'Room Announcement',
-                  style: TextStyle(color: Colors.white, fontSize: 16),
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 16,
+                    fontFamily: 'poppins',
+                  ),
                 ),
                 subtitle: Text(
                   _announcement != null && _announcement!.isNotEmpty
                       ? 'Edit room announcement'
                       : 'Add room announcement',
-                  style: const TextStyle(color: Colors.white70, fontSize: 12),
+                  style: const TextStyle(
+                    color: Colors.white70,
+                    fontSize: 12,
+                    fontFamily: 'poppins',
+                  ),
                 ),
                 trailing:
                     const Icon(Icons.chevron_right, color: Colors.white54),
@@ -2590,6 +2635,7 @@ class LivePageState extends State<LivePage>
                     Text(
                       'Danger Zone',
                       style: TextStyle(
+                        fontFamily: 'poppins',
                         color: Colors.red[300],
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
@@ -2612,6 +2658,7 @@ class LivePageState extends State<LivePage>
                                 Text(
                                   'Disband Group',
                                   style: TextStyle(
+                                    fontFamily: 'poppins',
                                     color: Colors.red[400],
                                     fontSize: 16,
                                     fontWeight: FontWeight.w600,
@@ -2620,6 +2667,7 @@ class LivePageState extends State<LivePage>
                                 Text(
                                   'Permanently delete this room',
                                   style: TextStyle(
+                                    fontFamily: 'poppins',
                                     color: Colors.red[200],
                                     fontSize: 12,
                                   ),
@@ -2715,6 +2763,7 @@ class LivePageState extends State<LivePage>
                 const Text(
                   'Room Announcement',
                   style: TextStyle(
+                    fontFamily: 'poppins',
                     fontSize: 20,
                     fontWeight: FontWeight.bold,
                     color: Colors.white,
@@ -2725,7 +2774,10 @@ class LivePageState extends State<LivePage>
                   controller: announcementController,
                   decoration: InputDecoration(
                     hintText: 'Enter room announcement',
-                    hintStyle: TextStyle(color: Colors.grey[400]),
+                    hintStyle: TextStyle(
+                      color: Colors.grey[400],
+                      fontFamily: 'poppins',
+                    ),
                     filled: true,
                     fillColor: Colors.white.withOpacity(0.1),
                     border: OutlineInputBorder(
@@ -2735,7 +2787,10 @@ class LivePageState extends State<LivePage>
                     contentPadding: const EdgeInsets.symmetric(
                         horizontal: 16, vertical: 12),
                   ),
-                  style: const TextStyle(color: Colors.white),
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontFamily: 'poppins',
+                  ),
                   maxLines: 5,
                 ),
                 const SizedBox(height: 20),
@@ -2746,7 +2801,10 @@ class LivePageState extends State<LivePage>
                       onPressed: () => Navigator.pop(context),
                       child: const Text(
                         'Cancel',
-                        style: TextStyle(color: Colors.white70),
+                        style: TextStyle(
+                          color: Colors.white70,
+                          fontFamily: 'poppins',
+                        ),
                       ),
                     ),
                     const SizedBox(width: 10),
@@ -2798,6 +2856,7 @@ class LivePageState extends State<LivePage>
               const Text(
                 'Disband Group',
                 style: TextStyle(
+                  fontFamily: 'poppins',
                   fontSize: 20,
                   fontWeight: FontWeight.bold,
                   color: Colors.white,
@@ -2808,6 +2867,7 @@ class LivePageState extends State<LivePage>
                 'Are you sure you want to disband this group? This action cannot be undone.',
                 textAlign: TextAlign.center,
                 style: TextStyle(
+                  fontFamily: 'poppins',
                   color: Colors.white.withOpacity(0.8),
                 ),
               ),
@@ -2829,7 +2889,10 @@ class LivePageState extends State<LivePage>
                     },
                     child: const Text(
                       'Disband',
-                      style: TextStyle(color: Colors.red),
+                      style: TextStyle(
+                        color: Colors.red,
+                        fontFamily: 'poppins',
+                      ),
                     ),
                   ),
                 ],
@@ -2872,7 +2935,10 @@ class LivePageState extends State<LivePage>
             child: Center(
               child: Text(
                 emoji,
-                style: const TextStyle(fontSize: 24),
+                style: const TextStyle(
+                  fontSize: 24,
+                  fontFamily: 'poppins',
+                ),
               ),
             ),
           ),
@@ -2965,6 +3031,7 @@ class LivePageState extends State<LivePage>
             Text(
               _currentSongName!,
               style: const TextStyle(
+                fontFamily: 'poppins',
                 color: Colors.white,
                 fontSize: 12,
               ),
@@ -3043,6 +3110,7 @@ class LivePageState extends State<LivePage>
                     child: Text(
                       'Leave Room',
                       style: TextStyle(
+                        fontFamily: 'poppins',
                         fontSize: 18,
                         fontWeight: FontWeight.bold,
                         color: Colors.white,
@@ -5038,6 +5106,21 @@ class LivePageState extends State<LivePage>
         ],
         hostButtons: [],
         speakerButtons: [],
+        speakerExtendButtons: [
+          SizedBox(
+            width: MediaQuery.of(context).size.width -
+                20, // Adjust width as needed
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                // Group 1: First 4 icons without spacing
+                _buildCustomButton(0, customIcons[0]),
+
+                _buildCustomButton(1, customIcons[1]),
+              ],
+            ),
+          ),
+        ],
         audienceButtons: [],
         audienceExtendButtons: [
           SizedBox(
