@@ -9,6 +9,7 @@ import 'package:just_audio/just_audio.dart';
 import 'package:rive/rive.dart' as rive;
 import 'package:svgaplayer_flutter/svgaplayer_flutter.dart';
 
+import '../HomeScreen.dart';
 import '../services/rive_service.dart';
 import './gift/gift.dart';
 import 'package:http/http.dart' as http;
@@ -5098,82 +5099,451 @@ class LivePageState extends State<LivePage>
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
+      isScrollControlled: true,
       builder: (context) {
         return Container(
-          decoration: BoxDecoration(
-            color: Colors.black.withOpacity(0.9),
-            borderRadius: const BorderRadius.only(
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.only(
               topLeft: Radius.circular(20),
               topRight: Radius.circular(20),
             ),
           ),
+          padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 20),
           child: Column(
             mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // Handle bar at the top of the bottom sheet
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  margin: const EdgeInsets.only(bottom: 20),
+                  decoration: BoxDecoration(
+                    color: Colors.grey.withOpacity(0.3),
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+
+              // Lucky Games Section
+              const Text(
+                'Lucky Games',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.black87,
+                ),
+              ),
+              const SizedBox(height: 16),
+
+              // Lucky Games Grid
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceAround,
+                children: [
+                  _buildGameItem(
+                    context,
+                    'GreedyBaby',
+                    'assets/images/greedy_baby.png',
+                    () => _openGameBottomSheet(context, 'GreedyBaby'),
+                    isSquare: true,
+                  ),
+                  _buildGameItem(
+                    context,
+                    'Lucky777',
+                    'assets/images/lucky_777.png',
+                    () => _openGameBottomSheet(context, 'Lucky777'),
+                    isSquare: true,
+                  ),
+                  _buildGameItem(
+                    context,
+                    'LuckyFruit',
+                    'assets/images/lucky_fruit.png',
+                    () => _openGameBottomSheet(context, 'LuckyFruit'),
+                    isSquare: true,
+                  ),
+                ],
+              ),
+
+              const SizedBox(height: 30),
+
+              // Tools Section
+              const Text(
+                'Tools',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.black87,
+                ),
+              ),
+              const SizedBox(height: 16),
+
+              // Tools Grid
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceAround,
+                children: [
+                  _buildToolItem(
+                    context,
+                    'Music',
+                    Icons.music_note,
+                    'assets/images/Music.png',
+                    Colors.blue.shade100,
+                    () {
+                      Navigator.pop(context);
+                      _showMusicPlayerSheet(context);
+                    },
+                  ),
+                  _buildToolItem(
+                    context,
+                    'Store',
+                    Icons.store,
+                    'assets/images/Store.png',
+                    Colors.orange.shade100,
+                    () => _openStoreBottomSheet(context),
+                  ),
+                  _buildToolItem(
+                    context,
+                    'Effect',
+                    Icons.auto_fix_high,
+                    'assets/images/Effect.png',
+                    Colors.amber.shade100,
+                    () => _openEffectsBottomSheet(context),
+                    hasNotification: true,
+                  ),
+                  _buildToolItem(
+                    context,
+                    'My Items',
+                    Icons.checkroom,
+                    'assets/images/Items.png',
+                    Colors.purple.shade100,
+                    () => _openMyItemsBottomSheet(context),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 20),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+// Helper method to build a game item (square)
+  Widget _buildGameItem(
+      BuildContext context, String name, String imagePath, VoidCallback onTap,
+      {bool isSquare = false}) {
+    return Column(
+      children: [
+        GestureDetector(
+          onTap: onTap,
+          child: Container(
+            width: 80,
+            height: 80,
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(isSquare ? 12 : 40),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.1),
+                  blurRadius: 5,
+                  spreadRadius: 1,
+                ),
+              ],
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(isSquare ? 12 : 40),
+              child: Image.asset(
+                imagePath,
+                fit: BoxFit.cover,
+                errorBuilder: (context, error, stackTrace) => Icon(
+                  Icons.games,
+                  size: 40,
+                  color: Colors.blue.shade300,
+                ),
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          name,
+          style: const TextStyle(
+            fontSize: 12,
+            color: Colors.grey,
+          ),
+        ),
+      ],
+    );
+  }
+
+// Helper method to build a tool item (circle)
+  Widget _buildToolItem(BuildContext context, String name, IconData icon,
+      String assetname, Color backgroundColor, VoidCallback onTap,
+      {bool hasNotification = false}) {
+    return Column(
+      children: [
+        GestureDetector(
+          onTap: onTap,
+          child: Stack(
+            children: [
+              Container(
+                width: 70,
+                height: 70,
+                decoration: BoxDecoration(
+                  color: backgroundColor,
+                  shape: BoxShape.circle,
+                ),
+                child: assetname == ''
+                    ? Icon(
+                        icon,
+                        size: 30,
+                        color:
+                            backgroundColor.withBlue(backgroundColor.blue + 50),
+                      )
+                    : Image(
+                        image: AssetImage(assetname),
+                      ),
+              ),
+              if (hasNotification)
+                Positioned(
+                  right: 8,
+                  top: 8,
+                  child: Container(
+                    width: 12,
+                    height: 12,
+                    decoration: const BoxDecoration(
+                      color: Colors.red,
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          name,
+          style: const TextStyle(
+            fontSize: 12,
+            color: Colors.grey,
+          ),
+        ),
+      ],
+    );
+  }
+
+// Method to open game bottom sheet
+  void _openGameBottomSheet(BuildContext context, String gameName) {
+    Navigator.pop(context);
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (context) {
+        return Container(
+          height: MediaQuery.of(context).size.height * 0.8,
+          decoration: BoxDecoration(
+            color: Colors.black.withOpacity(0.9),
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+          ),
+          child: Column(
+            children: [
+              // Handle bar
               Container(
                 width: 40,
                 height: 4,
-                margin: const EdgeInsets.only(top: 12, bottom: 16),
+                margin: const EdgeInsets.only(top: 12, bottom: 8),
                 decoration: BoxDecoration(
                   color: Colors.white.withOpacity(0.3),
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
 
-              // Play Music row
-              Padding(
-                padding:
-                    const EdgeInsets.symmetric(vertical: 16, horizontal: 20),
-                child: InkWell(
-                  onTap: () {
-                    Navigator.pop(context);
-                    _showMusicPlayerSheet(context);
-                  },
-                  child: Row(
+              // Use the GameScreen directly inside the bottom sheet
+              const Expanded(
+                child: ClipRRect(
+                  borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+                  child: GameScreen(),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+// Method to open store bottom sheet
+  void _openStoreBottomSheet(BuildContext context) {
+    Navigator.pop(context);
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.white,
+      isScrollControlled: true,
+      builder: (context) {
+        return SizedBox(
+          height: MediaQuery.of(context).size.height * 0.7,
+          child: Column(
+            children: [
+              // Handle bar
+              Container(
+                width: 40,
+                height: 4,
+                margin: const EdgeInsets.only(top: 12, bottom: 20),
+                decoration: BoxDecoration(
+                  color: Colors.grey.withOpacity(0.3),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+
+              const Text(
+                'Store',
+                style: TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 20),
+
+              // Store content placeholder
+              const Expanded(
+                child: Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      // Music icon
-                      Container(
-                        padding: const EdgeInsets.all(10),
-                        decoration: BoxDecoration(
-                          color: Colors.blue.withOpacity(0.3),
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: const Icon(
-                          Icons.music_note,
-                          color: Colors.blue,
-                          size: 24,
-                        ),
-                      ),
-
-                      const SizedBox(width: 16),
-
-                      // Text
-                      const Text(
-                        'Play Music',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 16,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-
-                      const Spacer(),
-
-                      // Arrow indicator
                       Icon(
-                        Icons.arrow_forward_ios,
-                        color: Colors.white.withOpacity(0.7),
-                        size: 16,
+                        Icons.store,
+                        size: 100,
+                        color: Colors.orange,
+                      ),
+                      SizedBox(height: 20),
+                      Text(
+                        'Store content will appear here',
+                        style: TextStyle(fontSize: 18),
                       ),
                     ],
                   ),
                 ),
               ),
+            ],
+          ),
+        );
+      },
+    );
+  }
 
-              // You can add more options here
+// Method to open effects bottom sheet
+  void _openEffectsBottomSheet(BuildContext context) {
+    Navigator.pop(context);
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.white,
+      isScrollControlled: true,
+      builder: (context) {
+        return SizedBox(
+          height: MediaQuery.of(context).size.height * 0.7,
+          child: Column(
+            children: [
+              // Handle bar
+              Container(
+                width: 40,
+                height: 4,
+                margin: const EdgeInsets.only(top: 12, bottom: 20),
+                decoration: BoxDecoration(
+                  color: Colors.grey.withOpacity(0.3),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
 
+              const Text(
+                'Effects',
+                style: TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
               const SizedBox(height: 20),
+
+              // Effects content placeholder
+              const Expanded(
+                child: Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        Icons.auto_fix_high,
+                        size: 100,
+                        color: Colors.amber,
+                      ),
+                      SizedBox(height: 20),
+                      Text(
+                        'Effects will appear here',
+                        style: TextStyle(fontSize: 18),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+// Method to open my items bottom sheet
+  void _openMyItemsBottomSheet(BuildContext context) {
+    Navigator.pop(context);
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.white,
+      isScrollControlled: true,
+      builder: (context) {
+        return SizedBox(
+          height: MediaQuery.of(context).size.height * 0.7,
+          child: Column(
+            children: [
+              // Handle bar
+              Container(
+                width: 40,
+                height: 4,
+                margin: const EdgeInsets.only(top: 12, bottom: 20),
+                decoration: BoxDecoration(
+                  color: Colors.grey.withOpacity(0.3),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+
+              const Text(
+                'My Items',
+                style: TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 20),
+
+              // My items content placeholder
+              const Expanded(
+                child: Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        Icons.checkroom,
+                        size: 100,
+                        color: Colors.purple,
+                      ),
+                      SizedBox(height: 20),
+                      Text(
+                        'Your items will appear here',
+                        style: TextStyle(fontSize: 18),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
             ],
           ),
         );

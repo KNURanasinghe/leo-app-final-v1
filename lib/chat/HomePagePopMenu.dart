@@ -20,54 +20,50 @@ class _HomePagePopupMenuButtonState extends State<HomePagePopupMenuButton> {
 
   @override
   Widget build(BuildContext context) {
-    return PopupMenuButton(
+    return PopupMenuButton<String>(
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.all(Radius.circular(15)),
       ),
       position: PopupMenuPosition.under,
       icon: const Icon(CupertinoIcons.add_circled),
       itemBuilder: (context) {
-        return [
-          PopupMenuItem(
+        return <PopupMenuEntry<String>>[
+          PopupMenuItem<String>(
             value: 'New Chat',
-            child: const ListTile(
-              leading: Icon(CupertinoIcons.chat_bubble_2_fill),
-              title: Text('New Chat', maxLines: 1),
+            child: ListTile(
+              leading: Icon(
+                CupertinoIcons.person_add,
+                color: Colors.blue[600],
+              ),
+              title: const Text('New Chat', maxLines: 1),
+              trailing: Text('>',
+                  style: TextStyle(
+                      color: Colors.grey.withOpacity(0.5), fontSize: 30)),
             ),
             onTap: () => showDefaultNewPeerChatDialog(context),
+          ), // Custom divider
+          PopupMenuItem<String>(
+            enabled: false,
+            height: 1,
+            padding: EdgeInsets.zero,
+            child: Container(
+              height: 1,
+              color: Colors.grey.withOpacity(0.3),
+            ),
           ),
-          // PopupMenuItem(
-          //   value: 'New Group',
-          //   child: const ListTile(
-          //     leading: Icon(CupertinoIcons.person_2_fill),
-          //     title: Text('New Group', maxLines: 1),
-          //   ),
-          //   onTap: () => showDefaultNewGroupChatDialog(context),
-          // ),
-          // PopupMenuItem(
-          //   value: 'Join Group',
-          //   child: const ListTile(
-          //       leading: Icon(Icons.group_add),
-          //       title: Text('Join Group', maxLines: 1)),
-          //   onTap: () => showDefaultJoinGroupDialog(context),
-          // ),
-          PopupMenuItem(
-            value: 'Delete All',
-            child: const ListTile(
-                leading: Icon(Icons.delete),
-                title: Text('Delete All', maxLines: 1)),
-            onTap: () {
-              ZIMKit().deleteAllConversation(
-                isAlsoDeleteFromServer: true,
-                isAlsoDeleteMessages: true,
-              );
-            },
-          ),
-          PopupMenuItem(
-            value: 'Call History ',
-            child: const ListTile(
-                leading: Icon(Icons.phone_missed_sharp),
-                title: Text('Call History', maxLines: 1)),
+
+          PopupMenuItem<String>(
+            value: 'Call History',
+            child: ListTile(
+              leading: Icon(
+                CupertinoIcons.phone_arrow_up_right,
+                color: Colors.blue[600],
+              ),
+              title: const Text('Call History', maxLines: 1),
+              trailing: Text('>',
+                  style: TextStyle(
+                      color: Colors.grey.withOpacity(0.5), fontSize: 30)),
+            ),
             onTap: () {
               Future.delayed(Duration.zero, () {
                 Navigator.push(
@@ -76,6 +72,37 @@ class _HomePagePopupMenuButtonState extends State<HomePagePopupMenuButton> {
                       builder: (context) => const CallHistoryScreen()),
                 );
               });
+            },
+          ),
+
+          // Custom divider with explicit height and color
+          PopupMenuItem<String>(
+            enabled: false, // Make it non-selectable
+            height: 1, // Minimal height
+            padding: EdgeInsets.zero, // No padding
+            child: Container(
+              height: 1,
+              color: Colors.grey.withOpacity(0.3), // Adjust opacity as needed
+            ),
+          ),
+
+          PopupMenuItem<String>(
+            value: 'Delete All',
+            child: ListTile(
+              leading: Icon(
+                Icons.delete_outline,
+                color: Colors.red[600],
+              ),
+              title: const Text('Delete All', maxLines: 1),
+              trailing: Text('>',
+                  style: TextStyle(
+                      color: Colors.grey.withOpacity(0.5), fontSize: 30)),
+            ),
+            onTap: () {
+              ZIMKit().deleteAllConversation(
+                isAlsoDeleteFromServer: true,
+                isAlsoDeleteMessages: true,
+              );
             },
           ),
         ];
