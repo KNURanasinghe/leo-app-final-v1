@@ -114,7 +114,7 @@ class ChatScreen1State extends State<ChatScreen1>
                 fontSize: 24,
               ),
             ),
-            actions: const [HomePagePopupMenuButton()],
+            // actions: const [HomePagePopupMenuButton()],
             bottom: TabBar(
               controller: _tabController,
               indicatorColor: Colors.blue[700],

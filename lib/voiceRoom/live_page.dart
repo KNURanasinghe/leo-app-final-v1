@@ -944,7 +944,7 @@ class LivePageState extends State<LivePage>
         });
       }
     });
-    Future.delayed(const Duration(seconds: 5), () {
+    Future.delayed(const Duration(seconds: 15), () {
       if (mounted) {
         setState(() {
           _showWelcomeMessage = false;
@@ -1097,66 +1097,82 @@ class LivePageState extends State<LivePage>
     final bool isSelf = userName == widget.username1;
     print('itemurl: $itemUrl');
 
-    return Column(
-      mainAxisSize: MainAxisSize.min,
+    // Use Stack to position welcome message at bottom and SVGA animation in original place
+    return Stack(
       children: [
-        // Welcome message container
-        Container(
-          width: MediaQuery.of(context).size.width * 0.6,
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: Colors.black.withOpacity(0.5),
-            borderRadius: BorderRadius.circular(12),
+        // SVG Animation - keep in original position at top
+        if (itemUrl != null && itemUrl.isNotEmpty)
+          Positioned(
+            top: 120, // Original position at top
+            left: 0,
+            right: 0,
+            child: Center(
+              child: SizedBox(
+                width: 100, // Adjust size as needed
+                height: 100,
+                child: SVGASimpleImage(resUrl: itemUrl),
+              ),
+            ),
           ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  if (avatarUrl != null &&
-                      avatarUrl.isNotEmpty &&
-                      !isSelf) //TODO is self added here if not show entry for me remove
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(15),
-                      child: CachedNetworkImage(
-                        imageUrl: avatarUrl,
-                        width: 30,
-                        height: 30,
-                        fit: BoxFit.cover,
-                        placeholder: (context, url) => Container(
-                          color: Colors.grey.shade200,
-                          child: const Icon(Icons.person,
-                              size: 20, color: Colors.grey),
+
+        // Welcome message positioned at bottom
+        Positioned(
+          bottom: MediaQuery.of(context).size.height *
+              0.31, // Position from bottom as requested
+          left: 16, // Position from left as requested
+          child: Container(
+            width: MediaQuery.of(context).size.width * 0.8,
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.black.withOpacity(0.5),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    if (avatarUrl != null && avatarUrl.isNotEmpty && !isSelf)
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(15),
+                        child: CachedNetworkImage(
+                          imageUrl: avatarUrl,
+                          width: 30,
+                          height: 30,
+                          fit: BoxFit.cover,
+                          placeholder: (context, url) => Container(
+                            color: Colors.grey.shade200,
+                            child: const Icon(Icons.person,
+                                size: 20, color: Colors.grey),
+                          ),
+                          errorWidget: (context, error, stackTrace) =>
+                              const Icon(Icons.person,
+                                  size: 20, color: Colors.white),
                         ),
-                        errorWidget: (context, error, stackTrace) => const Icon(
-                            Icons.person,
-                            size: 20,
-                            color: Colors.white),
+                      ),
+                    const SizedBox(width: 8),
+                    const Text(
+                      'Welcome',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                        decoration: TextDecoration.none,
                       ),
                     ),
-                  const SizedBox(width: 8),
-                  const Text(
-                    'Welcome',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 16,
-                      decoration: TextDecoration.none,
+                    const SizedBox(width: 3),
+                    Text(
+                      userName,
+                      style: const TextStyle(
+                        color: Colors.yellow,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                        decoration: TextDecoration.none,
+                      ),
                     ),
-                  ),
-                  const SizedBox(width: 3),
-                  Text(
-                    userName,
-                    style: const TextStyle(
-                      color: Colors.yellow,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 16,
-                      decoration: TextDecoration.none,
-                    ),
-                  ),
-                  const Flexible(
-                    child: Text(
-                      ' entered room',
+                    const SizedBox(width: 3),
+                    const Text(
+                      'entered room',
                       style: TextStyle(
                         color: Colors.white,
                         fontWeight: FontWeight.bold,
@@ -1165,34 +1181,20 @@ class LivePageState extends State<LivePage>
                         overflow: TextOverflow.ellipsis,
                       ),
                     ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
-
-        // SVG Animation below the message
-        if (itemUrl != null && itemUrl.isNotEmpty)
-          Padding(
-            padding: const EdgeInsets.only(top: 12),
-            child: SizedBox(
-              width: 100, // Adjust size as needed
-              height: 100,
-              child: SVGASimpleImage(resUrl: itemUrl),
+                  ],
+                ),
+              ],
             ),
           ),
+        ),
       ],
     );
   }
 
   Widget _buildWelcomeAndAnnouncement() {
     // Calculate the position based on welcome message visibility
-    double bottomPosition = _showWelcomeMessage
-        ? MediaQuery.of(context).size.height *
-            0.3 // Original position when welcome is visible
-        : MediaQuery.of(context).size.height * 0.3 +
-            16; // Move up when welcome is hidden
+    double bottomPosition = MediaQuery.of(context).size.height * 0.2 +
+        16; // Move up when welcome is hidden
 
     return Positioned(
       bottom: bottomPosition,
@@ -1244,8 +1246,8 @@ class LivePageState extends State<LivePage>
             ),
 
           // Only add spacing if welcome message is visible
-          if (_showWelcomeMessage) const SizedBox(height: 16),
-
+          if (_showWelcomeMessage) const SizedBox(height: 26),
+          const SizedBox(height: 36),
           // Announcement - always shown but position depends on welcome message visibility
           if (_announcement != null && _announcement!.isNotEmpty)
             Container(
@@ -3190,20 +3192,30 @@ class LivePageState extends State<LivePage>
             ),
 
 // In your build method, near where the emoji animation renderer is
+            // if (_activeEntries.isNotEmpty)
+            //   SizedBox(
+            //     width: double.infinity,
+            //     height: double.infinity,
+            //     child: CustomMultiChildLayout(
+            //       delegate: EntryLayoutDelegate(
+            //         users: _activeEntries.keys.toList(),
+            //         itemCount: _activeEntries.length,
+            //       ),
+            //       children: _activeEntries.entries.map((entry) {
+            //         return LayoutId(
+            //           id: entry.key,
+            //           child: entry.value,
+            //         );
+            //       }).toList(),
+            //     ),
+            //   ),
             if (_activeEntries.isNotEmpty)
               SizedBox(
                 width: double.infinity,
                 height: double.infinity,
-                child: CustomMultiChildLayout(
-                  delegate: EntryLayoutDelegate(
-                    users: _activeEntries.keys.toList(),
-                    itemCount: _activeEntries.length,
-                  ),
+                child: Stack(
                   children: _activeEntries.entries.map((entry) {
-                    return LayoutId(
-                      id: entry.key,
-                      child: entry.value,
-                    );
+                    return entry.value;
                   }).toList(),
                 ),
               ),

@@ -1,7 +1,11 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:zego_zimkit/zego_zimkit.dart';
+import '../chat/default_dialogs.dart';
 import '../constants/app_constants.dart';
 import '../services/socket_service.dart';
 import '../models/message.dart';
+import 'call_history.dart';
 import 'chat_screen_admin.dart';
 import 'status_create_screen.dart';
 import 'status_screen.dart';
@@ -364,6 +368,32 @@ class _AdminListScreenState extends State<AdminListScreen>
   Widget build(BuildContext context) {
     return Scaffold(
       body: _buildChatsTab(),
+      // body: Column(
+      //   children: [
+      // CustomListTile(
+      //   icon: CupertinoIcons.person_add,
+      //   iconColor: Colors.blue[600],
+      //   title: 'New Chat',
+      //   ontap: () => showDefaultNewPeerChatDialog(context),
+      // ),
+      // const Divider(),
+      // CustomListTile(
+      //   icon: CupertinoIcons.person_add,
+      //   iconColor: Colors.blue[600],
+      //   title: 'New Chat',
+      //   ontap: () => showDefaultNewPeerChatDialog(context),
+      // ),
+      // const Divider(),
+      // CustomListTile(
+      //   icon: CupertinoIcons.person_add,
+      //   iconColor: Colors.blue[600],
+      //   title: 'New Chat',
+      //   ontap: () => showDefaultNewPeerChatDialog(context),
+      // ),
+      // const Divider(),
+      //     _buildChatsTab(),
+      //   ],
+      // ),
       floatingActionButton: _currentTabIndex == 0 && _isCurrentUserAdmin
           ? FloatingActionButton(
               onPressed: () {
@@ -407,6 +437,46 @@ class _AdminListScreenState extends State<AdminListScreen>
 
     return ListView(
       children: [
+        CustomListTile(
+          icon: CupertinoIcons.person_add,
+          iconColor: Colors.blue[600],
+          title: 'New Chat',
+          ontap: () => showDefaultNewPeerChatDialog(context),
+        ),
+        Divider(
+          color: Colors.grey.withOpacity(0.3),
+        ),
+        CustomListTile(
+          icon: CupertinoIcons.phone_arrow_up_right,
+          iconColor: Colors.blue[600],
+          title: 'Call History',
+          ontap: () {
+            Future.delayed(Duration.zero, () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                    builder: (context) => const CallHistoryScreen()),
+              );
+            });
+          },
+        ),
+        Divider(
+          color: Colors.grey.withOpacity(0.3),
+        ),
+        CustomListTile(
+          icon: CupertinoIcons.delete,
+          iconColor: Colors.red[600],
+          title: 'Delete All',
+          ontap: () {
+            ZIMKit().deleteAllConversation(
+              isAlsoDeleteFromServer: true,
+              isAlsoDeleteMessages: true,
+            );
+          },
+        ),
+        Divider(
+          color: Colors.grey.withOpacity(0.3),
+        ),
         // Admin section for announcements
         if (_adminUsers.isNotEmpty) ...[
           Padding(
@@ -748,5 +818,35 @@ class _AdminListScreenState extends State<AdminListScreen>
     } else {
       return '${date.day}/${date.month}';
     }
+  }
+}
+
+class CustomListTile extends StatelessWidget {
+  final Function ontap;
+  final IconData icon;
+  final String title;
+  final Color? iconColor;
+  const CustomListTile(
+      {super.key,
+      required this.title,
+      required this.icon,
+      required this.iconColor,
+      required this.ontap});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: () => ontap(),
+      child: ListTile(
+        leading: Icon(
+          icon,
+          color: iconColor,
+        ),
+        title: Text(title, maxLines: 1),
+        trailing: Text('>',
+            style:
+                TextStyle(color: Colors.grey.withOpacity(0.5), fontSize: 30)),
+      ),
+    );
   }
 }
