@@ -217,8 +217,7 @@ class LivePageState extends State<LivePage>
 
   bool _showWelcomeMessage = true;
   final String _welcomeMessage =
-      "Welcome to Hapi! Please respect each other and talk politely. Abusing, third-party advertising, fake official information and politically sensitive topics are strictly prohibited. please report if you find these situations";
-
+      "Welcome to Leo! Please be respectful and communicate politely with others.The following are strictly prohibited: Abusive behavior Third-party advertising Fake official information Politically sensitive content If you encounter any of these, please report it immediately. Thank you for keeping Leo safe and friendly!";
   List<IconData> customIcons = [
     // Icons.message_outlined,
     Icons.mic,
