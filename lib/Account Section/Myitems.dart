@@ -1,126 +1,146 @@
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:http_parser/http_parser.dart';
+import 'package:leo_app_01/services/rive_service.dart';
 import 'dart:async';
+import 'package:pocketbase/pocketbase.dart';
+import 'package:http/http.dart' as http;
+import 'package:svgaplayer_flutter/svgaplayer_flutter.dart';
 
-// Import Rive with a prefix to avoid name conflicts
-import 'package:rive/rive.dart' as rive;
-// Import services
-import '../services/rive_service.dart';
+import '../services/pb_service.dart';
 
 class StoreScreen extends StatefulWidget {
-  const StoreScreen({super.key});
+  final bool startWithMyItems;
+  const StoreScreen({super.key, this.startWithMyItems = false});
 
   @override
   State<StoreScreen> createState() => _StoreScreenState();
 }
 
-class _StoreScreenState extends State<StoreScreen> {
-  String selectedTab = "Leo Store";
+class _StoreScreenState extends State<StoreScreen>
+    with SingleTickerProviderStateMixin {
+  // App bar state
+  String appBarTitle = "Store";
+  bool isViewingMyItems = false;
+
+  // Tab state
+  late TabController _tabController;
+  final List<String> _tabs = ["Frames", "Themes", "Entry Effects"];
+
+  // Data state
   bool isLoading = false;
-  List<dynamic> myItems = [];
+  List<RecordModel> storeItems = [];
+  List<RecordModel> myItems = [];
   int currentPage = 1;
   int totalPages = 1;
   int totalItems = 0;
-  final int pageSize = 10; // Number of items per page
+  final int pageSize = 10;
+
+  // Search state
   bool isSearching = false;
   final TextEditingController searchController = TextEditingController();
 
+  // PocketBase setup
   static const String baseUrl = 'http://145.223.21.62:8090';
-
-  // Dummy data for store items with network image URLs
-  final List<Map<String, dynamic>> storeItems = [
-    {
-      "image": "https://thumbs.dreamstime.com/b/car-gift-22638825.jpg",
-      "duration": "1 day",
-      "price": 5000,
-      "name": "Basic Package"
-    },
-    {
-      "image": "https://thumbs.dreamstime.com/b/car-gift-22638825.jpg",
-      "duration": "3 days",
-      "price": 15000,
-      "name": "Standard Package"
-    },
-    {
-      "image": "https://thumbs.dreamstime.com/b/car-gift-22638825.jpg",
-      "duration": "7 days",
-      "price": 35000,
-      "name": "Premium Package"
-    },
-    {
-      "image": "https://thumbs.dreamstime.com/b/car-gift-22638825.jpg",
-      "duration": "7 days",
-      "price": 70000,
-      "name": "Gold Package"
-    },
-    {
-      "image": "https://thumbs.dreamstime.com/b/car-gift-22638825.jpg",
-      "duration": "3 days",
-      "price": 45000,
-      "name": "Silver Package"
-    },
-    {
-      "image": "https://thumbs.dreamstime.com/b/car-gift-22638825.jpg",
-      "duration": "7 days",
-      "price": 55000,
-      "name": "Platinum Package"
-    },
-  ];
+  final PocketBase pb = PbService.instance.pb;
+  String? userId;
 
   @override
   void initState() {
     super.initState();
-    loadMyItems();
+    _tabController = TabController(length: _tabs.length, vsync: this);
+    _tabController.addListener(_handleTabChange);
+    if (widget.startWithMyItems) {
+      isViewingMyItems = true;
+      appBarTitle = "Mine";
+    }
+    _initialize();
   }
 
-  Future<void> loadMyItems() async {
-    if (selectedTab == "My Items") {
-      setState(() {
-        isLoading = true;
-      });
+  @override
+  void dispose() {
+    _tabController.removeListener(_handleTabChange);
+    _tabController.dispose();
+    searchController.dispose();
+    super.dispose();
+  }
 
-      try {
-        final result = await HttpService.getMyItems(
-          page: currentPage,
-          pageSize: pageSize,
-          sortField: 'created', // Sort by creation date
-          descending: true, // Most recent first
-        );
-
-        setState(() {
-          myItems = result['items'];
-          totalPages = result['totalPages'];
-          totalItems = result['totalItems'];
-          isLoading = false;
-        });
-      } catch (e) {
-        setState(() {
-          isLoading = false;
-        });
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to load items: $e')),
-        );
-      }
+  void _handleTabChange() {
+    if (_tabController.indexIsChanging) {
+      loadItems();
     }
   }
 
-  Future<void> searchItems(String query) async {
+  Future<void> _initialize() async {
+    userId = await HttpService.getUserId();
+    loadItems();
+  }
+
+  void toggleViewMode() {
+    setState(() {
+      isViewingMyItems = !isViewingMyItems;
+      appBarTitle = isViewingMyItems ? "Mine" : "Store";
+      currentPage = 1; // Reset to first page
+      isSearching = false; // Reset search
+      searchController.clear();
+    });
+    loadItems();
+  }
+
+  Future<void> loadItems() async {
     setState(() {
       isLoading = true;
     });
 
     try {
-      final result = await HttpService.searchMyItems(
-        query: query,
-        page: 1, // Start from first page for search
-        pageSize: pageSize,
+      if (isViewingMyItems) {
+        await loadMyItems();
+      } else {
+        await loadStoreItems();
+      }
+    } catch (e) {
+      setState(() {
+        isLoading = false;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to load items: $e')),
       );
+    }
+  }
+
+  String getFilterForCurrentTab() {
+    switch (_tabController.index) {
+      case 0:
+        return 'is_border=true';
+      case 1:
+        return 'is_theme=true';
+      case 2:
+        return 'is_rive=true';
+      default:
+        return '';
+    }
+  }
+
+  Future<void> loadStoreItems() async {
+    setState(() {
+      isLoading = true;
+    });
+
+    try {
+      // Get filter based on current tab
+      String filter = getFilterForCurrentTab();
+
+      // Fetch items from item_collection
+      final result = await pb.collection('item_collection').getList(
+            page: currentPage,
+            perPage: pageSize,
+            sort: '-created',
+            filter: filter,
+          );
 
       setState(() {
-        myItems = result['items'];
-        totalPages = result['totalPages'];
-        totalItems = result['totalItems'];
-        currentPage = 1; // Reset to first page
+        storeItems = result.items;
+        totalPages = result.totalPages;
+        totalItems = result.totalItems;
         isLoading = false;
       });
     } catch (e) {
@@ -128,25 +148,159 @@ class _StoreScreenState extends State<StoreScreen> {
         isLoading = false;
       });
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to search items: $e')),
+        SnackBar(content: Text('Failed to load store items: $e')),
       );
     }
   }
 
-  Future<void> buyItem(Map<String, dynamic> item) async {
+  Future<void> loadMyItems() async {
+    if (userId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+            content: Text('You need to be logged in to view your items')),
+      );
+      setState(() {
+        isLoading = false;
+      });
+      return;
+    }
+
     setState(() {
       isLoading = true;
     });
 
     try {
-      await HttpService.purchaseItem(item);
+      // Get filter based on current tab
+      String tabFilter = getFilterForCurrentTab();
+      String filter = 'userId = "$userId" && $tabFilter';
+
+      // For search queries
+      if (isSearching && searchController.text.isNotEmpty) {
+        filter += ' && name ~ "${searchController.text}"';
+      }
+
+      // Fetch items from myItems where userId matches current user and the appropriate type filter
+      final result = await pb.collection('myItems').getList(
+            page: currentPage,
+            perPage: pageSize,
+            sort: '-created',
+            filter: filter,
+          );
+
+      setState(() {
+        myItems = result.items;
+        totalPages = result.totalPages;
+        totalItems = result.totalItems;
+        isLoading = false;
+      });
+    } catch (e) {
+      setState(() {
+        isLoading = false;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to load your items: $e')),
+      );
+    }
+  }
+
+  Future<void> searchItems(String query) async {
+    if (userId == null) return;
+
+    setState(() {
+      isLoading = true;
+      isSearching = true;
+      currentPage = 1; // Reset to first page for search
+    });
+
+    // Loading with search is handled in loadMyItems()
+    loadMyItems();
+  }
+
+  Future<void> buyItem(RecordModel item) async {
+    if (userId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+            content: Text('You need to be logged in to purchase items')),
+      );
+      return;
+    }
+
+    setState(() {
+      isLoading = true;
+    });
+
+    try {
+      // First, create a simpler data structure with just the basic information
+      final Map<String, dynamic> data = {
+        'name': item.data['name'],
+        'price': item.data['price'],
+        'userId': userId,
+        'is_used': false,
+        'isborder_used': false,
+      };
+
+      // Set the appropriate type flags based on the source item
+      if (item.data['is_rive'] != null) {
+        data['is_rive'] = item.data['is_rive'];
+      }
+
+      if (item.data['is_border'] != null) {
+        data['is_border'] = item.data['is_border'];
+      }
+
+      if (item.data['is_theme'] != null) {
+        data['is_theme'] = item.data['is_theme'];
+      }
+
+      // Include image if present
+      if (item.data['image'] != null) {
+        data['image'] = item.data['image'];
+      }
+
+      // Create the record first without file references
+      final createdRecord = await pb.collection('myItems').create(body: data);
+
+      // Now handle file references separately if they exist
+      List<Future> fileTransfers = [];
+
+      // If there's a rive_file, transfer it
+      if (item.data['rive_file'] != null) {
+        final sourceUrl =
+            '$baseUrl/api/files/${item.collectionId}/${item.id}/${item.data['rive_file']}';
+        fileTransfers.add(
+            _transferFileToRecord(sourceUrl, createdRecord.id, 'rive_file'));
+      }
+
+      // If there's a border, transfer it
+      if (item.data['border'] != null) {
+        final sourceUrl =
+            '$baseUrl/api/files/${item.collectionId}/${item.id}/${item.data['border']}';
+        fileTransfers
+            .add(_transferFileToRecord(sourceUrl, createdRecord.id, 'border'));
+      }
+
+      // If there's a theme, transfer it
+      if (item.data['theme'] != null) {
+        final sourceUrl =
+            '$baseUrl/api/files/${item.collectionId}/${item.id}/${item.data['theme']}';
+        fileTransfers
+            .add(_transferFileToRecord(sourceUrl, createdRecord.id, 'theme'));
+      }
+
+      // Wait for all file transfers to complete
+      if (fileTransfers.isNotEmpty) {
+        await Future.wait(fileTransfers);
+      }
+
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Item purchased successfully!')),
       );
 
       // Switch to My Items tab and reload
       setState(() {
-        selectedTab = "My Items";
+        isViewingMyItems = true;
+        appBarTitle = "Mine";
+        isLoading = false;
       });
       loadMyItems();
     } catch (e) {
@@ -159,13 +313,83 @@ class _StoreScreenState extends State<StoreScreen> {
     }
   }
 
-  Future<void> markAsUsed(String itemId) async {
+  // Helper method to transfer files from one record to another
+  Future<void> _transferFileToRecord(
+      String sourceUrl, String recordId, String fieldName) async {
+    try {
+      // Download the file from the source URL
+      final response = await http.get(Uri.parse(sourceUrl));
+
+      if (response.statusCode != 200) {
+        throw Exception('Failed to download file from $sourceUrl');
+      }
+
+      // Create a form data request to upload the file
+      final request = http.MultipartRequest('PATCH',
+          Uri.parse('$baseUrl/api/collections/myItems/records/$recordId'));
+
+      // Create a multipart file from the response bytes
+      final filename = sourceUrl.split('/').last;
+      final multipartFile = http.MultipartFile.fromBytes(
+        fieldName,
+        response.bodyBytes,
+        filename: filename,
+        contentType: MediaType.parse(_getContentType(filename)),
+      );
+
+      // Add the file to the request
+      request.files.add(multipartFile);
+
+      // Send the request
+      final uploadResponse = await request.send();
+
+      if (uploadResponse.statusCode != 200) {
+        final responseBody = await uploadResponse.stream.bytesToString();
+        throw Exception('Failed to upload file: $responseBody');
+      }
+    } catch (e) {
+      print('Error transferring file: $e');
+      rethrow;
+    }
+  }
+
+  // Helper to determine content type based on filename
+  String _getContentType(String filename) {
+    if (filename.endsWith('.svga')) {
+      return 'application/octet-stream';
+    } else if (filename.endsWith('.png')) {
+      return 'image/png';
+    } else if (filename.endsWith('.jpg') || filename.endsWith('.jpeg')) {
+      return 'image/jpeg';
+    } else if (filename.endsWith('.gif')) {
+      return 'image/gif';
+    } else {
+      return 'application/octet-stream';
+    }
+  }
+
+  Future<void> markItemAsUsed(String itemId, String itemType) async {
     setState(() {
       isLoading = true;
     });
 
     try {
-      await HttpService.markItemAsUsed(itemId);
+      Map<String, dynamic> updateData = {};
+
+      // Set the appropriate field based on item type
+      switch (_tabController.index) {
+        case 0: // Frames
+          updateData = {'isborder_used': true};
+          break;
+        case 1: // Themes
+          updateData = {'is_theme_used': true};
+          break;
+        case 2: // Entry Effects (Rive)
+          updateData = {'is_rive_used': true};
+          break;
+      }
+
+      await pb.collection('myItems').update(itemId, body: updateData);
       loadMyItems(); // Reload to update UI
     } catch (e) {
       setState(() {
@@ -182,7 +406,7 @@ class _StoreScreenState extends State<StoreScreen> {
       setState(() {
         currentPage++;
       });
-      loadMyItems();
+      loadItems();
     }
   }
 
@@ -191,110 +415,27 @@ class _StoreScreenState extends State<StoreScreen> {
       setState(() {
         currentPage--;
       });
-      loadMyItems();
+      loadItems();
     }
   }
 
-  Widget buildLeoStore() {
-    return GridView.builder(
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 2,
-        crossAxisSpacing: 10,
-        mainAxisSpacing: 10,
-        childAspectRatio: 0.8,
-      ),
-      itemCount: storeItems.length,
-      itemBuilder: (context, index) {
-        final item = storeItems[index];
-        return Card(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-          elevation: 4,
-          child: Padding(
-            padding: const EdgeInsets.all(8.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                // Image
-                Expanded(
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(12),
-                    child: Image.network(
-                      item["image"],
-                      fit: BoxFit.cover,
-                      width: double.infinity,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 8),
-                // Duration
-                Text(
-                  item["duration"],
-                  style: const TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.blue,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                // Price
-                Text(
-                  "💰 ${item['price']}",
-                  style: const TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.black,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                // Buy Button
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Expanded(
-                      child: OutlinedButton(
-                        onPressed: () => buyItem(item),
-                        style: OutlinedButton.styleFrom(
-                          side: const BorderSide(color: Colors.blue),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                        ),
-                        child: const Text(
-                          "Buy Now",
-                          style: TextStyle(
-                              fontSize: 12,
-                              color: Colors.blue,
-                              fontWeight: FontWeight.bold),
-                        ),
-                      ),
-                    ),
-                  ],
-                )
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  Widget buildMyItems() {
+  Widget buildItemGrid(List<RecordModel> items) {
     if (isLoading) {
       return const Center(child: CircularProgressIndicator());
     }
 
-    if (myItems.isEmpty) {
+    if (items.isEmpty) {
       return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Text(
-              "You haven't purchased any items yet",
-              style: TextStyle(fontSize: 16),
+            Text(
+              isViewingMyItems
+                  ? "You haven't purchased any items of this type yet"
+                  : "No items available in the store right now",
+              style: const TextStyle(fontSize: 16),
             ),
-            if (isSearching)
+            if (isSearching && isViewingMyItems)
               TextButton(
                 onPressed: () {
                   searchController.clear();
@@ -321,10 +462,29 @@ class _StoreScreenState extends State<StoreScreen> {
               mainAxisSpacing: 10,
               childAspectRatio: 0.8,
             ),
-            itemCount: myItems.length,
+            itemCount: items.length,
             itemBuilder: (context, index) {
-              final item = myItems[index];
-              final bool isUsed = item['is_used'] ?? false;
+              final item = items[index];
+
+              // Determine item type and used status based on current tab
+              bool isUsed = false;
+              bool hasRiveFile = item.data['rive_file'] != null;
+              bool hasBorder = item.data['border'] != null;
+              bool hasTheme = item.data['theme'] != null;
+
+              if (isViewingMyItems) {
+                switch (_tabController.index) {
+                  case 0: // Frames
+                    isUsed = item.data['isborder_used'] ?? false;
+                    break;
+                  case 1: // Themes
+                    isUsed = item.data['is_theme_used'] ?? false;
+                    break;
+                  case 2: // Entry Effects
+                    isUsed = item.data['is_rive_used'] ?? false;
+                    break;
+                }
+              }
 
               return Card(
                 shape: RoundedRectangleBorder(
@@ -336,25 +496,72 @@ class _StoreScreenState extends State<StoreScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
-                      // Image or Rive animation
+                      // Preview container with appropriate content
                       Expanded(
                         child: Stack(
                           children: [
-                            ClipRRect(
-                              borderRadius: BorderRadius.circular(12),
-                              child: item['rive_file'] != null
-                                  ? rive.RiveAnimation.network(
-                                      '$baseUrl/api/files/${item['collectionId']}/${item['id']}/${item['riveFile']}',
-                                      fit: BoxFit.cover,
-                                    )
-                                  : Image.network(
-                                      item["image"] ??
-                                          "https://via.placeholder.com/150",
-                                      fit: BoxFit.cover,
-                                      width: double.infinity,
+                            // Border frame if available
+                            if (hasBorder && _tabController.index == 0)
+                              ClipRRect(
+                                borderRadius: BorderRadius.circular(12),
+                                child: Container(
+                                  width: double.infinity,
+                                  height: double.infinity,
+                                  decoration: BoxDecoration(
+                                    border: Border.all(
+                                      color: Colors.amber,
+                                      width: 2,
                                     ),
-                            ),
-                            if (isUsed)
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  child: SVGASimpleImage(
+                                    resUrl:
+                                        '$baseUrl/api/files/${item.collectionId}/${item.id}/${item.data['border']}',
+                                  ),
+                                ),
+                              ),
+
+                            // Theme if available
+                            if (hasTheme && _tabController.index == 1)
+                              ClipRRect(
+                                borderRadius: BorderRadius.circular(12),
+                                child: Container(
+                                  width: double.infinity,
+                                  height: double.infinity,
+                                  decoration: BoxDecoration(
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  child: Image.network(
+                                    '$baseUrl/api/files/${item.collectionId}/${item.id}/${item.data['theme']}',
+                                    fit: BoxFit.cover,
+                                  ),
+                                ),
+                              ),
+
+                            // Rive animation if available
+                            if (hasRiveFile && _tabController.index == 2)
+                              ClipRRect(
+                                borderRadius: BorderRadius.circular(12),
+                                child: SVGASimpleImage(
+                                  resUrl:
+                                      '$baseUrl/api/files/${item.collectionId}/${item.id}/${item.data['rive_file']}',
+                                ),
+                              ),
+
+                            // Fallback if no preview available
+                            if ((!hasBorder && _tabController.index == 0) ||
+                                (!hasTheme && _tabController.index == 1) ||
+                                (!hasRiveFile && _tabController.index == 2))
+                              Container(
+                                color: Colors.grey[200],
+                                child: const Center(
+                                  child:
+                                      Icon(Icons.image_not_supported, size: 40),
+                                ),
+                              ),
+
+                            // Overlay for used items
+                            if (isViewingMyItems && isUsed)
                               Positioned.fill(
                                 child: Container(
                                   decoration: BoxDecoration(
@@ -379,7 +586,7 @@ class _StoreScreenState extends State<StoreScreen> {
                       const SizedBox(height: 8),
                       // Item name
                       Text(
-                        item["name"] ?? "Unknown Item",
+                        item.data["name"] ?? "Unknown Item",
                         style: const TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.bold,
@@ -388,19 +595,9 @@ class _StoreScreenState extends State<StoreScreen> {
                         overflow: TextOverflow.ellipsis,
                       ),
                       const SizedBox(height: 4),
-                      // Duration
-                      Text(
-                        item["duration"] ?? "N/A",
-                        style: const TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.blue,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
                       // Price
                       Text(
-                        "💰 ${item['price'] ?? 'N/A'}",
+                        "💎 ${item.data['price'] ?? 'N/A'}",
                         style: const TextStyle(
                           fontSize: 14,
                           fontWeight: FontWeight.bold,
@@ -408,50 +605,49 @@ class _StoreScreenState extends State<StoreScreen> {
                         ),
                       ),
                       const SizedBox(height: 8),
-                      // Action Buttons
+
+                      // Action Button - Buy or Use
                       Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           Expanded(
-                            child: ElevatedButton(
-                              onPressed:
-                                  isUsed ? null : () => markAsUsed(item['id']),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.blue,
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                              ),
-                              child: const Text(
-                                "Use",
-                                style: TextStyle(
-                                    fontSize: 12, color: Colors.white),
-                              ),
-                            ),
+                            child: isViewingMyItems
+                                ? ElevatedButton(
+                                    onPressed: isUsed
+                                        ? null
+                                        : () => markItemAsUsed(item.id,
+                                            _tabs[_tabController.index]),
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor:
+                                          _getButtonColor(_tabController.index),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                    ),
+                                    child: Text(
+                                      "Use ${_getItemTypeName(_tabController.index)}",
+                                      style: const TextStyle(
+                                          fontSize: 12, color: Colors.white),
+                                    ),
+                                  )
+                                : OutlinedButton(
+                                    onPressed: () => buyItem(item),
+                                    style: OutlinedButton.styleFrom(
+                                      side:
+                                          const BorderSide(color: Colors.blue),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                    ),
+                                    child: const Text(
+                                      "Buy Now",
+                                      style: TextStyle(
+                                          fontSize: 12,
+                                          color: Colors.blue,
+                                          fontWeight: FontWeight.bold),
+                                    ),
+                                  ),
                           ),
-                          // If you want to re-enable the Upload button, uncomment these lines
-                          // const SizedBox(width: 8),
-                          // Expanded(
-                          //   child: OutlinedButton(
-                          //     onPressed: () {
-                          //       // Show dialog to upload Rive file
-                          //       _showUploadDialog(item['id']);
-                          //     },
-                          //     style: OutlinedButton.styleFrom(
-                          //       side: const BorderSide(color: Colors.green),
-                          //       shape: RoundedRectangleBorder(
-                          //         borderRadius: BorderRadius.circular(8),
-                          //       ),
-                          //     ),
-                          //     child: const Text(
-                          //       "Upload",
-                          //       style: TextStyle(
-                          //           fontSize: 12,
-                          //           color: Colors.green,
-                          //           fontWeight: FontWeight.bold),
-                          //     ),
-                          //   ),
-                          // ),
                         ],
                       )
                     ],
@@ -461,46 +657,64 @@ class _StoreScreenState extends State<StoreScreen> {
             },
           ),
         ),
+
+        // Pagination
+        if (totalPages > 1)
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8.0),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                IconButton(
+                  icon: const Icon(Icons.arrow_back_ios),
+                  onPressed: currentPage > 1 ? previousPage : null,
+                ),
+                Text('$currentPage / $totalPages'),
+                IconButton(
+                  icon: const Icon(Icons.arrow_forward_ios),
+                  onPressed: currentPage < totalPages ? nextPage : null,
+                ),
+              ],
+            ),
+          ),
       ],
     );
   }
 
-  // Uncomment if you want to re-enable the upload dialog
-  // void _showUploadDialog(String itemId) {
-  //   showDialog(
-  //     context: context,
-  //     builder: (context) => AlertDialog(
-  //       title: const Text('Upload Rive File'),
-  //       content: const Text(
-  //           'Would you like to upload a Rive animation file for this item?'),
-  //       actions: [
-  //         TextButton(
-  //           onPressed: () => Navigator.pop(context),
-  //           child: const Text('Cancel'),
-  //         ),
-  //         ElevatedButton(
-  //           onPressed: () async {
-  //             Navigator.pop(context);
-  //             // Use the file picker service to pick and upload a Rive file
-  //             await FilePickerService.pickAndUploadRiveFile(context, itemId);
-  //             // Reload my items to show the updated item with Rive file
-  //             loadMyItems();
-  //           },
-  //           child: const Text('Upload'),
-  //         ),
-  //       ],
-  //     ),
-  //   );
-  // }
+  Color _getButtonColor(int tabIndex) {
+    switch (tabIndex) {
+      case 0:
+        return Colors.amber; // Frame
+      case 1:
+        return Colors.green; // Theme
+      case 2:
+        return Colors.blue; // Entry Effect
+      default:
+        return Colors.blue;
+    }
+  }
+
+  String _getItemTypeName(int tabIndex) {
+    switch (tabIndex) {
+      case 0:
+        return "Frame";
+      case 1:
+        return "Theme";
+      case 2:
+        return "Effect";
+      default:
+        return "Item";
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         backgroundColor: Colors.blue,
-        title: const Text(
-          "Store",
-          style: TextStyle(color: Colors.white),
+        title: Text(
+          appBarTitle,
+          style: const TextStyle(color: Colors.white),
         ),
         centerTitle: true,
         leading: IconButton(
@@ -510,7 +724,15 @@ class _StoreScreenState extends State<StoreScreen> {
           },
         ),
         actions: [
-          if (selectedTab == "My Items")
+          TextButton(
+            onPressed: toggleViewMode,
+            child: Text(
+              isViewingMyItems ? "Store" : "Mine",
+              style: const TextStyle(
+                  color: Colors.white, fontWeight: FontWeight.bold),
+            ),
+          ),
+          if (isViewingMyItems)
             IconButton(
               icon: Icon(isSearching ? Icons.close : Icons.search,
                   color: Colors.white),
@@ -528,8 +750,8 @@ class _StoreScreenState extends State<StoreScreen> {
       ),
       body: Column(
         children: [
-          // Search bar (only for My Items tab)
-          if (selectedTab == "My Items" && isSearching)
+          // Search bar (only for My Items)
+          if (isViewingMyItems && isSearching)
             Padding(
               padding: const EdgeInsets.all(8.0),
               child: TextField(
@@ -558,65 +780,29 @@ class _StoreScreenState extends State<StoreScreen> {
             ),
 
           // Tab Bar
-          Container(
-            padding: const EdgeInsets.symmetric(vertical: 10),
-            decoration: BoxDecoration(
-              border: Border(
-                bottom: BorderSide(color: Colors.grey[300]!),
-              ),
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
-              children: ["Leo Store", "My Items"]
-                  .map((tab) => InkWell(
-                        onTap: () {
-                          setState(() {
-                            selectedTab = tab;
-                            currentPage =
-                                1; // Reset to first page when switching tabs
-                            isSearching =
-                                false; // Reset search when switching tabs
-                            searchController.clear();
-                          });
-                          if (tab == "My Items") {
-                            loadMyItems();
-                          }
-                        },
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 20, vertical: 8),
-                          decoration: BoxDecoration(
-                            border: Border(
-                              bottom: BorderSide(
-                                color: selectedTab == tab
-                                    ? Colors.blue
-                                    : Colors.transparent,
-                                width: 2,
-                              ),
-                            ),
-                          ),
-                          child: Text(
-                            tab,
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                              color: selectedTab == tab
-                                  ? Colors.blue
-                                  : Colors.black54,
-                            ),
-                          ),
-                        ),
-                      ))
-                  .toList(),
-            ),
+          TabBar(
+            controller: _tabController,
+            tabs: _tabs.map((tab) => Tab(text: tab)).toList(),
+            labelColor: Colors.blue,
+            unselectedLabelColor: Colors.black54,
+            indicatorColor: Colors.blue,
           ),
 
           // Content
           Expanded(
             child: Padding(
               padding: const EdgeInsets.all(8.0),
-              child:
-                  selectedTab == "Leo Store" ? buildLeoStore() : buildMyItems(),
+              child: TabBarView(
+                controller: _tabController,
+                children: [
+                  // Frames tab
+                  buildItemGrid(isViewingMyItems ? myItems : storeItems),
+                  // Themes tab
+                  buildItemGrid(isViewingMyItems ? myItems : storeItems),
+                  // Entry Effects tab
+                  buildItemGrid(isViewingMyItems ? myItems : storeItems),
+                ],
+              ),
             ),
           ),
         ],

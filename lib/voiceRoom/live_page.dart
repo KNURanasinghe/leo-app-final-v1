@@ -9,6 +9,7 @@ import 'package:just_audio/just_audio.dart';
 import 'package:rive/rive.dart' as rive;
 import 'package:svgaplayer_flutter/svgaplayer_flutter.dart';
 
+import '../Account Section/Myitems.dart';
 import '../HomeScreen.dart';
 import '../services/rive_service.dart';
 import './gift/gift.dart';
@@ -618,7 +619,7 @@ class LivePageState extends State<LivePage>
     try {
       final uri = Uri.parse('$POCKETBASE_URL/api/collections/myItems/records')
           .replace(queryParameters: {
-        'filter': 'userId="$userId" && is_used=true',
+        'filter': 'userId="$userId" && is_rive_used=true',
         'fields': 'id,rive_file,userId'
       });
 
@@ -5589,55 +5590,44 @@ class LivePageState extends State<LivePage>
 
 // Method to open my items bottom sheet
   void _openMyItemsBottomSheet(BuildContext context) {
-    Navigator.pop(context);
+    Navigator.pop(context); // Close the tools bottom sheet first
     showModalBottomSheet(
       context: context,
-      backgroundColor: Colors.white,
       isScrollControlled: true,
+      backgroundColor: Colors.transparent,
       builder: (context) {
-        return SizedBox(
-          height: MediaQuery.of(context).size.height * 0.7,
+        return Container(
+          height: MediaQuery.of(context).size.height * 0.85,
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+          ),
           child: Column(
             children: [
               // Handle bar
               Container(
                 width: 40,
                 height: 4,
-                margin: const EdgeInsets.only(top: 12, bottom: 20),
+                margin: const EdgeInsets.only(top: 12, bottom: 8),
                 decoration: BoxDecoration(
                   color: Colors.grey.withOpacity(0.3),
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
-
-              const Text(
-                'My Items',
-                style: TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: 20),
-
-              // My items content placeholder
-              const Expanded(
-                child: Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(
-                        Icons.checkroom,
-                        size: 100,
-                        color: Colors.purple,
-                      ),
-                      SizedBox(height: 20),
-                      Text(
-                        'Your items will appear here',
-                        style: TextStyle(fontSize: 18),
-                      ),
-                    ],
+              // Title
+              const Padding(
+                padding: EdgeInsets.all(16.0),
+                child: Text(
+                  'My Items',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
                   ),
                 ),
+              ),
+              // StoreScreen content
+              const Expanded(
+                child: StoreScreen(startWithMyItems: true),
               ),
             ],
           ),

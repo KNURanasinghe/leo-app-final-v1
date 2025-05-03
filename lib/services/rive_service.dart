@@ -16,6 +16,31 @@ class HttpService {
     return prefs.getString('userId');
   }
 
+  static Future<Map<String, dynamic>> getStoreItems({
+    required int page,
+    required int pageSize,
+    String sortField = 'created',
+    bool descending = true,
+  }) async {
+    final sort = descending ? '-$sortField' : sortField;
+
+    final response = await http.get(
+      Uri.parse(
+          '$baseUrl/api/collections/item_collection/records?page=$page&perPage=$pageSize&sort=$sort'),
+    );
+
+    if (response.statusCode == 200) {
+      final jsonResponse = json.decode(response.body);
+      return {
+        'items': jsonResponse['items'],
+        'totalItems': jsonResponse['totalItems'],
+        'totalPages': jsonResponse['totalPages'],
+      };
+    } else {
+      throw Exception('Failed to load store items: ${response.reasonPhrase}');
+    }
+  }
+
   // Get items purchased by the current user with pagination
   static Future<Map<String, dynamic>> getMyItems({
     int page = 1,
@@ -79,33 +104,6 @@ class HttpService {
 
     if (response.statusCode != 201 && response.statusCode != 200) {
       throw Exception('Failed to purchase item: ${response.statusCode}');
-    }
-  }
-
-  // Upload Rive file for an item
-  static Future<void> uploadRiveFile(String itemId, dynamic riveFile) async {
-    final userId = await getUserId();
-
-    if (userId == null) {
-      throw Exception('User ID not found');
-    }
-
-    // Create form data
-    var request = http.MultipartRequest(
-      'PATCH', // Changed from POST to PATCH to update the record
-      Uri.parse('$baseUrl/api/collections/myItems/records/$itemId'),
-    );
-
-    // Add file
-    request.files.add(
-      await http.MultipartFile.fromPath('rive_file', riveFile.path),
-    );
-
-    // Send request
-    final response = await request.send();
-
-    if (response.statusCode != 200) {
-      throw Exception('Failed to upload Rive file: ${response.statusCode}');
     }
   }
 
