@@ -2241,21 +2241,22 @@ class LivePageState extends State<LivePage>
     if (!isAttributeHost(user?.inRoomAttributes.value)) {
       return Container();
     }
-
-    return Positioned(
-      top: -7,
-      left: 0,
-      child: Container(
-        width: size.width,
-        height: size.height,
-        decoration: const BoxDecoration(
-          image: DecorationImage(
-            image: AssetImage('assets/images1/bac.png'),
-            fit: BoxFit.cover,
-          ),
-        ),
-      ),
-    );
+    return Container();
+    // return Positioned(
+    //   top: 2,
+    //   left: 5,
+    //   right: 5,
+    //   child: Container(
+    //     width: size.width,
+    //     height: size.height,
+    //     decoration: const BoxDecoration(
+    //       image: DecorationImage(
+    //         image: AssetImage('assets/images1/bac.png'),
+    //         fit: BoxFit.cover,
+    //       ),
+    //     ),
+    //   ),
+    // );
   }
 
   Widget foregroundBuilder(
@@ -2317,6 +2318,24 @@ class LivePageState extends State<LivePage>
                       ),
                     ),
                   ),
+                if (isAttributeHost(user?.inRoomAttributes.value))
+                  Positioned.fill(
+                    left: -1,
+                    right: -1,
+                    top: -18,
+                    bottom: -14,
+                    child: Container(
+                      width: size.width,
+                      height: size.height,
+                      decoration: const BoxDecoration(
+                        image: DecorationImage(
+                          image: AssetImage('assets/images1/bac.png'),
+                          fit: BoxFit.cover,
+                        ),
+                      ),
+                    ),
+                  ),
+
                 // Border behind avatar - rendered first in stack
                 if (seatData['borderUrl'] != null)
                   Positioned.fill(
