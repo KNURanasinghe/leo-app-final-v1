@@ -108,98 +108,199 @@ class _StatusViewScreenState extends State<StatusViewScreen> {
       });
     };
     _socketService.onStatusLikes = (statusId, likedBy, likeCount) async {
-      // Show dialog immediately with loading indicators
-      if (mounted) {
-        showDialog(
-          context: context,
-          builder: (BuildContext dialogContext) {
-            // We'll use this map to store user info as it's loaded
-            Map<String, User> usersMap = {};
+      _socketService.onStatusLikes = (statusId, likedBy, likeCount) async {
+        if (mounted) {
+          showModalBottomSheet(
+            backgroundColor: const Color(0xff111014),
+            context: context,
+            shape: const RoundedRectangleBorder(
+              borderRadius: BorderRadius.only(
+                topLeft: Radius.circular(32.0),
+                topRight: Radius.circular(32.0),
+              ),
+            ),
+            isDismissible: true,
+            isScrollControlled: true,
+            builder: (BuildContext context) {
+              // We'll use this map to store user info as it's loaded
+              Map<String, User> usersMap = {};
 
-            return StatefulBuilder(
-                builder: (BuildContext context, StateSetter setDialogState) {
-              // Fetch user data for each ID
-              for (String userId in likedBy) {
-                // Only fetch if we haven't already
-                if (!usersMap.containsKey(userId)) {
-                  // Set a placeholder while loading
-                  setDialogState(() {});
+              return StatefulBuilder(
+                builder:
+                    (BuildContext context, StateSetter setBottomSheetState) {
+                  // Fetch user data for each ID
+                  for (String userId in likedBy) {
+                    // Only fetch if we haven't already
+                    if (!usersMap.containsKey(userId)) {
+                      // Set a placeholder while loading
+                      setBottomSheetState(() {});
 
-                  // Fetch the actual data
-                  _userApiService.getUserById(userId).then((user) {
-                    setDialogState(() {
-                      usersMap[userId] = user;
-                    });
-                  }).catchError((error) {
-                    print('Error fetching user $userId: $error');
-                    setDialogState(() {
-                      // Create a placeholder user
-                      usersMap[userId] = User(
-                        id: userId,
-                        firstname: 'User',
-                        lastname: userId.substring(0, 4),
-                        phonenumber: 0,
-                        moto: '',
-                        bio: '',
-                        wallet: 0,
-                        country: '',
-                        gender: '',
-                        is_notification_off: false,
-                        player_id: '',
-                        is_admin: false,
-                      );
-                    });
-                  });
-                }
-              }
+                      // Fetch the actual data
+                      _userApiService.getUserById(userId).then((user) {
+                        setBottomSheetState(() {
+                          usersMap[userId] = user;
+                        });
+                      }).catchError((error) {
+                        print('Error fetching user $userId: $error');
+                        setBottomSheetState(() {
+                          // Create a placeholder user
+                          usersMap[userId] = User(
+                            id: userId,
+                            firstname: 'User',
+                            lastname: userId.substring(0, 4),
+                            phonenumber: 0,
+                            moto: '',
+                            bio: '',
+                            wallet: 0,
+                            country: '',
+                            gender: '',
+                            is_notification_off: false,
+                            player_id: '',
+                            is_admin: false,
+                          );
+                        });
+                      });
+                    }
+                  }
 
-              return AlertDialog(
-                title: Text('Likes ($likeCount)'),
-                content: likedBy.isEmpty
-                    ? const Text('No likes yet')
-                    : SizedBox(
-                        height: 300,
-                        width: 300,
-                        child: ListView.builder(
-                          itemCount: likedBy.length,
-                          itemBuilder: (context, index) {
-                            final userId = likedBy[index];
-                            final user = usersMap[userId];
-                            final bool isLoading = user == null;
-                            print('profileImage: ${user?.profileImage}');
-                            return ListTile(
-                              leading: user?.profileImage != null &&
-                                      user!.profileImage.isNotEmpty
-                                  ? CircleAvatar(
-                                      backgroundImage: NetworkImage(
-                                          'http://145.223.21.62:8090/api/files/users/$userId/${user.profileImage}'),
-                                      onBackgroundImageError: (_, __) =>
-                                          const Icon(Icons.person),
-                                    )
-                                  : const CircleAvatar(
-                                      child: Icon(Icons.person),
-                                    ),
-                              title: Text(isLoading
-                                  ? 'Loading...'
-                                  : '${user.firstname} ${user.lastname}'),
-                              subtitle: isLoading
-                                  ? const LinearProgressIndicator()
-                                  : null,
-                            );
-                          },
-                        ),
+                  return AnimatedPadding(
+                    padding: MediaQuery.of(context).viewInsets,
+                    duration: const Duration(milliseconds: 50),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        vertical: 20,
+                        horizontal: 16,
                       ),
-                actions: [
-                  TextButton(
-                    onPressed: () => Navigator.of(context).pop(),
-                    child: const Text('Close'),
-                  ),
-                ],
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // Add a drag handle at the top
+                          Center(
+                            child: Container(
+                              width: 40,
+                              height: 5,
+                              margin: const EdgeInsets.only(bottom: 16),
+                              decoration: BoxDecoration(
+                                color: Colors.grey[600],
+                                borderRadius: BorderRadius.circular(2.5),
+                              ),
+                            ),
+                          ),
+                          // Title
+                          Center(
+                            child: Text(
+                              'Likes ($likeCount)',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 20),
+                          // Content
+                          likedBy.isEmpty
+                              ? const Center(
+                                  child: Padding(
+                                  padding: EdgeInsets.all(20),
+                                  child: Text(
+                                    'No likes yet',
+                                    style: TextStyle(color: Colors.white),
+                                  ),
+                                ))
+                              : Container(
+                                  constraints: BoxConstraints(
+                                    maxHeight:
+                                        MediaQuery.of(context).size.height *
+                                            0.5,
+                                  ),
+                                  child: ListView.builder(
+                                    shrinkWrap: true,
+                                    itemCount: likedBy.length,
+                                    itemBuilder: (context, index) {
+                                      final userId = likedBy[index];
+                                      final user = usersMap[userId];
+                                      final bool isLoading = user == null;
+
+                                      return SizedBox(
+                                        height: 60,
+                                        child: Center(
+                                          child: ListTile(
+                                            leading: user?.profileImage !=
+                                                        null &&
+                                                    user!
+                                                        .profileImage.isNotEmpty
+                                                ? CircleAvatar(
+                                                    backgroundImage: NetworkImage(
+                                                        'http://145.223.21.62:8090/api/files/users/$userId/${user.profileImage}'),
+                                                    onBackgroundImageError:
+                                                        (_, __) => const Icon(
+                                                            Icons.person,
+                                                            color:
+                                                                Colors.white),
+                                                  )
+                                                : const CircleAvatar(
+                                                    backgroundColor:
+                                                        Colors.grey,
+                                                    child: Icon(Icons.person,
+                                                        color: Colors.white),
+                                                  ),
+                                            title: Text(
+                                              isLoading
+                                                  ? 'Loading...'
+                                                  : '${user.firstname} ${user.lastname}',
+                                              style: const TextStyle(
+                                                color: Colors.white,
+                                                fontSize: 14,
+                                                fontWeight: FontWeight.w500,
+                                              ),
+                                            ),
+                                            subtitle: isLoading
+                                                ? const LinearProgressIndicator(
+                                                    backgroundColor:
+                                                        Colors.grey,
+                                                    valueColor:
+                                                        AlwaysStoppedAnimation<
+                                                                Color>(
+                                                            Colors.white),
+                                                  )
+                                                : null,
+                                          ),
+                                        ),
+                                      );
+                                    },
+                                  ),
+                                ),
+                          // Close button
+                          Padding(
+                            padding: const EdgeInsets.only(top: 16),
+                            child: Center(
+                              child: GestureDetector(
+                                onTap: () {
+                                  Navigator.of(context).pop();
+                                },
+                                child: const Text(
+                                  'Close',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                },
               );
-            });
-          },
-        );
-      }
+            },
+          );
+        }
+      };
     };
   }
 
@@ -701,7 +802,9 @@ class _StatusViewScreenState extends State<StatusViewScreen> {
               overflow: TextOverflow.ellipsis,
             ),
           ),
-
+        if (status.userId == widget.currentUserId)
+          ...[]
+        else
         // Action buttons (like, share, reply)
         if (!_isReplying)
           Positioned(

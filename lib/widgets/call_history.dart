@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:leo_app_01/Provider/call_history_provider.dart';
 import 'package:leo_app_01/models/call_istory_model.dart';
+import 'package:leo_app_01/services/api_service.dart';
 
 class CallHistoryScreen extends StatefulWidget {
   const CallHistoryScreen({super.key});
@@ -14,6 +15,8 @@ class _CallHistoryScreenState extends State<CallHistoryScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
   final CallHistoryService _historyService = CallHistoryService();
+  final UserApiService _apiService =
+      UserApiService(baseUrl: 'http://145.223.21.62:8090');
 
   @override
   void initState() {
@@ -25,6 +28,12 @@ class _CallHistoryScreenState extends State<CallHistoryScreen>
   Future<void> _loadHistory() async {
     await _historyService.loadHistory();
     if (mounted) setState(() {});
+  }
+
+  Future<String> getusersNamesAndAvatar(String userId) async {
+    final response = await _apiService.getUserById(userId);
+    print('User data: ${response.firstname}');
+    return response.firstname;
   }
 
   @override
@@ -102,31 +111,36 @@ class _CallHistoryScreenState extends State<CallHistoryScreen>
     final callTime = DateTime.fromMillisecondsSinceEpoch(call.timestamp);
     final timeString = DateFormat.yMMMd().add_jm().format(callTime);
 
-    // You'd usually have a user service to look up user details by ID
-    final otherUserId = call.isOutgoing ? call.receiverId : call.callerId;
-    final otherUserName = "User: $otherUserId"; // Replace with actual user name
+    return FutureBuilder<String>(
+      future: getusersNamesAndAvatar(
+          call.isOutgoing ? call.receiverId : call.callerId),
+      builder: (context, snapshot) {
+        // While the future is loading, you can show a placeholder or loading indicator
+        final otherUserName = snapshot.hasData ? snapshot.data! : 'Loading...';
 
-    return ListTile(
-      leading: CircleAvatar(
-        backgroundColor: Colors.grey[300],
-        child: Icon(call.isVideoCall ? Icons.videocam : Icons.phone),
-      ),
-      title: Text(otherUserName),
-      subtitle: Row(
-        children: [
-          Icon(callIcon, size: 16, color: iconColor),
-          const SizedBox(width: 4),
-          Text(timeString),
-        ],
-      ),
-      trailing: IconButton(
-        icon: Icon(call.isVideoCall ? Icons.videocam : Icons.call),
-        onPressed: () {
-          // Implement call back functionality
-        },
-      ),
-      onTap: () {
-        // Show call details or initiate a new call
+        return ListTile(
+          leading: CircleAvatar(
+            backgroundColor: Colors.grey[300],
+            child: Icon(call.isVideoCall ? Icons.videocam : Icons.phone),
+          ),
+          title: Text(otherUserName),
+          subtitle: Row(
+            children: [
+              Icon(callIcon, size: 16, color: iconColor),
+              const SizedBox(width: 4),
+              Text(timeString),
+            ],
+          ),
+          trailing: IconButton(
+            icon: Icon(call.isVideoCall ? Icons.videocam : Icons.call),
+            onPressed: () {
+              // Implement call back functionality
+            },
+          ),
+          onTap: () {
+            // Show call details or initiate a new call
+          },
+        );
       },
     );
   }

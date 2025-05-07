@@ -1,7 +1,10 @@
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:leo_app_01/StartScreen.dart';
 import 'package:leo_app_01/chat/chatting.dart';
+import 'package:leo_app_01/firebase_options.dart';
+import 'package:leo_app_01/services/firebase_service.dart';
 import 'package:leo_app_01/splash.dart';
 import 'package:provider/provider.dart';
 import 'package:tencent_calls_uikit/tencent_calls_uikit.dart';
@@ -9,14 +12,44 @@ import 'package:zego_zimkit/zego_zimkit.dart';
 import 'package:zego_uikit/zego_uikit.dart';
 import 'package:zego_uikit_prebuilt_live_audio_room/zego_uikit_prebuilt_live_audio_room.dart';
 import 'package:flutter/cupertino.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'Provider/broadcast_.dart';
 import 'chat/default_dialogs.dart';
-import 'services/socket_service.dart';
 
+// Global Navigator key for accessing Navigator from outside of widget tree
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
-void main() {
+// Make this available to the FirebaseService
+void initializeGlobalKeys() {
+  globalNavigatorKey = navigatorKey;
+}
+
+// Create a global instance of FirebaseService for easier access
+final FirebaseService firebaseService = FirebaseService();
+
+void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Initialize navigator key before Firebase initialization
+  initializeGlobalKeys();
+
+  try {
+    // Initialize Firebase
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    );
+
+    // Initialize notifications
+    try {
+      await firebaseService.initNotifications();
+    } catch (e) {
+      print('Failed to initialize notifications: $e');
+      // Continue app initialization regardless of notification failure
+    }
+  } catch (e) {
+    print('Failed to initialize Firebase: $e');
+    // Continue without Firebase
+  }
 
   // Initialize the ZEGOCLOUD SDK
   ZIMKit().init(
@@ -45,7 +78,7 @@ class MyApp extends StatelessWidget {
         builder: (context, child) {
           return MaterialApp(
             navigatorObservers: [TUICallKit.navigatorObserver],
-            navigatorKey: navigatorKey, // Add the navigator key
+            navigatorKey: navigatorKey, // This is used for global navigation
             debugShowCheckedModeBanner: false,
             title: 'ZEGOCLOUD Chat App',
             theme: ThemeData(
@@ -76,19 +109,6 @@ class MyApp extends StatelessWidget {
                     supportClickZoom:
                         true, // Allow click-to-restore functionality
                   ),
-                  // Positioned(
-                  //   bottom: 20,
-                  //   right: 20,
-                  //   child: ElevatedButton(
-                  //     onPressed: () {
-                  //       if (ZegoUIKitPrebuiltLiveAudioRoomController().minimize.isMinimizing) {
-                  //         ZegoUIKitPrebuiltLiveAudioRoomController().minimize.restore(context);
-                  //       }
-                  //     },
-                  //     child: Text("Restore Audio Room"),
-                  //   ),
-                  //
-                  // ),
                 ],
               );
             },
@@ -99,53 +119,129 @@ class MyApp extends StatelessWidget {
   }
 }
 
-// class LoginPage extends StatefulWidget {
-//   @override
-//   _LoginPageState createState() => _LoginPageState();
-// }
-//
-// class _LoginPageState extends State<LoginPage> {
-//   final TextEditingController _userIdController = TextEditingController();
-//   final TextEditingController _userNameController = TextEditingController();
-//
-//   void _login() {
-//     String userId = _userIdController.text;
-//     String userName = _userNameController.text;
-//
-//     ZIMKit().connectUser(id: userId, name: userName).then((_) {
-//       Navigator.of(context).push(
-//         MaterialPageRoute(builder: (context) => const ZIMKitDemoHomePage()),
-//       );
-//     }).catchError((error) {
-//       // Handle login error
-//       print("Login failed: $error");
-//     });
-//   }
-//
-//   @override
-//   Widget build(BuildContext context) {
-//     return Scaffold(
-//       appBar: AppBar(title: const Text('Login')),
-//       body: Padding(
-//         padding: const EdgeInsets.all(16.0),
-//         child: Column(
-//           children: [
-//             TextField(
-//               controller: _userIdController,
-//               decoration: InputDecoration(labelText: 'User ID'),
-//             ),
-//             TextField(
-//               controller: _userNameController,
-//               decoration: InputDecoration(labelText: 'User Name'),
-//             ),
-//             SizedBox(height: 20),
-//             ElevatedButton(onPressed: _login, child: const Text('Login')),
-//           ],
-//         ),
-//       ),
-//     );
-//   }
-// }
+// Create a screen for handling incoming calls
+class IncomingCallScreen extends StatelessWidget {
+  final String callerId;
+  final String callerName;
+  final bool isVideoCall;
+  final String roomId;
+  final VoidCallback onAccept;
+  final VoidCallback onDecline;
+
+  const IncomingCallScreen({
+    Key? key,
+    required this.callerId,
+    required this.callerName,
+    required this.isVideoCall,
+    required this.roomId,
+    required this.onAccept,
+    required this.onDecline,
+  }) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.black.withOpacity(0.9),
+      body: SafeArea(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Spacer(flex: 1),
+            CircleAvatar(
+              radius: 60,
+              backgroundColor: Colors.blue.withOpacity(0.2),
+              child: Icon(
+                isVideoCall ? Icons.videocam : Icons.call,
+                size: 50,
+                color: Colors.white,
+              ),
+            ),
+            const SizedBox(height: 20),
+            Text(
+              callerName,
+              style: const TextStyle(
+                fontSize: 24,
+                fontWeight: FontWeight.bold,
+                color: Colors.white,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              isVideoCall ? 'Incoming Video Call' : 'Incoming Voice Call',
+              style: TextStyle(
+                fontSize: 16,
+                color: Colors.white.withOpacity(0.8),
+              ),
+            ),
+            const Spacer(flex: 2),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [
+                _buildCallButton(
+                  icon: Icons.call_end,
+                  color: Colors.red,
+                  onTap: () {
+                    onDecline();
+                    Navigator.of(context).pop();
+                  },
+                  label: 'Decline',
+                ),
+                _buildCallButton(
+                  icon: Icons.call,
+                  color: Colors.green,
+                  onTap: () {
+                    onAccept();
+                    Navigator.of(context).pop();
+                    // Navigate to call screen or initiate call here
+                    // For example, using TUICallKit:
+                    // TUICallKit.instance.join(roomId);
+                  },
+                  label: 'Accept',
+                ),
+              ],
+            ),
+            const SizedBox(height: 50),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCallButton({
+    required IconData icon,
+    required Color color,
+    required VoidCallback onTap,
+    required String label,
+  }) {
+    return Column(
+      children: [
+        GestureDetector(
+          onTap: onTap,
+          child: Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: color,
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              icon,
+              color: Colors.white,
+              size: 30,
+            ),
+          ),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          label,
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 14,
+          ),
+        ),
+      ],
+    );
+  }
+}
 
 class ZIMKitDemoHomePage extends StatelessWidget {
   const ZIMKitDemoHomePage({super.key});
@@ -208,21 +304,6 @@ class _HomePagePopupMenuButtonState extends State<HomePagePopupMenuButton> {
             ),
             onTap: () => showDefaultNewPeerChatDialog(context),
           ),
-          // PopupMenuItem(
-          //   value: 'New Group',
-          //   child: const ListTile(
-          //     leading: Icon(CupertinoIcons.person_2_fill),
-          //     title: Text('New Group', maxLines: 1),
-          //   ),
-          //   onTap: () => showDefaultNewGroupChatDialog(context),
-          // ),
-          // PopupMenuItem(
-          //   value: 'Join Group',
-          //   child: const ListTile(
-          //       leading: Icon(Icons.group_add),
-          //       title: Text('Join Group', maxLines: 1)),
-          //   onTap: () => showDefaultJoinGroupDialog(context),
-          // ),
           PopupMenuItem(
             value: 'Delete All',
             child: const ListTile(
@@ -238,13 +319,10 @@ class _HomePagePopupMenuButtonState extends State<HomePagePopupMenuButton> {
           PopupMenuItem(
             value: 'Call History',
             child: const ListTile(
-                leading: Icon(Icons.delete),
-                title: Text('Delete All', maxLines: 1)),
+                leading: Icon(Icons.history),
+                title: Text('Call History', maxLines: 1)),
             onTap: () {
-              ZIMKit().deleteAllConversation(
-                isAlsoDeleteFromServer: true,
-                isAlsoDeleteMessages: true,
-              );
+              // TODO: Navigate to call history screen
             },
           ),
         ];

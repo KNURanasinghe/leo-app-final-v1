@@ -26,11 +26,12 @@ class CallButtons extends StatefulWidget {
 
 class _CallButtonsState extends State<CallButtons> {
   // Replace with your SDKAppID and SecretKey from Tencent Cloud console
-  final int sdkAppID = 20021921;
+  final int sdkAppID = 20022826;
   final String secretKey =
-      "6c7a11557df307edb7aa2bfdf7e1fa620670b17b0b461d5e6c26a6ecb7395bf0";
+      "308edb9b9c3883b07ecef5871bd9e96fb0bf0a2f7bf0040112049d6d2c07e348";
 
   bool isInitialized = false;
+  bool isInitializing = false;
 
   @override
   void initState() {
@@ -40,7 +41,8 @@ class _CallButtonsState extends State<CallButtons> {
 
   // Initialize TUICallKit with the current user
   Future<void> _initializeTUICallKit() async {
-    if (!isInitialized) {
+    if (!isInitialized && !isInitializing) {
+      setState(() => isInitializing = true);
       try {
         String userSig = GenerateTestUserSig.genTestSig(
             widget.currentUserId, sdkAppID, secretKey);
@@ -49,15 +51,22 @@ class _CallButtonsState extends State<CallButtons> {
         TUIResult result = await TUICallKit.instance
             .login(sdkAppID, widget.currentUserId, userSig);
         print("Login result: ${result.code} - ${result.message}");
+
         if (result.code.isEmpty) {
           print("Setting self info after initialization...");
           await TUICallKit.instance.setSelfInfo(widget.name, widget.image);
-          setState(() => isInitialized = true);
+          setState(() {
+            isInitialized = true;
+            isInitializing = false;
+          });
+          print("TUICallKit initialized successfully!");
         } else {
           print("Initialization failed: ${result.code} - ${result.message}");
+          setState(() => isInitializing = false);
         }
       } catch (e) {
         print("Initialization error: $e");
+        setState(() => isInitializing = false);
       }
     }
   }
@@ -68,10 +77,26 @@ class _CallButtonsState extends State<CallButtons> {
     return 'room_${sortedIds[0]}_${sortedIds[1]}';
   }
 
-  void _startCall(BuildContext context, bool isVideoCall) {
+  Future<void> _startCall(BuildContext context, bool isVideoCall) async {
+    // Show loading indicator
+    ScaffoldMessenger.of(context)
+        .showSnackBar(const SnackBar(content: Text("Preparing call...")));
+
+    // Wait for initialization if not already initialized
+    if (!isInitialized) {
+      await _initializeTUICallKit();
+      if (!isInitialized) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+            content:
+                Text("Failed to initialize call service. Please try again.")));
+        return;
+      }
+    }
+
     final roomId = _generateRoomId();
     final SocketService socketService = SocketService();
     final callId = "call_${DateTime.now().millisecondsSinceEpoch}";
+
     CallHistoryService().addCall(CallHistoryEntry(
       callId: callId,
       callerId: widget.currentUserId,
@@ -83,22 +108,35 @@ class _CallButtonsState extends State<CallButtons> {
       roomId: roomId,
     ));
 
-    // ✨ ADD THIS: Save the history to storage
+    // Save the history to storage
     CallHistoryService().saveHistory();
+
     // Check if user is online first
     socketService.debugCallFlow("START_CALL_ATTEMPT", {
       "caller": widget.currentUserId,
       "target": widget.targetUserId,
       "isVideoCall": isVideoCall
     });
+
     print("Initiating direct call to ${widget.targetUserId}");
     socketService.checkUserOnline(widget.targetUserId);
 
-    // Set up online status callback
+    // Set up online status callback with timeout
     Function originalOnlineStatusCallback =
         socketService.onUserStatus ?? (_) {};
 
+    // Add timeout for status check
+    bool receivedResponse = false;
+    Future.delayed(const Duration(seconds: 5), () {
+      if (!receivedResponse) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+            content: Text("No response from server. Making direct call...")));
+        _makeTencentCall(context, isVideoCall);
+      }
+    });
+
     socketService.onUserStatus = (statusData) {
+      receivedResponse = true;
       originalOnlineStatusCallback(statusData);
 
       if (statusData['targetId'] == widget.targetUserId) {
@@ -118,8 +156,8 @@ class _CallButtonsState extends State<CallButtons> {
       socketService.debugCallFlow("CALL_REQUESTED_RECEIVED", callData);
 
       if (callData['status'] == 'sent') {
-        // Instead of navigating to VideoCallScreen, use Tencent UIKit to make a call
-        _makeTencentCall(isVideoCall);
+        // Use Tencent UIKit to make a call
+        _makeTencentCall(context, isVideoCall);
       } else if (callData['status'] == 'target_not_available') {
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
             content: Text("User is not available for a call right now")));
@@ -146,37 +184,57 @@ class _CallButtonsState extends State<CallButtons> {
   }
 
   // Make a call using Tencent UIKit
-  void _makeTencentCall(bool isVideoCall) async {
+  void _makeTencentCall(BuildContext context, bool isVideoCall) async {
     try {
-      // Generate fresh UserSig
-      String userSig = GenerateTestUserSig.genTestSig(
-          widget.currentUserId, sdkAppID, secretKey);
+      // Skip the re-login if already initialized
+      if (!isInitialized) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+            content:
+                Text("Call service not initialized. Initializing now...")));
 
-      print("Attempting login with fresh UserSig...");
-      TUIResult loginResult = await TUICallKit.instance
-          .login(sdkAppID, widget.currentUserId, userSig);
-      print('Login result: ${loginResult.code} - ${loginResult.message}');
-      if (loginResult.code.isNotEmpty) {
-        print("Login failed: ${loginResult.code} - ${loginResult.message}");
-        return;
+        String userSig = GenerateTestUserSig.genTestSig(
+            widget.currentUserId, sdkAppID, secretKey);
+
+        print("Attempting login with fresh UserSig...");
+        TUIResult loginResult = await TUICallKit.instance
+            .login(sdkAppID, widget.currentUserId, userSig);
+
+        print('Login result: ${loginResult.code} - ${loginResult.message}');
+        if (loginResult.code.isNotEmpty) {
+          print("Login failed: ${loginResult.code} - ${loginResult.message}");
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+              content:
+                  Text("Call initialization failed: ${loginResult.message}")));
+          return;
+        }
+
+        print("Login successful, setting self info...");
+        await TUICallKit.instance.setSelfInfo(widget.name, widget.image);
+        setState(() => isInitialized = true);
       }
 
-      print("Login successful, setting self info...");
-      // Now set self info after successful login
-      await TUICallKit.instance.setSelfInfo(
-        widget.name,
-        widget.image,
-      );
-
       print("Making the call...");
+      // Add explicit UI feedback that call is being initiated
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text("Initiating call...")));
+
       TUICallMediaType mediaType =
           isVideoCall ? TUICallMediaType.video : TUICallMediaType.audio;
+
       TUIResult callResult =
           await TUICallKit.instance.call(widget.targetUserId, mediaType);
 
       print("Call result: ${callResult.code} - ${callResult.message}");
+
+      if (callResult.code.isNotEmpty) {
+        print("Call failed: ${callResult.code} - ${callResult.message}");
+        ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text("Call failed: ${callResult.message}")));
+      }
     } catch (e) {
       print("Exception in _makeTencentCall: $e");
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text("Call error: $e")));
     }
   }
 
@@ -191,7 +249,9 @@ class _CallButtonsState extends State<CallButtons> {
             Icons.phone,
             color: AppConstants.iconColor,
           ),
-          onPressed: () => _startCall(context, false),
+          onPressed: isInitializing
+              ? null // Disable button while initializing
+              : () => _startCall(context, false),
           tooltip: 'Audio Call',
         ),
         // Video call button
@@ -200,7 +260,9 @@ class _CallButtonsState extends State<CallButtons> {
             Icons.videocam,
             color: AppConstants.iconColor,
           ),
-          onPressed: () => _startCall(context, true),
+          onPressed: isInitializing
+              ? null // Disable button while initializing
+              : () => _startCall(context, true),
           tooltip: 'Video Call',
         ),
       ],

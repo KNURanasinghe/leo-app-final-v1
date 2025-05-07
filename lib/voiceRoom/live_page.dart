@@ -945,13 +945,13 @@ class LivePageState extends State<LivePage>
         });
       }
     });
-    Future.delayed(const Duration(seconds: 15), () {
-      if (mounted) {
-        setState(() {
-          _showWelcomeMessage = false;
-        });
-      }
-    });
+    // Future.delayed(const Duration(seconds: 15), () { //TODO as customer request remove that 15 sec welcome message remove option
+    //   if (mounted) {
+    //     setState(() {
+    //       _showWelcomeMessage = false;
+    //     });
+    //   }
+    // });
     socket.on('gifReaction', (data) {
       print('Received emoji data: $data'); // Debug log
 
@@ -1119,7 +1119,7 @@ class LivePageState extends State<LivePage>
         // Welcome message positioned at bottom
         Positioned(
           bottom: MediaQuery.of(context).size.height *
-              0.31, // Position from bottom as requested
+              0.15, // Position from bottom as requested
           left: 16, // Position from left as requested
           child: Container(
             width: MediaQuery.of(context).size.width * 0.8,
@@ -1195,10 +1195,10 @@ class LivePageState extends State<LivePage>
   Widget _buildWelcomeAndAnnouncement() {
     // Calculate the position based on welcome message visibility
     double bottomPosition = MediaQuery.of(context).size.height * 0.2 +
-        16; // Move up when welcome is hidden
+        26; // Move up when welcome is hidden
 
     return Positioned(
-      bottom: bottomPosition + 26,
+      bottom: bottomPosition,
       left: 16,
       right: 16,
       child: Column(
@@ -1238,7 +1238,8 @@ class LivePageState extends State<LivePage>
                     _welcomeMessage,
                     style: TextStyle(
                       color: Colors.blue[400],
-                      fontSize: 12,
+                      fontFamily: 'poppins',
+                      fontSize: 14,
                       decoration: TextDecoration.none,
                     ),
                   ),
@@ -1247,7 +1248,7 @@ class LivePageState extends State<LivePage>
             ),
 
           // Only add spacing if welcome message is visible
-          if (_showWelcomeMessage) const SizedBox(height: 46),
+          // if (_showWelcomeMessage) const SizedBox(height: 46),
           const SizedBox(height: 36),
           // Announcement - always shown but position depends on welcome message visibility
           if (_announcement != null && _announcement!.isNotEmpty)
@@ -6141,6 +6142,7 @@ class LivePageState extends State<LivePage>
       foregroundBuilder: foregroundBuilder,
       closeWhenJoining: false,
       // avatarBuilder: avatarBuilder,
+      openIcon: Image.asset('assets/icons8-mic-24.png'),
     );
   }
 
