@@ -217,7 +217,7 @@ class LivePageState extends State<LivePage>
   final Map<String, String> _userBorders = {};
   final Map<int, Map<String, dynamic>> _seatOccupants = {};
 
-  bool _showWelcomeMessage = true;
+  final bool _showWelcomeMessage = true;
   final String _welcomeMessage =
       "Welcome to Leo! Please be respectful and communicate politely with others.The following are strictly prohibited: Abusive behavior Third-party advertising Fake official information Politically sensitive content If you encounter any of these, please report it immediately. Thank you for keeping Leo safe and friendly!";
   List<IconData> customIcons = [
@@ -858,6 +858,7 @@ class LivePageState extends State<LivePage>
     super.initState();
     _initializeSocket();
     _fetchInitialUsers();
+    print('Room ID usern: ${widget.username1}');
     Timer.periodic(const Duration(seconds: 30), (_) {
       if (mounted && socket.connected) {
         _fetchOwnBorder();
@@ -1097,6 +1098,7 @@ class LivePageState extends State<LivePage>
       String userName, String? avatarUrl, String? itemUrl) {
     final bool isSelf = userName == widget.username1;
     print('itemurl: $itemUrl');
+    print('user name c $userName');
 
     // Use Stack to position welcome message at bottom and SVGA animation in original place
     return Stack(
@@ -1120,7 +1122,7 @@ class LivePageState extends State<LivePage>
         // Welcome message positioned at bottom
         Positioned(
           bottom: MediaQuery.of(context).size.height *
-              0.15, // Position from bottom as requested
+              0.13, // Position from bottom as requested
           left: 16, // Position from left as requested
           child: Container(
             width: MediaQuery.of(context).size.width * 0.8,
@@ -1195,8 +1197,8 @@ class LivePageState extends State<LivePage>
 
   Widget _buildWelcomeAndAnnouncement() {
     // Calculate the position based on welcome message visibility
-    double bottomPosition = MediaQuery.of(context).size.height * 0.2 +
-        26; // Move up when welcome is hidden
+    double bottomPosition = MediaQuery.of(context).size.height *
+        0.2; // Move up when welcome is hidden
 
     return Positioned(
       bottom: bottomPosition,
@@ -1209,7 +1211,7 @@ class LivePageState extends State<LivePage>
           if (_showWelcomeMessage)
             Container(
               padding: const EdgeInsets.all(12),
-              width: MediaQuery.of(context).size.width * 0.6,
+              width: MediaQuery.of(context).size.width * 0.7,
               decoration: BoxDecoration(
                 color: Colors.black.withOpacity(0.3),
                 borderRadius: BorderRadius.circular(12),
@@ -1217,40 +1219,44 @@ class LivePageState extends State<LivePage>
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Row(
-                    children: [
-                      const Spacer(),
-                      GestureDetector(
-                        onTap: () {
-                          setState(() {
-                            _showWelcomeMessage = false;
-                          });
-                        },
-                        child: const Icon(
-                          Icons.close,
-                          color: Colors.white70,
-                          size: 16,
-                        ),
-                      ),
-                    ],
+                  // Row(
+                  //   children: [
+                  //     const Spacer(),
+                  //     GestureDetector(
+                  //       onTap: () {
+                  //         setState(() {
+                  //           _showWelcomeMessage = false;
+                  //         });
+                  //       },
+                  //       child: const Icon(
+                  //         Icons.close,
+                  //         color: Colors.white70,
+                  //         size: 16,
+                  //       ),
+                  //     ),
+                  //   ],
+                  // ),
+                  const SizedBox(
+                    height: 2,
                   ),
-                  const SizedBox(height: 8),
                   Text(
                     _welcomeMessage,
                     style: TextStyle(
                       color: Colors.blue[400],
+                      height: 1,
                       fontFamily: 'poppins',
-                      fontSize: 14,
+                      fontSize: 11,
                       decoration: TextDecoration.none,
                     ),
+                  ),
+                  const SizedBox(
+                    height: 2,
                   ),
                 ],
               ),
             ),
 
-          // Only add spacing if welcome message is visible
-          // if (_showWelcomeMessage) const SizedBox(height: 46),
-          const SizedBox(height: 36),
+          const SizedBox(height: 15),
           // Announcement - always shown but position depends on welcome message visibility
           if (_announcement != null && _announcement!.isNotEmpty)
             Container(
@@ -1280,15 +1286,14 @@ class LivePageState extends State<LivePage>
                       ),
                       if (isAdmin)
                         GestureDetector(
-                          onTap: () {
-                            _showAnnouncementDialog(context);
-                          },
-                          child: const Icon(
-                            Icons.edit_note,
-                            color: Colors.white,
-                            size: 20,
-                          ),
-                        ),
+                            onTap: () {
+                              _showAnnouncementDialog(context);
+                            },
+                            child: SizedBox(
+                                width: 20,
+                                height: 20,
+                                child:
+                                    Image.asset('assets/icons8-edit-32.png'))),
                     ],
                   ),
                   const SizedBox(height: 8),
@@ -2423,289 +2428,291 @@ class LivePageState extends State<LivePage>
         child: Container(
           width: MediaQuery.of(context).size.width * 0.85,
           padding: const EdgeInsets.all(20),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // Header with close button
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text(
-                    'Room Settings',
-                    style: TextStyle(
-                      fontFamily: 'poppins',
-                      fontSize: 22,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
-                    ),
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.close, color: Colors.white70),
-                    onPressed: () => Navigator.pop(context),
-                  ),
-                ],
-              ),
-
-              const Divider(color: Colors.white24, height: 32),
-
-              // Room Photo Setting
-              ListTile(
-                leading: Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: Colors.blue.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Icon(Icons.photo_camera, color: Colors.blue[300]),
-                ),
-                title: const Text(
-                  'Change Room Photo',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 16,
-                    fontFamily: 'poppins',
-                  ),
-                ),
-                subtitle: const Text(
-                  'Update room profile picture',
-                  style: TextStyle(
-                    color: Colors.white70,
-                    fontSize: 12,
-                    fontFamily: 'poppins',
-                  ),
-                ),
-                trailing:
-                    const Icon(Icons.chevron_right, color: Colors.white54),
-                onTap: () {
-                  Navigator.pop(context);
-                  _pickRoomPhoto();
-                },
-              ),
-
-              const Divider(color: Colors.white12, indent: 56),
-
-              // Room Name Setting
-              ListTile(
-                leading: Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: Colors.green.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Icon(Icons.edit, color: Colors.green[300]),
-                ),
-                title: const Text(
-                  'Edit Room Name',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 16,
-                    fontFamily: 'poppins',
-                  ),
-                ),
-                subtitle: const Text(
-                  'Change room display name',
-                  style: TextStyle(
-                    color: Colors.white70,
-                    fontSize: 12,
-                    fontFamily: 'poppins',
-                  ),
-                ),
-                trailing:
-                    const Icon(Icons.chevron_right, color: Colors.white54),
-                onTap: () {
-                  // Show dialog to edit room name
-                  showDialog(
-                    context: context,
-                    builder: (context) => AlertDialog(
-                      backgroundColor: Colors.black.withOpacity(0.9),
-                      title: const Text(
-                        'Edit Room Name',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontFamily: 'poppins',
-                        ),
-                      ),
-                      content: TextField(
-                        controller: roomNameController,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontFamily: 'poppins',
-                        ),
-                        decoration: InputDecoration(
-                          hintText: 'Enter new room name',
-                          hintStyle: TextStyle(
-                            color: Colors.grey[400],
-                            fontFamily: 'poppins',
-                          ),
-                          filled: true,
-                          fillColor: Colors.white.withOpacity(0.1),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(10),
-                            borderSide: BorderSide.none,
-                          ),
-                        ),
-                      ),
-                      actions: [
-                        TextButton(
-                          onPressed: () => Navigator.pop(context),
-                          child: const Text('Cancel'),
-                        ),
-                        TextButton(
-                          onPressed: () {
-                            Navigator.pop(context);
-                            Navigator.pop(context);
-                            _updateRoomName(roomNameController.text);
-                          },
-                          child: const Text('Save'),
-                        ),
-                      ],
-                    ),
-                  );
-                },
-              ),
-
-              const Divider(color: Colors.white12, indent: 56),
-
-              // Background Setting
-              ListTile(
-                leading: Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: Colors.purple.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Icon(Icons.wallpaper, color: Colors.purple[300]),
-                ),
-                title: const Text(
-                  'Change Background',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 16,
-                    fontFamily: 'poppins',
-                  ),
-                ),
-                subtitle: const Text(
-                  'Customize room background',
-                  style: TextStyle(
-                    color: Colors.white70,
-                    fontSize: 12,
-                    fontFamily: 'poppins',
-                  ),
-                ),
-                trailing:
-                    const Icon(Icons.chevron_right, color: Colors.white54),
-                onTap: () {
-                  Navigator.pop(context);
-                  _pickBackgroundImage();
-                },
-              ),
-
-              const Divider(color: Colors.white12, indent: 56),
-
-              // NEW: Announcement Setting
-              ListTile(
-                leading: Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: Colors.amber.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Icon(Icons.campaign, color: Colors.amber[300]),
-                ),
-                title: const Text(
-                  'Room Announcement',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 16,
-                    fontFamily: 'poppins',
-                  ),
-                ),
-                subtitle: Text(
-                  _announcement != null && _announcement!.isNotEmpty
-                      ? 'Edit room announcement'
-                      : 'Add room announcement',
-                  style: const TextStyle(
-                    color: Colors.white70,
-                    fontSize: 12,
-                    fontFamily: 'poppins',
-                  ),
-                ),
-                trailing:
-                    const Icon(Icons.chevron_right, color: Colors.white54),
-                onTap: () {
-                  Navigator.pop(context);
-                  _showAnnouncementDialog(context);
-                },
-              ),
-
-              const SizedBox(height: 20),
-
-              // Danger Zone
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: Colors.red.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                    color: Colors.red.withOpacity(0.3),
-                    width: 1,
-                  ),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Header with close button
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text(
-                      'Danger Zone',
+                    const Text(
+                      'Room Settings',
                       style: TextStyle(
                         fontFamily: 'poppins',
-                        color: Colors.red[300],
-                        fontSize: 16,
+                        fontSize: 22,
                         fontWeight: FontWeight.bold,
+                        color: Colors.white,
                       ),
                     ),
-                    const SizedBox(height: 12),
-                    GestureDetector(
-                      onTap: () {
-                        Navigator.pop(context);
-                        _showDisbandConfirmation();
-                      },
-                      child: Row(
-                        children: [
-                          Icon(Icons.delete_forever, color: Colors.red[400]),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  'Disband Group',
-                                  style: TextStyle(
-                                    fontFamily: 'poppins',
-                                    color: Colors.red[400],
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                                Text(
-                                  'Permanently delete this room',
-                                  style: TextStyle(
-                                    fontFamily: 'poppins',
-                                    color: Colors.red[200],
-                                    fontSize: 12,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
+                    IconButton(
+                      icon: const Icon(Icons.close, color: Colors.white70),
+                      onPressed: () => Navigator.pop(context),
                     ),
                   ],
                 ),
-              ),
 
-              const SizedBox(height: 16),
-            ],
+                const Divider(color: Colors.white24, height: 32),
+
+                // Room Photo Setting
+                ListTile(
+                  leading: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Colors.blue.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Icon(Icons.photo_camera, color: Colors.blue[300]),
+                  ),
+                  title: const Text(
+                    'Change Room Photo',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 16,
+                      fontFamily: 'poppins',
+                    ),
+                  ),
+                  subtitle: const Text(
+                    'Update room profile picture',
+                    style: TextStyle(
+                      color: Colors.white70,
+                      fontSize: 12,
+                      fontFamily: 'poppins',
+                    ),
+                  ),
+                  trailing:
+                      const Icon(Icons.chevron_right, color: Colors.white54),
+                  onTap: () {
+                    Navigator.pop(context);
+                    _pickRoomPhoto();
+                  },
+                ),
+
+                const Divider(color: Colors.white12, indent: 56),
+
+                // Room Name Setting
+                ListTile(
+                  leading: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Colors.green.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Icon(Icons.edit, color: Colors.green[300]),
+                  ),
+                  title: const Text(
+                    'Edit Room Name',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 16,
+                      fontFamily: 'poppins',
+                    ),
+                  ),
+                  subtitle: const Text(
+                    'Change room display name',
+                    style: TextStyle(
+                      color: Colors.white70,
+                      fontSize: 12,
+                      fontFamily: 'poppins',
+                    ),
+                  ),
+                  trailing:
+                      const Icon(Icons.chevron_right, color: Colors.white54),
+                  onTap: () {
+                    // Show dialog to edit room name
+                    showDialog(
+                      context: context,
+                      builder: (context) => AlertDialog(
+                        backgroundColor: Colors.black.withOpacity(0.9),
+                        title: const Text(
+                          'Edit Room Name',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontFamily: 'poppins',
+                          ),
+                        ),
+                        content: TextField(
+                          controller: roomNameController,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontFamily: 'poppins',
+                          ),
+                          decoration: InputDecoration(
+                            hintText: 'Enter new room name',
+                            hintStyle: TextStyle(
+                              color: Colors.grey[400],
+                              fontFamily: 'poppins',
+                            ),
+                            filled: true,
+                            fillColor: Colors.white.withOpacity(0.1),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(10),
+                              borderSide: BorderSide.none,
+                            ),
+                          ),
+                        ),
+                        actions: [
+                          TextButton(
+                            onPressed: () => Navigator.pop(context),
+                            child: const Text('Cancel'),
+                          ),
+                          TextButton(
+                            onPressed: () {
+                              Navigator.pop(context);
+                              Navigator.pop(context);
+                              _updateRoomName(roomNameController.text);
+                            },
+                            child: const Text('Save'),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
+
+                const Divider(color: Colors.white12, indent: 56),
+
+                // Background Setting
+                ListTile(
+                  leading: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Colors.purple.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Icon(Icons.wallpaper, color: Colors.purple[300]),
+                  ),
+                  title: const Text(
+                    'Change Background',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 16,
+                      fontFamily: 'poppins',
+                    ),
+                  ),
+                  subtitle: const Text(
+                    'Customize room background',
+                    style: TextStyle(
+                      color: Colors.white70,
+                      fontSize: 12,
+                      fontFamily: 'poppins',
+                    ),
+                  ),
+                  trailing:
+                      const Icon(Icons.chevron_right, color: Colors.white54),
+                  onTap: () {
+                    Navigator.pop(context);
+                    _pickBackgroundImage();
+                  },
+                ),
+
+                const Divider(color: Colors.white12, indent: 56),
+
+                // NEW: Announcement Setting
+                ListTile(
+                  leading: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Colors.amber.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Icon(Icons.campaign, color: Colors.amber[300]),
+                  ),
+                  title: const Text(
+                    'Room Announcement',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 16,
+                      fontFamily: 'poppins',
+                    ),
+                  ),
+                  subtitle: Text(
+                    _announcement != null && _announcement!.isNotEmpty
+                        ? 'Edit room announcement'
+                        : 'Add room announcement',
+                    style: const TextStyle(
+                      color: Colors.white70,
+                      fontSize: 12,
+                      fontFamily: 'poppins',
+                    ),
+                  ),
+                  trailing:
+                      const Icon(Icons.chevron_right, color: Colors.white54),
+                  onTap: () {
+                    Navigator.pop(context);
+                    _showAnnouncementDialog(context);
+                  },
+                ),
+
+                const SizedBox(height: 20),
+
+                // Danger Zone
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.red.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: Colors.red.withOpacity(0.3),
+                      width: 1,
+                    ),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Danger Zone',
+                        style: TextStyle(
+                          fontFamily: 'poppins',
+                          color: Colors.red[300],
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      GestureDetector(
+                        onTap: () {
+                          Navigator.pop(context);
+                          _showDisbandConfirmation();
+                        },
+                        child: Row(
+                          children: [
+                            Icon(Icons.delete_forever, color: Colors.red[400]),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Disband Group',
+                                    style: TextStyle(
+                                      fontFamily: 'poppins',
+                                      color: Colors.red[400],
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                  Text(
+                                    'Permanently delete this room',
+                                    style: TextStyle(
+                                      fontFamily: 'poppins',
+                                      color: Colors.red[200],
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
+                const SizedBox(height: 16),
+              ],
+            ),
           ),
         ),
       ),
@@ -3609,12 +3616,11 @@ class LivePageState extends State<LivePage>
 
             // Room Info Overlay
             Positioned(
-              top: MediaQuery.of(context).padding.top - 8, // Moved higher up
+              top: MediaQuery.of(context).padding.top - 24, // Moved higher up
               left: 0,
               child: Container(
                 width: MediaQuery.of(context).size.width * 0.429,
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                // padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 0),
                 decoration: BoxDecoration(
                   color: Colors.black.withOpacity(0.5),
                   borderRadius: const BorderRadius.only(
@@ -3630,7 +3636,7 @@ class LivePageState extends State<LivePage>
                         maxHeight: 60,
                       ),
                       padding: const EdgeInsets.symmetric(
-                          horizontal: 8, vertical: 8),
+                          horizontal: 4, vertical: 4),
                       // decoration: BoxDecoration(
                       //   gradient: LinearGradient(
                       //     colors: [
@@ -3736,7 +3742,7 @@ class LivePageState extends State<LivePage>
                                 Row(
                                   children: [
                                     Text(
-                                      "ID: ",
+                                      "ID:",
                                       style: TextStyle(
                                         color: Colors.white.withOpacity(0.7),
                                         fontSize: 12,
@@ -5046,6 +5052,9 @@ class LivePageState extends State<LivePage>
     return (widget.isHost
         ? ZegoUIKitPrebuiltLiveAudioRoomConfig.host()
         : ZegoUIKitPrebuiltLiveAudioRoomConfig.audience())
+      ..duration = ZegoLiveAudioRoomLiveDurationConfig(
+        isVisible: false, // Set this to false to hide the duration section
+      )
       ..seat = (getSeatConfig()
         ..takeIndexWhenJoining = widget.isHost ? getHostSeatIndex() : -1
         ..hostIndexes = getLockSeatIndex()
@@ -6296,7 +6305,7 @@ class LivePageState extends State<LivePage>
 
         //gift box
         Positioned(
-          bottom: MediaQuery.of(context).size.width * 0.5, // Adjusted position
+          bottom: MediaQuery.of(context).size.width * 0.65, // Adjusted position
           right: 16, // Adjusted position
           child: SizedBox(
             width: 70, // Vertical rectangle width

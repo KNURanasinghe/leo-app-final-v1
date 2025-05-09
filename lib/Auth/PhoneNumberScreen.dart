@@ -169,6 +169,7 @@ class _PhoneNumberScreenState extends State<PhoneNumberScreen> {
                                   String userId = existingUser.id;
                                   prefs.setString('userId', userId);
                                   String username = existingUser.firstname;
+                                  prefs.setString('firstName', username);
                                   print('Found user with ID: $userId');
                                   print('Found user with username: $username');
                                   // User exists, navigate directly to home

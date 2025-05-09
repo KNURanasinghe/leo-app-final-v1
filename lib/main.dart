@@ -129,14 +129,14 @@ class IncomingCallScreen extends StatelessWidget {
   final VoidCallback onDecline;
 
   const IncomingCallScreen({
-    Key? key,
+    super.key,
     required this.callerId,
     required this.callerName,
     required this.isVideoCall,
     required this.roomId,
     required this.onAccept,
     required this.onDecline,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
