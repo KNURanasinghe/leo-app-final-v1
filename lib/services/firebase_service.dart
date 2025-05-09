@@ -5,6 +5,7 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:leo_app_01/services/rive_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 // Define your navigator key in a global scope - should match the one in main.dart
@@ -43,8 +44,8 @@ class FirebaseService {
   String? _userId;
 
   // Method to set the user ID when user logs in
-  void setUserId(String userId) {
-    _userId = userId;
+  void setUserId(String userId) async {
+    _userId = await HttpService.getUserId();
     // Update token when user ID is set
     _updateTokenOnServer();
   }

@@ -1104,13 +1104,14 @@ class LivePageState extends State<LivePage>
         // SVG Animation - keep in original position at top
         if (itemUrl != null && itemUrl.isNotEmpty)
           Positioned(
-            top: 120, // Original position at top
-            left: 0,
-            right: 0,
+            top: 230, // Original position at top
+
+            left: 200,
+            right: 20,
             child: Center(
               child: SizedBox(
-                width: 100, // Adjust size as needed
-                height: 100,
+                width: 130, // Adjust size as needed
+                height: 130,
                 child: SVGASimpleImage(resUrl: itemUrl),
               ),
             ),
@@ -3270,9 +3271,9 @@ class LivePageState extends State<LivePage>
           children: [
             // Main Zego UIKit widget
             ZegoUIKitPrebuiltLiveAudioRoom(
-              appID: 50134611,
+              appID: 1751596057,
               appSign:
-                  '3c478217fcd4ec348ae0783f6c12fb7171978dc4cc1399f5ca2f9f5234332d83',
+                  'bce1247e5dfb0d8b471bebd6d13038f88efd4e66c67fb1616c591841993f4cea',
               userID: localUserID,
               userName: widget.username1,
               roomID: widget.roomID,
@@ -3611,14 +3612,14 @@ class LivePageState extends State<LivePage>
               top: MediaQuery.of(context).padding.top - 8, // Moved higher up
               left: 0,
               child: Container(
-                width: MediaQuery.of(context).size.width * 0.5,
+                width: MediaQuery.of(context).size.width * 0.429,
                 padding:
                     const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                 decoration: BoxDecoration(
                   color: Colors.black.withOpacity(0.5),
                   borderRadius: const BorderRadius.only(
-                      bottomRight: Radius.circular(45),
-                      topRight: Radius.circular(45)),
+                      bottomRight: Radius.circular(15),
+                      topRight: Radius.circular(15)),
                 ),
                 child: LayoutBuilder(
                   builder: (context, constraints) {
@@ -5458,7 +5459,7 @@ class LivePageState extends State<LivePage>
       isScrollControlled: true,
       builder: (context) {
         return Container(
-          height: MediaQuery.of(context).size.height * 0.8,
+          height: MediaQuery.of(context).size.height * 0.6,
           decoration: BoxDecoration(
             color: Colors.black.withOpacity(0.9),
             borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),

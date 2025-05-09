@@ -234,7 +234,7 @@ class GameScreen extends StatelessWidget {
           // Full background image
           Image.asset(
             'assets/images/gameback.jpeg', // Replace with your actual asset path
-            fit: BoxFit.cover,
+            fit: BoxFit.fitHeight,
           ),
           const SafeArea(
             child: Column(
