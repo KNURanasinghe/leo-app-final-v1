@@ -225,7 +225,7 @@ class LivePageState extends State<LivePage>
     Icons.mic,
     Icons.volume_up,
     Icons.emoji_emotions,
-    Icons.mail,
+    Icons.message_rounded,
     Icons.open_with_sharp,
     //Icons.lock_outline,
   ];
@@ -5059,6 +5059,89 @@ class LivePageState extends State<LivePage>
       //   ZegoLiveAudioRoomMenuBarButtonName.minimizingButton, // Keep only this button
       // ]
       ..userAvatarUrl = _userAvatarUrl
+      ..inRoomMessage = ZegoLiveAudioRoomInRoomMessageConfig(
+        itemBuilder: (
+          BuildContext context,
+          ZegoInRoomMessage message,
+          Map<String, dynamic> extraInfo,
+        ) {
+          /// how to use itemBuilder to custom message view
+          return Text('${message.user.name} : ${message.message}');
+        },
+      )
+      ..inRoomMessage = ZegoLiveAudioRoomInRoomMessageConfig(
+        itemBuilder: (
+          BuildContext context,
+          ZegoInRoomMessage message,
+          Map<String, dynamic> extraInfo,
+        ) {
+          // Custom message view
+          return Container(
+            margin: const EdgeInsets.symmetric(vertical: 6, horizontal: 10),
+            padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+            decoration: BoxDecoration(
+              color: Colors.black.withOpacity(0.4),
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // User avatar (optional)
+                // if (_userAvatarUrl != null)
+                //   Container(
+                //     width: 30,
+                //     height: 30,
+                //     margin: const EdgeInsets.only(right: 8),
+                //     decoration: BoxDecoration(
+                //       shape: BoxShape.circle,
+                //       border: Border.all(color: Colors.white, width: 1),
+                //     ),
+                //     child: ClipRRect(
+                //       borderRadius: BorderRadius.circular(15),
+                //       child: CachedNetworkImage(
+                //         imageUrl: _userAvatarUrl!,
+                //         fit: BoxFit.cover,
+                //         placeholder: (context, url) => Container(
+                //           color: Colors.grey[300],
+                //           child: const Icon(Icons.person, color: Colors.grey),
+                //         ),
+                //         errorWidget: (context, url, error) => Container(
+                //           color: Colors.grey[300],
+                //           child: const Icon(Icons.person, color: Colors.grey),
+                //         ),
+                //       ),
+                //     ),
+                //   ),
+
+                // Message content
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        message.user.name,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 12,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        message.message,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 14,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
+      )
       ..bottomMenuBar = ZegoLiveAudioRoomBottomMenuBarConfig(
         maxCount: 7,
         hostExtendButtons: [
@@ -5070,15 +5153,16 @@ class LivePageState extends State<LivePage>
               children: [
                 // Group 1: First 4 icons without spacing
                 _buildCustomButton(0, customIcons[0]),
-                _buildCustomButton(1, customIcons[1]),
+                _buildCustomButton(3, customIcons[3]),
+
                 _buildCustomButton(2, customIcons[2]),
 
                 // Space between groups - explicit width
                 const SizedBox(width: 60),
 
                 // Group 2: Mail icon
+                _buildCustomButton(1, customIcons[1]),
 
-                _buildCustomButton(3, customIcons[3]),
                 // Another space
 
                 AnimatedBuilder(
@@ -5139,6 +5223,7 @@ class LivePageState extends State<LivePage>
                 _buildCustomButton(0, customIcons[0]),
 
                 _buildCustomButton(1, customIcons[1]),
+                _buildCustomButton(3, customIcons[3]),
               ],
             ),
           ),
@@ -5155,11 +5240,149 @@ class LivePageState extends State<LivePage>
                 _buildCustomButton(0, customIcons[0]),
 
                 _buildCustomButton(1, customIcons[1]),
+                _buildCustomButton(3, customIcons[3]),
               ],
             ),
           ),
         ],
       );
+  }
+
+  void _showMessageBottomSheet(BuildContext context) {
+    print('Showing message bottom sheet');
+    final TextEditingController messageController = TextEditingController();
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (BuildContext context) {
+        return Padding(
+          padding: EdgeInsets.only(
+            bottom: MediaQuery.of(context).viewInsets.bottom,
+          ),
+          child: Container(
+            decoration: BoxDecoration(
+              color: Colors.black.withOpacity(0.9),
+              borderRadius: const BorderRadius.only(
+                topLeft: Radius.circular(20),
+                topRight: Radius.circular(20),
+              ),
+            ),
+            padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Handle bar
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    margin: const EdgeInsets.only(bottom: 16),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.3),
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ),
+
+                // Title
+                const Text(
+                  'Send Message',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  ),
+                ),
+                const SizedBox(height: 20),
+
+                // Text field
+                TextField(
+                  controller: messageController,
+                  style: const TextStyle(color: Colors.white),
+                  decoration: InputDecoration(
+                    hintText: 'Type your message...',
+                    hintStyle: TextStyle(color: Colors.grey[400]),
+                    filled: true,
+                    fillColor: Colors.white.withOpacity(0.1),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                      borderSide: BorderSide.none,
+                    ),
+                    contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 16, vertical: 12),
+                    suffixIcon: IconButton(
+                      icon: Icon(Icons.send, color: Colors.blue[400]),
+                      onPressed: () {
+                        // Get the message text
+                        final message = messageController.text.trim();
+                        if (message.isNotEmpty) {
+                          // Send the message using ZegoUIKit
+                          ZegoUIKit().sendInRoomMessage(message);
+
+                          // Emit message to socket
+                          socket.emit('roomMessage', {
+                            'roomId': widget.roomID,
+                            'userId': widget.userId,
+                            'userName': widget.username1,
+                            'message': message,
+                            'timestamp': DateTime.now().millisecondsSinceEpoch
+                          });
+
+                          // Close the bottom sheet
+                          Navigator.pop(context);
+
+                          // Show a notification or handle message sent
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Message sent'),
+                              duration: Duration(seconds: 1),
+                            ),
+                          );
+                        }
+                      },
+                    ),
+                  ),
+                  maxLines: 3,
+                  minLines: 1,
+                  textInputAction: TextInputAction.send,
+                  onSubmitted: (value) {
+                    final message = value.trim();
+                    if (message.isNotEmpty) {
+                      // Send the message using ZegoUIKit
+                      ZegoUIKit().sendInRoomMessage(message);
+
+                      // Emit message to socket
+                      socket.emit('roomMessage', {
+                        'roomId': widget.roomID,
+                        'userId': widget.userId,
+                        'userName': widget.username1,
+                        'message': message,
+                        'timestamp': DateTime.now().millisecondsSinceEpoch
+                      });
+
+                      // Close the bottom sheet
+                      Navigator.pop(context);
+
+                      // Show a notification or handle message sent
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Message sent'),
+                          duration: Duration(seconds: 1),
+                        ),
+                      );
+                    }
+                  },
+                ),
+                const SizedBox(height: 20),
+              ],
+            ),
+          ),
+        );
+      },
+    );
   }
 
 // Helper method to build custom buttons with consistent styling
@@ -5181,7 +5404,11 @@ class LivePageState extends State<LivePage>
               MaterialTapTargetSize.shrinkWrap, // Minimize tap target padding
           minimumSize: const Size(40, 40), // Enforce minimum size
         ),
-        onPressed: () => _handleCustomButtonTap(index),
+        onPressed: () {
+          print(
+              'Button clicked with icon: $icon at index $index'); // Debug print
+          _handleCustomButtonTap(index);
+        },
         child: Center(child: Icon(icon, size: 20)),
       ),
     );
@@ -5197,7 +5424,14 @@ class LivePageState extends State<LivePage>
         _toggleMicrophone();
         break;
       case Icons.message_outlined:
-        _showMessageDialog(context);
+        //_showMessageDialog(context);
+        print('Mail button clicked - should show bottom sheet');
+        _showMessageBottomSheet(context);
+        break;
+      case Icons.message_rounded:
+        //_showMessageDialog(context);
+        print('Mail button clicked - should show bottom sheet');
+        _showMessageBottomSheet(context);
         break;
       case Icons.open_with_sharp:
         _showMoreOptionsBottomSheet(context);
@@ -5766,6 +6000,7 @@ class LivePageState extends State<LivePage>
                       // Get the message text
                       final message = messageController.text.trim();
                       if (message.isNotEmpty) {
+                        ZegoUIKit().sendInRoomMessage(message);
                         // Emit message to socket
                         socket.emit('roomMessage', {
                           'roomId': widget.roomID,
@@ -6061,7 +6296,7 @@ class LivePageState extends State<LivePage>
 
         //gift box
         Positioned(
-          bottom: MediaQuery.of(context).size.width * 0.8, // Adjusted position
+          bottom: MediaQuery.of(context).size.width * 0.5, // Adjusted position
           right: 16, // Adjusted position
           child: SizedBox(
             width: 70, // Vertical rectangle width
