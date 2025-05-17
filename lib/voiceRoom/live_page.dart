@@ -859,7 +859,7 @@ class LivePageState extends State<LivePage>
     _initializeSocket();
     _fetchInitialUsers();
     print('Room ID usern: ${widget.username1}');
-    Timer.periodic(const Duration(seconds: 30), (_) {
+    Timer.periodic(const Duration(seconds: 1), (_) {
       if (mounted && socket.connected) {
         _fetchOwnBorder();
       }
@@ -2284,7 +2284,7 @@ class LivePageState extends State<LivePage>
       // Create a larger container for the entire seat area to allow border to expand
       const double nameLabelHeight = 20;
       final double avatarSize =
-          size.width * 0.755; // Make avatar 60% of seat width
+          size.width * 0.73; // Make avatar 60% of seat width
 
       return Column(
         children: [
@@ -2325,23 +2325,23 @@ class LivePageState extends State<LivePage>
                       ),
                     ),
                   ),
-                if (isAttributeHost(user?.inRoomAttributes.value))
-                  Positioned.fill(
-                    left: -1,
-                    right: -1,
-                    top: -18,
-                    bottom: -14,
-                    child: Container(
-                      width: size.width,
-                      height: size.height,
-                      decoration: const BoxDecoration(
-                        image: DecorationImage(
-                          image: AssetImage('assets/images1/bac.png'),
-                          fit: BoxFit.cover,
-                        ),
-                      ),
-                    ),
-                  ),
+                // if (isAttributeHost(user?.inRoomAttributes.value))
+                //   Positioned.fill(
+                //     left: -1,
+                //     right: -1,
+                //     top: -18,
+                //     bottom: -14,
+                //     child: Container(
+                //       width: size.width,
+                //       height: size.height,
+                //       decoration: const BoxDecoration(
+                //         image: DecorationImage(
+                //           image: AssetImage('assets/images1/bac.png'),
+                //           fit: BoxFit.cover,
+                //         ),
+                //       ),
+                //     ),
+                //   ),
 
                 // Border behind avatar - rendered first in stack
                 if (seatData['borderUrl'] != null)
@@ -3616,7 +3616,7 @@ class LivePageState extends State<LivePage>
 
             // Room Info Overlay
             Positioned(
-              top: MediaQuery.of(context).padding.top - 24, // Moved higher up
+              top: MediaQuery.of(context).padding.top - 26, // Moved higher up
               left: 0,
               child: Container(
                 width: MediaQuery.of(context).size.width * 0.429,
@@ -5095,33 +5095,6 @@ class LivePageState extends State<LivePage>
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // User avatar (optional)
-                // if (_userAvatarUrl != null)
-                //   Container(
-                //     width: 30,
-                //     height: 30,
-                //     margin: const EdgeInsets.only(right: 8),
-                //     decoration: BoxDecoration(
-                //       shape: BoxShape.circle,
-                //       border: Border.all(color: Colors.white, width: 1),
-                //     ),
-                //     child: ClipRRect(
-                //       borderRadius: BorderRadius.circular(15),
-                //       child: CachedNetworkImage(
-                //         imageUrl: _userAvatarUrl!,
-                //         fit: BoxFit.cover,
-                //         placeholder: (context, url) => Container(
-                //           color: Colors.grey[300],
-                //           child: const Icon(Icons.person, color: Colors.grey),
-                //         ),
-                //         errorWidget: (context, url, error) => Container(
-                //           color: Colors.grey[300],
-                //           child: const Icon(Icons.person, color: Colors.grey),
-                //         ),
-                //       ),
-                //     ),
-                //   ),
-
                 // Message content
                 Expanded(
                   child: Column(
@@ -5219,7 +5192,7 @@ class LivePageState extends State<LivePage>
             ),
           ),
         ],
-        hostButtons: [],
+        hostButtons: [ZegoLiveAudioRoomMenuBarButtonName.closeSeatButton],
         speakerButtons: [],
         speakerExtendButtons: [
           SizedBox(
@@ -6305,14 +6278,16 @@ class LivePageState extends State<LivePage>
 
         //gift box
         Positioned(
-          bottom: MediaQuery.of(context).size.width * 0.65, // Adjusted position
+          bottom: MediaQuery.of(context).size.width * 0.75, // Adjusted position
           right: 16, // Adjusted position
           child: SizedBox(
-            width: 70, // Vertical rectangle width
-            height: 150, // Vertical rectangle height
+            width: MediaQuery.of(context).size.width *
+                0.25, // Vertical rectangle width
+            height: MediaQuery.of(context).size.width *
+                0.4, // Vertical rectangle height
             child: ImageCarouselSlider(
               items: imageList,
-              imageHeight: 140, // Matches the container height
+              imageHeight: 125, // Matches the container height
               dotColor: Colors.black, // Dot color for indicators
             ),
           ),
@@ -6385,7 +6360,7 @@ class LivePageState extends State<LivePage>
     return ZegoLiveAudioRoomSeatConfig(
       backgroundBuilder: backgroundBuilder,
       foregroundBuilder: foregroundBuilder,
-      closeWhenJoining: false,
+      //closeWhenJoining: false,
       // avatarBuilder: avatarBuilder,
       openIcon: Image.asset('assets/icons8-mic-24.png'),
     );
