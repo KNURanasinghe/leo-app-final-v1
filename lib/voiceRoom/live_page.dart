@@ -3390,9 +3390,9 @@ class LivePageState extends State<LivePage>
           children: [
             // Main Zego UIKit widget
             ZegoUIKitPrebuiltLiveAudioRoom(
-              appID: 1751596057,
+              appID: 1650323814,
               appSign:
-                  'bce1247e5dfb0d8b471bebd6d13038f88efd4e66c67fb1616c591841993f4cea',
+                  '61c1d2d1813c834ba6e587cdfb7be4c784b543fc3b3ee45a9828fdd03650de95',
               userID: localUserID,
               userName: widget.username1,
               roomID: widget.roomID,
@@ -6043,97 +6043,97 @@ class LivePageState extends State<LivePage>
     );
   }
 
-  void _showMessageDialog(BuildContext context) {
-    final TextEditingController messageController = TextEditingController();
+  // void _showMessageDialog(BuildContext context) {
+  //   final TextEditingController messageController = TextEditingController();
 
-    showDialog(
-      context: context,
-      builder: (context) => Dialog(
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
-        ),
-        backgroundColor: Colors.black.withOpacity(0.9),
-        child: Padding(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Text(
-                'Send Message',
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.white,
-                ),
-              ),
-              const SizedBox(height: 20),
-              TextField(
-                controller: messageController,
-                style: const TextStyle(color: Colors.white),
-                decoration: InputDecoration(
-                  hintText: 'Type your message...',
-                  hintStyle: TextStyle(color: Colors.grey[400]),
-                  filled: true,
-                  fillColor: Colors.white.withOpacity(0.1),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(10),
-                    borderSide: BorderSide.none,
-                  ),
-                  contentPadding:
-                      const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                ),
-                maxLines: 3,
-              ),
-              const SizedBox(height: 20),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  TextButton(
-                    onPressed: () => Navigator.pop(context),
-                    child: const Text(
-                      'Cancel',
-                      style: TextStyle(color: Colors.white70),
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  ElevatedButton(
-                    onPressed: () {
-                      // Get the message text
-                      final message = messageController.text.trim();
-                      if (message.isNotEmpty) {
-                        ZegoUIKit().sendInRoomMessage(message);
-                        // Emit message to socket
-                        socket.emit('roomMessage', {
-                          'roomId': widget.roomID,
-                          'userId': widget.userId,
-                          'userName': widget.username1,
-                          'message': message,
-                          'timestamp': DateTime.now().millisecondsSinceEpoch
-                        });
+  //   showDialog(
+  //     context: context,
+  //     builder: (context) => Dialog(
+  //       shape: RoundedRectangleBorder(
+  //         borderRadius: BorderRadius.circular(20),
+  //       ),
+  //       backgroundColor: Colors.black.withOpacity(0.9),
+  //       child: Padding(
+  //         padding: const EdgeInsets.all(20),
+  //         child: Column(
+  //           mainAxisSize: MainAxisSize.min,
+  //           children: [
+  //             const Text(
+  //               'Send Message',
+  //               style: TextStyle(
+  //                 fontSize: 20,
+  //                 fontWeight: FontWeight.bold,
+  //                 color: Colors.white,
+  //               ),
+  //             ),
+  //             const SizedBox(height: 20),
+  //             TextField(
+  //               controller: messageController,
+  //               style: const TextStyle(color: Colors.white),
+  //               decoration: InputDecoration(
+  //                 hintText: 'Type your message...',
+  //                 hintStyle: TextStyle(color: Colors.grey[400]),
+  //                 filled: true,
+  //                 fillColor: Colors.white.withOpacity(0.1),
+  //                 border: OutlineInputBorder(
+  //                   borderRadius: BorderRadius.circular(10),
+  //                   borderSide: BorderSide.none,
+  //                 ),
+  //                 contentPadding:
+  //                     const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+  //               ),
+  //               maxLines: 3,
+  //             ),
+  //             const SizedBox(height: 20),
+  //             Row(
+  //               mainAxisAlignment: MainAxisAlignment.end,
+  //               children: [
+  //                 TextButton(
+  //                   onPressed: () => Navigator.pop(context),
+  //                   child: const Text(
+  //                     'Cancel',
+  //                     style: TextStyle(color: Colors.white70),
+  //                   ),
+  //                 ),
+  //                 const SizedBox(width: 10),
+  //                 ElevatedButton(
+  //                   onPressed: () {
+  //                     // Get the message text
+  //                     final message = messageController.text.trim();
+  //                     if (message.isNotEmpty) {
+  //                       ZegoUIKit().sendInRoomMessage(message);
+  //                       // Emit message to socket
+  //                       socket.emit('roomMessage', {
+  //                         'roomId': widget.roomID,
+  //                         'userId': widget.userId,
+  //                         'userName': widget.username1,
+  //                         'message': message,
+  //                         'timestamp': DateTime.now().millisecondsSinceEpoch
+  //                       });
 
-                        // Show a notification or handle message sent
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Message sent')),
-                        );
-                      }
-                      Navigator.pop(context);
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.blue,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                    ),
-                    child: const Text('Send'),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
+  //                       // Show a notification or handle message sent
+  //                       ScaffoldMessenger.of(context).showSnackBar(
+  //                         const SnackBar(content: Text('Message sent')),
+  //                       );
+  //                     }
+  //                     Navigator.pop(context);
+  //                   },
+  //                   style: ElevatedButton.styleFrom(
+  //                     backgroundColor: Colors.blue,
+  //                     shape: RoundedRectangleBorder(
+  //                       borderRadius: BorderRadius.circular(10),
+  //                     ),
+  //                   ),
+  //                   child: const Text('Send'),
+  //                 ),
+  //               ],
+  //             ),
+  //           ],
+  //         ),
+  //       ),
+  //     ),
+  //   );
+  // }
 
   void _showEmojiBottomSheet(BuildContext context) {
     showModalBottomSheet(
