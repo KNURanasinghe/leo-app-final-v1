@@ -5,12 +5,27 @@ import 'dart:async';
 import 'package:pocketbase/pocketbase.dart';
 import 'package:http/http.dart' as http;
 import 'package:svgaplayer_flutter/svgaplayer_flutter.dart';
+import 'package:socket_io_client/socket_io_client.dart' as IO;
 
 import '../services/pb_service.dart';
 
 class StoreScreen extends StatefulWidget {
   final bool startWithMyItems;
-  const StoreScreen({super.key, this.startWithMyItems = false});
+  final IO.Socket? socket;
+  final String? roomId;
+  final String? userId;
+  final String? userAvatarUrl;
+  final String? userName;
+
+  const StoreScreen({
+    super.key,
+    this.startWithMyItems = false,
+    this.socket,
+    this.roomId,
+    this.userId,
+    this.userAvatarUrl,
+    this.userName,
+  });
 
   @override
   State<StoreScreen> createState() => _StoreScreenState();
@@ -269,6 +284,7 @@ class _StoreScreenState extends State<StoreScreen>
             '$baseUrl/api/files/${item.collectionId}/${item.id}/${item.data['rive_file']}';
         fileTransfers.add(
             _transferFileToRecord(sourceUrl, createdRecord.id, 'rive_file'));
+        print("File transfers: $fileTransfers   and source $sourceUrl");
       }
 
       // If there's a border, transfer it
@@ -277,6 +293,7 @@ class _StoreScreenState extends State<StoreScreen>
             '$baseUrl/api/files/${item.collectionId}/${item.id}/${item.data['border']}';
         fileTransfers
             .add(_transferFileToRecord(sourceUrl, createdRecord.id, 'border'));
+        print("File transfers: $fileTransfers   and source $sourceUrl");
       }
 
       // If there's a theme, transfer it
@@ -285,6 +302,7 @@ class _StoreScreenState extends State<StoreScreen>
             '$baseUrl/api/files/${item.collectionId}/${item.id}/${item.data['theme']}';
         fileTransfers
             .add(_transferFileToRecord(sourceUrl, createdRecord.id, 'theme'));
+        print("File transfers: $fileTransfers   and source $sourceUrl");
       }
 
       // Wait for all file transfers to complete
@@ -307,9 +325,9 @@ class _StoreScreenState extends State<StoreScreen>
       setState(() {
         isLoading = false;
       });
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to purchase item: $e')),
-      );
+      // ScaffoldMessenger.of(context).showSnackBar(
+      //   SnackBar(content: Text('Failed to purchase item: $e')),
+      // );
     }
   }
 
@@ -375,22 +393,87 @@ class _StoreScreenState extends State<StoreScreen>
 
     try {
       Map<String, dynamic> updateData = {};
+      String eventType = "";
+      String itemUrl = "";
+
+      // Get the item data first
+      final itemData = await pb.collection('myItems').getOne(itemId);
+
+      // Check if this is the first time it's being used
+      bool alreadyUsed = false;
 
       // Set the appropriate field based on item type
       switch (_tabController.index) {
         case 0: // Frames
+          alreadyUsed = itemData.data['isborder_used'] ?? false;
           updateData = {'isborder_used': true};
+          eventType = "borderChange";
+          itemUrl =
+              '$baseUrl/api/files/myItems/$itemId/${itemData.data['border']}';
+
+          // Reset other borders if needed
+          if (!alreadyUsed) {
+            await _resetOtherBorders(itemId);
+          }
           break;
+
         case 1: // Themes
+          alreadyUsed = itemData.data['is_theme_used'] ?? false;
           updateData = {'is_theme_used': true};
+          eventType = "themeChange";
+          itemUrl =
+              '$baseUrl/api/files/myItems/$itemId/${itemData.data['theme']}';
+
+          // Reset other themes if needed
+          // if (!alreadyUsed) {
+          //   await _resetOtherThemes(itemId);
+          // }
           break;
+
         case 2: // Entry Effects (Rive)
+          alreadyUsed = itemData.data['is_rive_used'] ?? false;
           updateData = {'is_rive_used': true};
+          eventType = "entryEffectChange";
+          itemUrl =
+              '$baseUrl/api/files/myItems/$itemId/${itemData.data['rive_file']}';
+
+          // Reset other entry effects if needed
+          // if (!alreadyUsed) {
+          //   await _resetOtherEntryEffects(itemId);
+          // }
           break;
       }
 
-      await pb.collection('myItems').update(itemId, body: updateData);
-      loadMyItems(); // Reload to update UI
+      // Skip update if already used
+      if (!alreadyUsed) {
+        // Update the item in PocketBase
+        await pb.collection('myItems').update(itemId, body: updateData);
+      }
+
+      // Send real-time update through socket.io
+      if (widget.socket != null &&
+          widget.socket!.connected &&
+          widget.roomId != null) {
+        widget.socket!.emit(eventType, {
+          'roomId': widget.roomId,
+          'userId': widget.userId,
+          'userName': widget.userName,
+          'itemUrl': itemUrl,
+          'timestamp': DateTime.now().millisecondsSinceEpoch
+        });
+
+        print('Emitted $eventType event with URL: $itemUrl');
+      }
+
+      // Reload to update UI
+      loadMyItems();
+
+      // Show success message
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+            content: Text(
+                '${_getItemTypeName(_tabController.index)} is now being used!')),
+      );
     } catch (e) {
       setState(() {
         isLoading = false;
@@ -400,6 +483,25 @@ class _StoreScreenState extends State<StoreScreen>
       );
     }
   }
+
+// Add these helper methods to reset other active items
+  Future<void> _resetOtherBorders(String exceptItemId) async {
+    try {
+      final filter =
+          'userId = "$userId" && is_border=true && isborder_used=true && id != "$exceptItemId"';
+      final result = await pb.collection('myItems').getList(filter: filter);
+
+      for (final item in result.items) {
+        await pb
+            .collection('myItems')
+            .update(item.id, body: {'isborder_used': false});
+      }
+    } catch (e) {
+      print('Error resetting other borders: $e');
+    }
+  }
+
+// Similar methods for themes and entry effects
 
   void nextPage() {
     if (currentPage < totalPages) {

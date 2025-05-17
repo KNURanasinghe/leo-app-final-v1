@@ -233,6 +233,8 @@ class LivePageState extends State<LivePage>
   bool _isMusicPlaying = false;
   String? _currentSongName;
 
+  final Map<String, String> _userEntryEffects = {};
+
   void _showMusicPlayerSheet(BuildContext context) {
     showModalBottomSheet(
       context: context,
@@ -645,6 +647,33 @@ class LivePageState extends State<LivePage>
     }
   }
 
+  void _updateUserItemDisplay(String userId, String itemType, String itemUrl) {
+    // For borders, you already have the _userBorders map
+    if (itemType == 'borderChange') {
+      setState(() {
+        _userBorders[userId] = itemUrl;
+
+        // Update any active seats this user might be in
+        _seatOccupants.forEach((seatIndex, userInfo) {
+          if (userInfo['userId'] == userId) {
+            userInfo['borderUrl'] = itemUrl;
+          }
+        });
+      });
+    }
+    // For entry effects, store them for use when showing entry animations
+    else if (itemType == 'entryEffectChange') {
+      // Store the user's entry effect URL for when they enter the room
+      // This could be stored in a map similar to _userBorders
+    }
+    // For themes, update if user is the admin
+    else if (itemType == 'themeChange' && isAdmin && userId == widget.userId) {
+      setState(() {
+        _backgroundImageUrl = itemUrl;
+      });
+    }
+  }
+
 // Method to handle room photo selection
   Future<void> _pickRoomPhoto() async {
     final picker = ImagePicker();
@@ -865,6 +894,28 @@ class LivePageState extends State<LivePage>
       }
     });
 
+    socket.on('roomItems', (data) {
+      if (mounted) {
+        // Process existing borders
+        if (data['borders'] != null) {
+          final borders = data['borders'] as Map<String, dynamic>;
+          borders.forEach((userId, borderUrl) {
+            _userBorders[userId] = borderUrl;
+          });
+        }
+
+        // Process theme if user is room owner
+        if (data['theme'] != null && isAdmin) {
+          setState(() {
+            _backgroundImageUrl = data['theme']['url'];
+          });
+        }
+
+        // Update any active seats
+        _updateSeatDisplays();
+      }
+    });
+
     socket.on('seatTaken', (data) {
       print(
           'seat taken ${data['seatIndex']} ${data['userId']} ${data['userName']} ${data['userAvatar']} ${data['borderUrl']}');
@@ -877,6 +928,14 @@ class LivePageState extends State<LivePage>
             'borderUrl': data['borderUrl']
           };
         });
+      }
+    });
+
+    socket.on('entryEffectChange', (data) {
+      if (mounted && data['userId'] != null && data['itemUrl'] != null) {
+        print('Received entryEffectChange: ${data['itemUrl']}');
+        // Store the user's selected entry effect for future use
+        // This will be used when they join the room or perform an action
       }
     });
 
@@ -908,6 +967,12 @@ class LivePageState extends State<LivePage>
 
     socket.on('borderChange', (data) {
       if (mounted && data['userId'] != null && data['borderUrl'] != null) {
+        if (data['userId'] != widget.userId &&
+            _seatOccupants.values
+                .any((seat) => seat['userId'] == data['userId'])) {
+          // Flash effect on their seat
+          _showUpdateEffect(data['userId']);
+        }
         setState(() {
           _userBorders[data['userId']] = data['borderUrl'];
 
@@ -1094,11 +1159,56 @@ class LivePageState extends State<LivePage>
     });
   }
 
+  int? _flashingSeat;
+  void _showUpdateEffect(String userId) {
+    // Find the seat with this user
+    int? seatIndex;
+    _seatOccupants.forEach((index, info) {
+      if (info['userId'] == userId) {
+        seatIndex = index;
+      }
+    });
+
+    if (seatIndex != null) {
+      // Create a flash effect
+      _flashingSeat = seatIndex;
+      setState(() {});
+
+      // Reset after animation
+      Future.delayed(const Duration(milliseconds: 500), () {
+        if (mounted) {
+          _flashingSeat = null;
+          setState(() {});
+        }
+      });
+    }
+  }
+
+  void _updateSeatDisplays() {
+    setState(() {
+      _seatOccupants.forEach((seatIndex, userInfo) {
+        final userId = userInfo['userId'];
+        if (_userBorders.containsKey(userId)) {
+          userInfo['borderUrl'] = _userBorders[userId];
+        }
+      });
+    });
+  }
+
   Widget _buildEntryAnimation(
       String userName, String? avatarUrl, String? itemUrl) {
     final bool isSelf = userName == widget.username1;
     print('itemurl: $itemUrl');
     print('user name c $userName');
+
+    String? effectUrl = itemUrl;
+    if (isSelf) {
+      // For current user, use their active item
+      final storedEffect = _userEntryEffects[widget.userId];
+      if (storedEffect != null) {
+        effectUrl = storedEffect;
+      }
+    }
 
     // Use Stack to position welcome message at bottom and SVGA animation in original place
     return Stack(
@@ -1426,6 +1536,7 @@ class LivePageState extends State<LivePage>
         });
       }
 
+      socket.emit('fetchRoomItems', {'roomId': widget.roomID});
       // Send full user details when joining
       await _fetchAndSetUserAvatar(); // Make sure we have avatar URL
       await _fetchOwnBorder();
@@ -2271,6 +2382,7 @@ class LivePageState extends State<LivePage>
     // Get the seat index from the 'index' key
     final seatIndex = extraInfo['index'] as int?;
     print('Seat index: $seatIndex, User: ${user?.name}');
+    final isFlashing = seatIndex != null && seatIndex == _flashingSeat;
 
     // If no seat index is provided, return empty container
     if (seatIndex == null) return Container();
@@ -5863,8 +5975,15 @@ class LivePageState extends State<LivePage>
                 ),
               ),
               // StoreScreen content
-              const Expanded(
-                child: StoreScreen(startWithMyItems: true),
+              Expanded(
+                child: StoreScreen(
+                  startWithMyItems: true,
+                  socket: socket,
+                  roomId: widget.roomID,
+                  userId: widget.userId,
+                  userAvatarUrl: _userAvatarUrl,
+                  userName: widget.username1,
+                ),
               ),
             ],
           ),
