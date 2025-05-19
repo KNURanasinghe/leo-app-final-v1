@@ -21,6 +21,10 @@ class MessageBubble extends StatelessWidget {
     this.isSelected = false,
   });
 
+  // In the MessageBubble class, update the build method to handle taps on status messages
+
+  // Enhanced build method with better debugging for status taps
+
   @override
   Widget build(BuildContext context) {
     // Check if message is deleted
@@ -36,23 +40,22 @@ class MessageBubble extends StatelessWidget {
         children: [
           GestureDetector(
             onTap: () {
-              // Special handling for status share messages
-              if (message.messageType == 'status_share') {
-                print("=== STATUS SHARE DEBUG INFO ===");
-                print("Message Type: ${message.messageType}");
-                print("Message ID: ${message.messageId}");
-                print("Status ID: ${message.statusId ?? 'NULL'}");
-                print("Status Type: ${message.statusType ?? 'NULL'}");
-                print("Status Content: ${message.statusContent ?? 'NULL'}");
-                print("Status File URL: ${message.statusFileUrl ?? 'NULL'}");
+              // Force a debug statement to verify the tap is detected
+              debugPrint("⚡ Message bubble tapped");
+              debugPrint("Message type: ${message.messageType}");
 
-                // Dump the full message JSON for debugging
-                print("Full message data: ${message.toJson()}");
-                _openSharedStatus(context);
+              // Handle navigation for status messages
+              if (message.messageType == 'status_share' ||
+                  message.messageType == 'status_reply') {
+                debugPrint("✓ Status message detected - navigating");
+
+                // Remove the call to the old _openSharedStatus method and use only _navigateToStatus
+                _navigateToStatus(context);
               }
             },
             onLongPress: isDeleted ? null : onLongPress,
             child: Container(
+              // Rest of your container code remains the same
               constraints: BoxConstraints(
                 maxWidth: MediaQuery.of(context).size.width * 0.7,
               ),
@@ -75,79 +78,105 @@ class MessageBubble extends StatelessWidget {
                     ? Border.all(color: Colors.blue, width: 2)
                     : null,
               ),
-              child: isDeleted
-                  ? _buildDeletedMessageContent(isDeletedForEveryone)
-                  : Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        // For status reply messages
-                        if (message.messageType == 'status_reply')
-                          _buildStatusReplyContent(context),
-
-                        // For status share messages
-                        if (message.messageType == 'status_share')
-                          _buildStatusShareContent(context),
-
-                        // File preview for non-special messages
-                        if (message.messageType !=
-                                AppConstants.messageTypeText &&
-                            message.messageType != 'status_reply' &&
-                            message.messageType != 'status_share' &&
-                            message.fileUrl != null &&
-                            message.fileUrl!.isNotEmpty)
-                          _buildFilePreview(context),
-
-                        // Text message or caption
-                        if (message.message.isNotEmpty &&
-                            message.messageType != 'status_reply' &&
-                            message.messageType != 'status_share')
-                          Padding(
-                            padding: message.messageType !=
-                                    AppConstants.messageTypeText
-                                ? const EdgeInsets.only(top: 8)
-                                : EdgeInsets.zero,
-                            child: Text(message.message),
-                          ),
-
-                        // Add some spacing before timestamp
-                        const SizedBox(height: 4),
-
-                        // Timestamp and status in a row at the end
-                        Row(
-                          mainAxisSize: MainAxisSize.min,
-                          mainAxisAlignment: MainAxisAlignment.end,
-                          children: [
-                            Text(
-                              _formatTimestamp(message.timestamp),
-                              style: TextStyle(
-                                fontSize: 11,
-                                color: Colors.grey[600],
-                              ),
-                            ),
-                            if (isMe) ...[
-                              const SizedBox(width: 4),
-                              Icon(
-                                message.read
-                                    ? Icons.done_all
-                                    : (message.delivered
-                                        ? Icons.done_all
-                                        : Icons.done),
-                                size: 16,
-                                color: message.read
-                                    ? Colors.blue
-                                    : Colors.grey[400],
-                              ),
-                            ],
-                          ],
-                        ),
-                      ],
+              child: Container(
+                constraints: BoxConstraints(
+                  maxWidth: MediaQuery.of(context).size.width * 0.7,
+                ),
+                padding: message.messageType == AppConstants.messageTypeText ||
+                        message.messageType == 'status_reply' ||
+                        message.messageType == 'status_share'
+                    ? const EdgeInsets.symmetric(horizontal: 16, vertical: 10)
+                    : const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: _getBubbleColor(isDeleted),
+                  borderRadius: BorderRadius.circular(12),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.05),
+                      offset: const Offset(0, 1),
+                      blurRadius: 3,
                     ),
+                  ],
+                  border: isSelected
+                      ? Border.all(color: Colors.blue, width: 2)
+                      : null,
+                ),
+                child: isDeleted
+                    ? _buildDeletedMessageContent(isDeletedForEveryone)
+                    : Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // For status reply messages
+                          if (message.messageType == 'status_reply')
+                            _buildStatusReplyContent(context),
+
+                          // For status share messages
+                          if (message.messageType == 'status_share')
+                            _buildStatusShareContent(context),
+
+                          // File preview for non-special messages
+                          if (message.messageType !=
+                                  AppConstants.messageTypeText &&
+                              message.messageType != 'status_reply' &&
+                              message.messageType != 'status_share' &&
+                              message.fileUrl != null &&
+                              message.fileUrl!.isNotEmpty)
+                            _buildFilePreview(context),
+
+                          // Text message or caption
+                          if (message.message.isNotEmpty &&
+                              message.messageType != 'status_reply' &&
+                              message.messageType != 'status_share')
+                            Padding(
+                              padding: message.messageType !=
+                                      AppConstants.messageTypeText
+                                  ? const EdgeInsets.only(top: 8)
+                                  : EdgeInsets.zero,
+                              child: Text(message.message),
+                            ),
+
+                          // Add some spacing before timestamp
+                          const SizedBox(height: 4),
+
+                          // Timestamp and status in a row at the end
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            mainAxisAlignment: MainAxisAlignment.end,
+                            children: [
+                              Text(
+                                _formatTimestamp(message.timestamp),
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: Colors.grey[600],
+                                ),
+                              ),
+                              if (isMe) ...[
+                                const SizedBox(width: 4),
+                                Icon(
+                                  message.read
+                                      ? Icons.done_all
+                                      : (message.delivered
+                                          ? Icons.done_all
+                                          : Icons.done),
+                                  size: 16,
+                                  color: message.read
+                                      ? Colors.blue
+                                      : Colors.grey[400],
+                                ),
+                              ],
+                            ],
+                          ),
+                        ],
+                      ),
+              ),
             ),
-          ),
+          )
         ],
       ),
     );
   }
+
+  // Update the status share content builder to make it consistent
 
   Widget _buildStatusShareContent(BuildContext context) {
     return Container(
@@ -161,41 +190,40 @@ class MessageBubble extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Header with status icon
+          // Header with status icon and tap indicator on the same row
           Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Icon(Icons.share, size: 14, color: Colors.blue),
-              const SizedBox(width: 4),
-              Text(
-                'Shared Status',
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.blue[700],
-                ),
+              Row(
+                children: [
+                  const Icon(Icons.share, size: 14, color: Colors.blue),
+                  const SizedBox(width: 4),
+                  Text(
+                    'Shared Status',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.blue[700],
+                    ),
+                  ),
+                ],
               ),
+              // Only show tap indicator if status ID is present
+              if (message.statusId != null && message.statusId!.isNotEmpty)
+                Text(
+                  'Tap to view',
+                  style: TextStyle(
+                    fontSize: 10,
+                    color: Colors.blue[700],
+                    fontStyle: FontStyle.italic,
+                  ),
+                ),
             ],
           ),
           const SizedBox(height: 8),
 
           // Status content preview based on type
           _buildStatusSharePreview(),
-
-          // View status button
-          Container(
-            width: double.infinity,
-            margin: const EdgeInsets.only(top: 8),
-            child: Center(
-              child: Text(
-                'Tap to view',
-                style: TextStyle(
-                  color: Colors.blue[700],
-                  fontSize: 12,
-                  fontStyle: FontStyle.italic,
-                ),
-              ),
-            ),
-          ),
         ],
       ),
     );
@@ -338,31 +366,100 @@ class MessageBubble extends StatelessWidget {
   }
 
   // And update the _openSharedStatus method to first check socket connection
-  void _openSharedStatus(BuildContext context) async {
+  // void _openSharedStatus(BuildContext context) async {
+  //   try {
+  //     print("=== ATTEMPTING TO OPEN SHARED STATUS ===");
+  //     print("Status Info - ID: ${message.statusId ?? 'NULL'}");
+  //     print("Status Info - Type: ${message.statusType ?? 'NULL'}");
+  //     print("Status Info - Content: ${message.statusContent ?? 'NULL'}");
+  //     print("Status Info - FileURL: ${message.statusFileUrl ?? 'NULL'}");
+
+  //     // Check if status information is complete
+  //     final bool hasStatusId =
+  //         message.statusId != null && message.statusId!.isNotEmpty;
+  //     final bool hasStatusUrl =
+  //         message.statusFileUrl != null && message.statusFileUrl!.isNotEmpty;
+
+  //     if (!hasStatusId || !hasStatusUrl) {
+  //       print("ERROR: Status information is incomplete");
+  //       ScaffoldMessenger.of(context).showSnackBar(
+  //         const SnackBar(
+  //             content: Text('Status details not available or incomplete')),
+  //       );
+  //       return;
+  //     }
+
+  //     // Get status owner information - extract from content or use default
+  //     String statusOwnerName = "User"; // Default fallback
+  //     if (message.statusContent != null &&
+  //         message.statusContent!.contains("Shared from ")) {
+  //       try {
+  //         statusOwnerName = message.statusContent!
+  //             .split("Shared from ")[1]
+  //             .split(":")[0]
+  //             .trim();
+  //       } catch (e) {
+  //         print("Could not extract owner name: $e");
+  //       }
+  //     }
+
+  //     print("Opening status with owner name: $statusOwnerName");
+
+  //     // Navigate to status viewer as a full screen page
+  //     Navigator.push(
+  //       context,
+  //       MaterialPageRoute(
+  //         builder: (context) => StatusViewScreen(
+  //           currentUserId: currentUserId,
+  //           imageUrl: message.statusFileUrl!,
+  //           statusUserId: message.statusId!,
+  //           userName: statusOwnerName,
+  //         ),
+  //       ),
+  //     );
+  //   } catch (e) {
+  //     print('Error opening status: $e');
+  //     ScaffoldMessenger.of(context).showSnackBar(
+  //       SnackBar(content: Text('Error opening status: ${e.toString()}')),
+  //     );
+  //   }
+  // }
+
+  // Replace your _navigateToStatus method with this improved version
+
+  void _navigateToStatus(BuildContext context) {
+    // Force debug logs to appear
+    debugPrint("=== NAVIGATING TO STATUS ===");
+    debugPrint("Message Type: ${message.messageType}");
+    debugPrint("Message ID: ${message.messageId}");
+    debugPrint("Sender ID: ${message.senderId}");
+    debugPrint("Receiver ID: ${message.receiverId}");
+    debugPrint("Status Info - statusId: '${message.statusId}'");
+    debugPrint("Status Info - statusType: '${message.statusType}'");
+    debugPrint("Status Info - statusContent: '${message.statusContent}'");
+    debugPrint("Status Info - statusFileUrl: '${message.statusFileUrl}'");
+
     try {
-      print("=== ATTEMPTING TO OPEN SHARED STATUS ===");
-      print("Status Info - ID: ${message.statusId ?? 'NULL'}");
-      print("Status Info - Type: ${message.statusType ?? 'NULL'}");
-      print("Status Info - Content: ${message.statusContent ?? 'NULL'}");
-      print("Status Info - FileURL: ${message.statusFileUrl ?? 'NULL'}");
+      // In your system, statusId field contains the ID of the user who created the status
+      String? statusOwnerId = message.statusId;
+      String mediaUrl = '';
+      String statusOwnerName = "User"; // Default name
 
-      // Check if status information is complete
-      final bool hasStatusId =
-          message.statusId != null && message.statusId!.isNotEmpty;
-      final bool hasStatusUrl =
-          message.statusFileUrl != null && message.statusFileUrl!.isNotEmpty;
+      // Generate a unique identifier for the specific status based on available information
+      String specificStatusIdentifier =
+          "${message.statusFileUrl ?? ''}:${message.statusType ?? ''}";
 
-      if (!hasStatusId || !hasStatusUrl) {
-        print("ERROR: Status information is incomplete");
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-              content: Text('Status details not available or incomplete')),
-        );
-        return;
+      debugPrint("Initial statusOwnerId: $statusOwnerId");
+
+      // Use status file URL if available
+      if (message.statusFileUrl != null && message.statusFileUrl!.isNotEmpty) {
+        mediaUrl = message.statusFileUrl!;
+      } else if (message.fileUrl != null && message.fileUrl!.isNotEmpty) {
+        // Fallback to message's own file URL if status URL not available
+        mediaUrl = message.fileUrl!;
       }
 
-      // Get status owner information - extract from content or use default
-      String statusOwnerName = "User"; // Default fallback
+      // Try to extract status owner name from the message content
       if (message.statusContent != null &&
           message.statusContent!.contains("Shared from ")) {
         try {
@@ -370,27 +467,63 @@ class MessageBubble extends StatelessWidget {
               .split("Shared from ")[1]
               .split(":")[0]
               .trim();
+          debugPrint("Extracted status owner name: $statusOwnerName");
         } catch (e) {
-          print("Could not extract owner name: $e");
+          debugPrint("Failed to extract owner name: $e");
         }
       }
 
-      print("Opening status with owner name: $statusOwnerName");
+      // Validation for status owner ID
+      if ((statusOwnerId == null || statusOwnerId.isEmpty) &&
+          message.messageType == 'status_share') {
+        debugPrint(
+            "⚠️ WARNING: Status ID is missing in a shared status message!");
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content:
+                Text('Cannot view status: Missing original status information'),
+            duration: Duration(seconds: 2),
+          ),
+        );
+        return;
+      }
 
-      // Navigate to status viewer as a full screen page
+      // If we still don't have a valid status owner ID, show error
+      if (statusOwnerId == null || statusOwnerId.isEmpty) {
+        debugPrint("CRITICAL ERROR: Could not determine status owner ID");
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Status details not available - Missing owner ID'),
+          ),
+        );
+        return;
+      }
+
+      // Debug what we're about to navigate to
+      debugPrint("🚀 Navigating to status with:");
+      debugPrint("- Owner ID: $statusOwnerId");
+      debugPrint("- Owner name: $statusOwnerName");
+      debugPrint("- Media URL: $mediaUrl");
+      debugPrint("- Specific status identifier: $specificStatusIdentifier");
+      debugPrint("- Current user ID: $currentUserId");
+
+      // Navigate to status view screen with additional information
       Navigator.push(
         context,
         MaterialPageRoute(
           builder: (context) => StatusViewScreen(
             currentUserId: currentUserId,
-            imageUrl: message.statusFileUrl!,
-            statusUserId: message.statusId!,
+            statusUserId: statusOwnerId,
+            imageUrl: mediaUrl,
             userName: statusOwnerName,
+            // Pass extra properties to help identify the specific status
+            targetMediaUrl: mediaUrl,
+            targetStatusType: message.statusType ?? 'unknown',
           ),
         ),
       );
     } catch (e) {
-      print('Error opening status: $e');
+      debugPrint('Error navigating to status: $e');
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Error opening status: ${e.toString()}')),
       );
@@ -478,11 +611,13 @@ class MessageBubble extends StatelessWidget {
   }
 
   // Status reply specific content builder
+  // Update the status reply content builder to indicate it's tappable
+
   Widget _buildStatusReplyContent(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Status content preview container
+        // Status content preview container with tap indicator
         Container(
           padding: const EdgeInsets.all(8),
           margin: const EdgeInsets.only(bottom: 8),
@@ -496,17 +631,32 @@ class MessageBubble extends StatelessWidget {
             children: [
               // Status reply header
               Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Icon(Icons.reply, size: 14, color: Colors.grey),
-                  const SizedBox(width: 4),
-                  Text(
-                    'Replied to status',
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontStyle: FontStyle.italic,
-                      color: Colors.grey[600],
-                    ),
+                  Row(
+                    children: [
+                      const Icon(Icons.reply, size: 14, color: Colors.grey),
+                      const SizedBox(width: 4),
+                      Text(
+                        'Replied to status',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontStyle: FontStyle.italic,
+                          color: Colors.grey[600],
+                        ),
+                      ),
+                    ],
                   ),
+                  // Add a tap indicator
+                  if (message.statusId != null && message.statusId!.isNotEmpty)
+                    Text(
+                      'Tap to view',
+                      style: TextStyle(
+                        fontSize: 10,
+                        color: Colors.blue[700],
+                        fontStyle: FontStyle.italic,
+                      ),
+                    ),
                 ],
               ),
               const SizedBox(height: 4),

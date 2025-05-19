@@ -14,13 +14,19 @@ class StatusViewScreen extends StatefulWidget {
   final String statusUserId;
   final String? userName;
   final String imageUrl;
+  // Add these new fields
+  final String? targetMediaUrl;
+  final String? targetStatusType;
 
-  const StatusViewScreen(
-      {super.key,
-      required this.currentUserId,
-      required this.statusUserId,
-      required this.userName,
-      required this.imageUrl});
+  const StatusViewScreen({
+    super.key,
+    required this.currentUserId,
+    required this.statusUserId,
+    required this.userName,
+    required this.imageUrl,
+    this.targetMediaUrl,
+    this.targetStatusType,
+  });
 
   @override
   _StatusViewScreenState createState() => _StatusViewScreenState();
@@ -52,6 +58,7 @@ class _StatusViewScreenState extends State<StatusViewScreen> {
   @override
   void initState() {
     super.initState();
+
     _pageController = PageController();
     _setupSocketListeners();
     _loadStatuses();
@@ -326,8 +333,131 @@ class _StatusViewScreenState extends State<StatusViewScreen> {
     }
   }
 
+  // Add this property to _StatusViewScreenState
+  bool _usedFallbackStatus = false;
+
   void _loadStatuses() {
+    // Print debug info
+    print("Loading statuses for user: ${widget.statusUserId}");
+    print("Target media URL: ${widget.targetMediaUrl}");
+    print("Target status type: ${widget.targetStatusType}");
+
+    // Request all statuses for this user
     _socketService.getUserStatuses(widget.statusUserId);
+
+    // Update the socket listener to handle responses
+    _socketService.onUserStatuses = (userId, statuses) {
+      if (userId == widget.statusUserId) {
+        if (statuses.isEmpty) {
+          print("No statuses returned from server, creating fallback status");
+          _createFallbackStatus();
+        } else {
+          print("Received ${statuses.length} statuses from server");
+
+          // Check if we need to find a specific status based on URL and type
+          if (widget.targetMediaUrl != null &&
+              widget.targetMediaUrl!.isNotEmpty) {
+            print("Looking for status with URL: ${widget.targetMediaUrl}");
+
+            // Try to find the specific status by matching the URL and type
+            int targetIndex = statuses.indexWhere((status) =>
+                status.fileUrl == widget.targetMediaUrl &&
+                status.statusType == widget.targetStatusType);
+
+            if (targetIndex >= 0) {
+              print("Found target status at index: $targetIndex");
+
+              // Rearrange to put target status first
+              if (targetIndex > 0) {
+                final targetStatus = statuses[targetIndex];
+                statuses.removeAt(targetIndex);
+                statuses.insert(0, targetStatus);
+              }
+            } else {
+              print("Target status not found, showing all available statuses");
+            }
+          }
+
+          setState(() {
+            _statuses = statuses;
+            _isLoading = false;
+          });
+
+          // Initialize the first status
+          if (_statuses.isNotEmpty) {
+            _preloadStatus(0);
+
+            // Check if current user has liked each status
+            for (var status in statuses) {
+              _checkStatusLike(status.statusId);
+            }
+
+            // Preload the next status if available
+            if (_statuses.length > 1) {
+              _preloadStatus(1, autoPlay: false);
+            }
+          }
+        }
+      }
+    };
+
+    // Add a timeout to create a fallback status if server doesn't respond
+    Future.delayed(const Duration(seconds: 5), () {
+      if (_isLoading && !_usedFallbackStatus) {
+        print("Server timeout, creating fallback status");
+        _createFallbackStatus();
+      }
+    });
+  }
+
+  void _createFallbackStatus() {
+    // Only create fallback if we have the necessary information
+    if ((widget.targetMediaUrl == null || widget.targetMediaUrl!.isEmpty) &&
+        widget.imageUrl.isEmpty) {
+      setState(() {
+        _isLoading = false;
+      });
+      return;
+    }
+
+    // Mark that we've used the fallback to prevent duplicate creation
+    _usedFallbackStatus = true;
+
+    // Determine media URL
+    final String mediaUrl = widget.targetMediaUrl ?? widget.imageUrl;
+
+    // Determine status type based on URL extension or provided type
+    String statusType = widget.targetStatusType ?? 'unknown';
+    if (statusType == 'unknown') {
+      if (mediaUrl.toLowerCase().endsWith('.jpg') ||
+          mediaUrl.toLowerCase().endsWith('.jpeg') ||
+          mediaUrl.toLowerCase().endsWith('.png')) {
+        statusType = 'image';
+      } else if (mediaUrl.toLowerCase().endsWith('.mp4') ||
+          mediaUrl.toLowerCase().endsWith('.mov')) {
+        statusType = 'video';
+      }
+    }
+
+    // Create a synthetic status from the shared message data
+    final fallbackStatus = Status(
+      statusId: 'shared_${DateTime.now().millisecondsSinceEpoch}',
+      userId: widget.statusUserId,
+      statusType: statusType,
+      content: "Shared status", // You can customize this
+      fileUrl: mediaUrl,
+      timestamp: DateTime.now().millisecondsSinceEpoch,
+      expiresAt:
+          DateTime.now().millisecondsSinceEpoch + 86400000, // 24h from now
+    );
+
+    setState(() {
+      _statuses = [fallbackStatus];
+      _isLoading = false;
+    });
+
+    // Initialize the status
+    _preloadStatus(0);
   }
 
   void _onPageChanged(int index) {
@@ -686,7 +816,32 @@ class _StatusViewScreenState extends State<StatusViewScreen> {
             'No active status found',
             style: TextStyle(color: Colors.white, fontSize: 18),
           ),
-          const SizedBox(height: 24),
+          if (widget.targetMediaUrl != null &&
+              widget.targetMediaUrl!.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 32),
+              child: Text(
+                'This status may have expired or been deleted.',
+                style: TextStyle(color: Colors.white70, fontSize: 14),
+                textAlign: TextAlign.center,
+              ),
+            ),
+          ],
+          const SizedBox(height: 20),
+          if (widget.targetMediaUrl != null) ...[
+            // Show direct media view button
+            ElevatedButton.icon(
+              onPressed: () => _createFallbackStatus(),
+              icon: const Icon(Icons.visibility),
+              label: const Text('Try to View Directly'),
+              style: ElevatedButton.styleFrom(
+                foregroundColor: Colors.white,
+                backgroundColor: Colors.blue,
+              ),
+            ),
+            const SizedBox(height: 12),
+          ],
           ElevatedButton(
             onPressed: () => Navigator.pop(context),
             child: const Text('Go Back'),

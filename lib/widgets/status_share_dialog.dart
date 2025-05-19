@@ -257,78 +257,80 @@ class _StatusShareDialogState extends State<StatusShareDialog> {
     }
   }
 
+  // Update the _sendStatusToUser method in your ContactSelectionPage
+
   void _sendStatusToUser(String receiverId) async {
+    final prefs = await SharedPreferences.getInstance();
+    final currentUserId = prefs.getString('userId');
+    print("=== CREATING STATUS SHARE MESSAGE ===");
+    print("- statusId: '${widget.statusId}'");
+    print("- mediaType: '${widget.mediaType}'");
+    print("- caption: '${widget.caption}'");
+    print("- mediaUrl: '${widget.mediaUrl}'");
+    print("- statusOwnerName: '${widget.statusOwnerName}'");
+    print("- currentUserId: '$currentUserId'");
+    print("- receiverId: '$receiverId'");
+
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final currentUserId = prefs.getString('userId');
-      // Debug log for status information
-      print("*** STATUS SHARE DATA VERIFICATION ***");
-      print("statusId: '${widget.statusId}'");
-      print("mediaType: '${widget.mediaType}'");
-      print("caption: '${widget.caption}'");
-      print("mediaUrl: '${widget.mediaUrl}'");
+      // Generate a unique message ID with timestamp and random string
+      String messageId =
+          "msg_${DateTime.now().millisecondsSinceEpoch}_${_generateRandomString(8)}";
+      print("Generated messageId: $messageId");
 
-      // Verify that we have required status information
-      if (widget.statusId.isEmpty) {
-        print("WARNING: Status ID is empty!");
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Error: Status ID is missing')),
-        );
-        return;
-      }
-
-      if (widget.mediaUrl.isEmpty) {
-        print("WARNING: Media URL is empty!");
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Error: Media URL is missing')),
-        );
-        return;
-      }
-
-      // Create a message that references the status - using a Map first to ensure all fields are properly set
-      final Map<String, dynamic> messageData = {
-        'messageId':
-            "msg_${DateTime.now().millisecondsSinceEpoch}_${_generateRandomString(10)}",
+      // Create a message that references the status - using explicit Map first
+      Map<String, dynamic> messageData = {
+        'messageId': messageId,
         'senderId': currentUserId,
         'receiverId': receiverId,
-        'message': 'Shared a status with you',
+        'message': 'Shared a status with you', // Default message text
         'timestamp': DateTime.now().millisecondsSinceEpoch,
         'delivered': false,
         'read': false,
-        'messageType': 'status_share',
-        // Explicitly set status fields
+        'messageType': 'status_share', // Special type for shared statuses
+
+        // Explicitly set status fields with String values to avoid null or conversion issues
         'statusId': widget.statusId,
         'statusType': widget.mediaType,
-        'statusContent': widget.caption,
+        'statusContent':
+            "Shared from ${widget.statusOwnerName}: ${widget.caption}",
         'statusFileUrl': widget.mediaUrl,
       };
 
-      print("Creating message with status data: $messageData");
+      // Print message data for debugging
+      print("Message data map: $messageData");
+      print("statusId in map: ${messageData['statusId']}");
 
-      // Create message object from the data
-      final message = Message.fromJson(messageData);
+      // Create a Message object from this data
+      final Message message = Message.fromJson(messageData);
 
-      // Verify that status fields were properly set in the Message object
-      print("Verifying message object:");
-      print("message.statusId: '${message.statusId}'");
-      print("message.statusType: '${message.statusType}'");
-      print("message.statusContent: '${message.statusContent}'");
-      print("message.statusFileUrl: '${message.statusFileUrl}'");
+      // Verify all fields were properly set
+      print("Created message object with:");
+      print("- message.messageId: '${message.messageId}'");
+      print("- message.messageType: '${message.messageType}'");
+      print("- message.statusId: '${message.statusId}'");
+      print("- message.statusType: '${message.statusType}'");
+      print("- message.statusContent: '${message.statusContent}'");
+      print("- message.statusFileUrl: '${message.statusFileUrl}'");
+
+      // Convert back to JSON to verify all fields are present
+      final Map<String, dynamic> json = message.toJson();
+      print("Message converted to JSON: $json");
+      print(
+          "JSON contains statusId: ${json.containsKey('statusId')} = '${json['statusId']}'");
 
       // Using SocketService to send the message
-      final socketService = SocketService();
+      final SocketService socketService = SocketService();
 
       // Ensure socket is connected
       if (!socketService.isConnected) {
         print("Socket not connected, connecting...");
         socketService.connect(currentUserId!);
         // Give some time for connection to establish
-        await Future.delayed(const Duration(milliseconds: 1000));
+        await Future.delayed(const Duration(milliseconds: 500));
       }
 
       print("Sending message via socket...");
-
-      // Send using the regular message method instead of status-specific one
+      // Send the message
       socketService.sendMessage(message);
 
       // Show confirmation and close
@@ -348,7 +350,7 @@ class _StatusShareDialogState extends State<StatusShareDialog> {
     }
   }
 
-// Add this helper method to the ContactSelectionPage class
+// Helper method to generate random string
   String _generateRandomString(int length) {
     const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
     final random = Random();
@@ -601,51 +603,85 @@ class _ContactSelectionPageState extends State<ContactSelectionPage> {
     });
   }
 
+  // Update the _sendStatusToUser method in your StatusShareDialog class
+
   void _sendStatusToUser(String receiverId) async {
-    print("Creating message with status - ID: ${widget.statusId}");
-    print("Creating message with status - Type: ${widget.mediaType}");
-    print("Creating message with status - Content: ${widget.caption}");
-    print("Creating message with status - URL: ${widget.mediaUrl}");
     try {
-      // Create a message that references the status
-      final message = Message(
-        messageId: DateTime.now().millisecondsSinceEpoch.toString(),
-        senderId: widget.currentUserId,
-        message: 'Shared a status with you', // Default message text
-        timestamp: DateTime.now().millisecondsSinceEpoch,
-        delivered: false,
-        read: false,
-        messageType: 'status_share', // Special type for shared statuses
-        receiverId: receiverId,
-        // Status information
-        statusId: widget.statusId,
-        statusType: widget.mediaType,
-        statusContent: widget.caption,
-        statusFileUrl: widget.mediaUrl,
-      );
-      print("Message created with status - ID: ${message.statusId}");
-      print("Message created with status - Type: ${message.statusType}");
-      print("Message created with status - Content: ${message.statusContent}");
-      print("Message created with status - URL: ${message.statusFileUrl}");
-      final json = message.toJson();
-      print("Message JSON: $json");
-      print("JSON contains statusId: ${json.containsKey('statusId')}");
-      print("JSON contains statusType: ${json.containsKey('statusType')}");
+      final prefs = await SharedPreferences.getInstance();
+      final currentUserId = prefs.getString('userId');
+
+      // Debug log for status information
+      print("=== STATUS SHARE DATA VERIFICATION ===");
+      print("statusId: '${widget.statusId}'");
+      print("mediaType: '${widget.mediaType}'");
+      print("caption: '${widget.caption}'");
+      print("mediaUrl: '${widget.mediaUrl}'");
+      print("statusOwnerName: '${widget.statusOwnerName}'");
+      print("currentUserId: '$currentUserId'");
+      print("receiverId: '$receiverId'");
+
+      // Verify that we have required status information
+      if (widget.statusId.isEmpty) {
+        print("WARNING: Status ID is empty!");
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Error: Status ID is missing')),
+        );
+        return;
+      }
+
+      // Generate a unique message ID
+      String messageId =
+          "msg_${DateTime.now().millisecondsSinceEpoch}_${_generateRandomString(10)}";
+
+      // Create a message that references the status - using a Map first to ensure all fields are properly set
+      final Map<String, dynamic> messageData = {
+        'messageId': messageId,
+        'senderId': currentUserId,
+        'receiverId': receiverId,
+        'message': 'Shared a status with you',
+        'timestamp': DateTime.now().millisecondsSinceEpoch,
+        'delivered': false,
+        'read': false,
+        'messageType': 'status_share',
+        // Explicitly set status fields
+        'statusId': widget.statusId,
+        'statusType': widget.mediaType,
+        'statusContent':
+            "Shared from ${widget.statusOwnerName}: ${widget.caption}",
+        'statusFileUrl': widget.mediaUrl,
+      };
+
+      print("Creating message with status data: $messageData");
+
+      // Create message object from the data
+      final message = Message.fromJson(messageData);
+
+      // Verify that status fields were properly set in the Message object
+      print("Verifying message object:");
+      print("message.statusId: '${message.statusId}'");
+      print("message.statusType: '${message.statusType}'");
+      print("message.statusContent: '${message.statusContent}'");
+      print("message.statusFileUrl: '${message.statusFileUrl}'");
+
+      // Check if the message.toJson() preserves the status fields
+      final messageJson = message.toJson();
+      print("Converted message to JSON: $messageJson");
       print(
-          "JSON contains statusContent: ${json.containsKey('statusContent')}");
-      print(
-          "JSON contains statusFileUrl: ${json.containsKey('statusFileUrl')}");
+          "JSON contains statusId: ${messageJson.containsKey('statusId')} = '${messageJson['statusId']}'");
+
       // Using SocketService to send the message
       final socketService = SocketService();
 
       // Ensure socket is connected
       if (!socketService.isConnected) {
-        socketService.connect(widget.currentUserId);
+        print("Socket not connected, connecting...");
+        socketService.connect(currentUserId!);
         // Give some time for connection to establish
-        await Future.delayed(const Duration(milliseconds: 500));
+        await Future.delayed(const Duration(milliseconds: 1000));
       }
 
-      // Send the message
+      print("Sending message via socket...");
+      // Send using the regular message method
       socketService.sendMessage(message);
 
       // Show confirmation and close
@@ -663,6 +699,17 @@ class _ContactSelectionPageState extends State<ContactSelectionPage> {
         ),
       );
     }
+  }
+
+  String _generateRandomString(int length) {
+    const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
+    final random = Random();
+    return String.fromCharCodes(
+      Iterable.generate(
+        length,
+        (_) => chars.codeUnitAt(random.nextInt(chars.length)),
+      ),
+    );
   }
 
   @override

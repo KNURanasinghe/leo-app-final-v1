@@ -394,12 +394,20 @@ class _StatusCreateScreenState extends State<StatusCreateScreen> {
 
       // Set up callback for when status is posted
       _socketService.onStatusPosted = (statusData) {
-        Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(
-                builder: (context) => StatusScreen(
-                    currentUserId: widget
-                        .currentUserId))); // Return true to indicate success
+        // Navigator.pushReplacement(
+        //     context,
+        //     MaterialPageRoute(
+        //         builder: (context) => StatusScreen(
+        //             currentUserId: widget
+        //                 .currentUserId))); // Return true to indicate success
+
+        Navigator.pop(context, true);
+
+        // Access the parent Navigator to pop back to ChatScreen1
+        // and tell ChatScreen1 to switch to the Status tab (index 1)
+        if (Navigator.canPop(context)) {
+          Navigator.pop(context, {'switchToTab': 1});
+        }
       };
     } catch (e) {
       setState(() {

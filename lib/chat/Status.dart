@@ -189,17 +189,17 @@ class _StatusPageState extends State<StatusPage> {
           IconButton(
             icon: const Icon(Icons.add, color: Colors.white),
             onPressed: () async {
-              final result = await Navigator.push(
-                context,
-                MaterialPageRoute(
-                    builder: (context) => const AddStatusScreen()),
-              );
-              if (result == true) {
-                setState(() {
-                  isLoading = true;
-                });
-                fetchStatuses();
-              }
+              // final result = await Navigator.push(
+              //   context,
+              //   MaterialPageRoute(
+              //       builder: (context) => const AddStatusScreen()),
+              // );
+              // if (result == true) {
+              //   setState(() {
+              //     isLoading = true;
+              //   });
+              //   fetchStatuses();
+              // }
             },
           ),
         ],

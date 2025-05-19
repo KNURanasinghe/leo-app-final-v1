@@ -102,6 +102,7 @@ class SocketService {
   Function(bool isUserBlocked, bool isOtherUserBlocked)? onBlockedStatus;
   Function(String blockedByUserId)? onBlockedByUser;
   Function(String receiverId, String reason)? onMessageBlocked;
+  Function(Status)? onSingleStatus;
 
   // Keep track of processed message IDs to prevent duplicates
   final Set<String> _processedMessageIds = {};
@@ -1672,6 +1673,10 @@ class SocketService {
         onNewMessage!(message);
       }
     });
+  }
+
+  void getStatusById(String statusId) {
+    socket.emit('getStatusById', {'statusId': statusId});
   }
 
   void sendStatusShareMessage(Message message) {

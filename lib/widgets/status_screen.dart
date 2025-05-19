@@ -1,12 +1,9 @@
-import 'dart:io';
 import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:image_picker/image_picker.dart';
 import 'package:http/http.dart' as http;
 import 'package:cached_network_image/cached_network_image.dart';
 import '../models/status_model.dart';
 import '../services/socket_service.dart';
-import '../constants/app_constants.dart';
 import 'status_create_screen.dart';
 import 'status_view_screen.dart';
 
@@ -84,6 +81,8 @@ class _StatusScreenState extends State<StatusScreen>
     };
   }
 
+  // Updated _fetchUserProfiles method for StatusScreen class
+
   Future<void> _fetchUserProfiles(List<String> userIds) async {
     if (userIds.isEmpty) return;
 
@@ -98,19 +97,24 @@ class _StatusScreenState extends State<StatusScreen>
 
         if (response.statusCode == 200) {
           final userData = json.decode(response.body);
+          final String name = userData['firstname'] ?? 'Unknown User';
+          final String? avatarUrl = userData['avatar'] != null
+              ? '$_pocketbaseUrl/api/files/users/$userId/${userData['avatar']}'
+              : null;
+
           profiles[userId] = UserProfile(
             id: userId,
-            name: userData['firstname'] ?? 'Unknown User',
-            avatarUrl: userData['avatar'] != null
-                ? '$_pocketbaseUrl/api/files/users/$userId/${userData['avatar']}'
-                : null,
+            name: name,
+            avatarUrl: avatarUrl,
           );
-          setState(() {
-            username = userData['firstname'] ?? 'Unknown User';
-            profileImg = userData['avatar'] != null
-                ? '$_pocketbaseUrl/api/files/users/$userId/${userData['avatar']}'
-                : null;
-          });
+
+          // Only set username and profileImg for the current user
+          if (userId == widget.currentUserId) {
+            setState(() {
+              username = name;
+              profileImg = avatarUrl;
+            });
+          }
         } else {
           print(
               'Failed to fetch profile for user $userId: ${response.statusCode}');
@@ -151,21 +155,32 @@ class _StatusScreenState extends State<StatusScreen>
       ),
     );
 
-    if (result == true) {
+    if (result != null) {
       // Refresh statuses after creating a new one
       _loadStatuses();
     }
   }
 
   void _viewUserStatus(String userId) {
+    // Get the correct user profile from the _userProfiles map
+    final userProfile = _userProfiles[userId];
+
+    // Use the specific user's name and avatar URL
+    final userName = userProfile?.name ?? 'User';
+    final imageUrl = userProfile?.avatarUrl ?? '';
+
+    print("Viewing status for user: $userId");
+    print("User name: $userName");
+    print("Image URL: $imageUrl");
+
     Navigator.push(
       context,
       MaterialPageRoute(
         builder: (context) => StatusViewScreen(
           currentUserId: widget.currentUserId,
           statusUserId: userId,
-          userName: username,
-          imageUrl: profileImg ?? '',
+          userName: userName, // Use the specific user's name
+          imageUrl: imageUrl, // Use the specific user's avatar URL
         ),
       ),
     );
@@ -368,7 +383,23 @@ class _StatusScreenState extends State<StatusScreen>
                               ),
                         onTap: () {
                           if (_hasMyStatus()) {
-                            _viewUserStatus(widget.currentUserId);
+                            // Use your own profile from the _userProfiles map
+                            final myProfile =
+                                _userProfiles[widget.currentUserId];
+                            final myName = myProfile?.name ?? 'My Status';
+                            final myImageUrl = myProfile?.avatarUrl ?? '';
+
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => StatusViewScreen(
+                                  currentUserId: widget.currentUserId,
+                                  statusUserId: widget.currentUserId,
+                                  userName: myName,
+                                  imageUrl: myImageUrl,
+                                ),
+                              ),
+                            );
                           } else {
                             _createStatus();
                           }
