@@ -454,15 +454,15 @@ class _ChatListScreenState extends State<ChatListScreenUser>
         //   onPressed: () => _showNewChatDialog(),
         //   child: const Icon(Icons.chat),
         // ),
-        appBar: AppBar(
-          title: const Text('Chats'),
-          actions: [
-            ChatRequestIndicator(userId: widget.currentUserId),
-            const SizedBox(width: 12),
-            // Your other actions like search
-          ],
-          // rest of the AppBar properties
-        ),
+        // appBar: AppBar(
+        //   title: const Text('Chats'),
+        //   actions: [
+        //     ChatRequestIndicator(userId: widget.currentUserId),
+        //     const SizedBox(width: 12),
+        //     // Your other actions like search
+        //   ],
+        //   rest of the AppBar properties
+        // ),
       ),
     );
   }

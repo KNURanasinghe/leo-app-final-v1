@@ -1,11 +1,13 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:zego_zimkit/zego_zimkit.dart';
+import '../chat/chat_list.dart';
 import '../chat/default_dialogs.dart';
 import '../constants/app_constants.dart';
 import '../services/socket_service.dart';
 import '../models/message.dart';
 import 'call_history.dart';
+import 'chat_request_screen.dart';
 import 'chat_screen_admin.dart';
 import 'status_create_screen.dart';
 import 'status_screen.dart';
@@ -44,6 +46,9 @@ class _AdminListScreenState extends State<AdminListScreen>
   late TabController _tabController;
   int _currentTabIndex = 0;
 
+  int _pendingChatRequests = 0;
+  bool _isLoadingChatRequests = true;
+
   void _startPeriodicRefresh() {
     // Cancel any existing timer first
     _stopPeriodicRefresh();
@@ -74,7 +79,7 @@ class _AdminListScreenState extends State<AdminListScreen>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-
+    _setupChatRequestListeners();
     // Check if current user is admin
     _isCurrentUserAdmin =
         AppConstants.adminUsers.contains(widget.currentUserId);
@@ -116,6 +121,61 @@ class _AdminListScreenState extends State<AdminListScreen>
         });
       }
     });
+  }
+
+  void _setupChatRequestListeners() {
+    _socketService.onChatRequestsList = (requests) {
+      setState(() {
+        _pendingChatRequests = requests.length;
+        _isLoadingChatRequests = false;
+      });
+    };
+
+    _socketService.onChatRequestReceived = (request) {
+      if (request.receiverId == widget.currentUserId &&
+          request.status == 'pending') {
+        setState(() {
+          _pendingChatRequests++;
+        });
+
+        // Show a notification
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('New chat request from ${request.senderName}'),
+              action: SnackBarAction(
+                label: 'View',
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => ChatRequestScreen(
+                        currentUserId: widget.currentUserId,
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+          );
+        }
+      }
+    };
+
+    _socketService.onChatRequestUpdated = (request) {
+      if (request.status != 'pending' &&
+          request.receiverId == widget.currentUserId) {
+        // Refresh the count when a request is approved/rejected
+        _loadPendingChatRequests();
+      }
+    };
+
+    // Load pending requests
+    _loadPendingChatRequests();
+  }
+
+  void _loadPendingChatRequests() {
+    _socketService.getPendingChatRequests(widget.currentUserId);
   }
 
   void _setupSocketListeners() {
@@ -278,6 +338,7 @@ class _AdminListScreenState extends State<AdminListScreen>
 
     // Fetch broadcast messages
     _fetchBroadcastMessages();
+    _loadPendingChatRequests();
 
     // Get regular chats only for admin users
     if (_isCurrentUserAdmin) {
@@ -472,6 +533,29 @@ class _AdminListScreenState extends State<AdminListScreen>
               isAlsoDeleteFromServer: true,
               isAlsoDeleteMessages: true,
             );
+          },
+        ),
+        Divider(
+          color: Colors.grey.withOpacity(0.3),
+        ),
+        CustomListTile(
+          icon: CupertinoIcons.person_add,
+          iconColor: Colors.green[600],
+          title: 'Chat Requests',
+          ontap: () {
+            Future.delayed(Duration.zero, () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => ChatRequestScreen(
+                    currentUserId: widget.currentUserId,
+                  ),
+                ),
+              ).then((_) {
+                // Refresh count when returning from the requests screen
+                _loadPendingChatRequests();
+              });
+            });
           },
         ),
         Divider(
@@ -826,21 +910,55 @@ class CustomListTile extends StatelessWidget {
   final IconData icon;
   final String title;
   final Color? iconColor;
-  const CustomListTile(
-      {super.key,
-      required this.title,
-      required this.icon,
-      required this.iconColor,
-      required this.ontap});
+  final int? badge; // Add this parameter
+
+  const CustomListTile({
+    super.key,
+    required this.title,
+    required this.icon,
+    required this.iconColor,
+    required this.ontap,
+    this.badge, // Initialize the parameter
+  });
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: () => ontap(),
       child: ListTile(
-        leading: Icon(
-          icon,
-          color: iconColor,
+        leading: Stack(
+          clipBehavior: Clip.none,
+          children: [
+            Icon(
+              icon,
+              color: iconColor,
+            ),
+            if (badge != null && badge! > 0)
+              Positioned(
+                right: -8,
+                top: -8,
+                child: Container(
+                  padding: const EdgeInsets.all(4),
+                  decoration: const BoxDecoration(
+                    color: Colors.red,
+                    shape: BoxShape.circle,
+                  ),
+                  constraints: const BoxConstraints(
+                    minWidth: 16,
+                    minHeight: 16,
+                  ),
+                  child: Text(
+                    badge! > 9 ? '9+' : badge!.toString(),
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+              ),
+          ],
         ),
         title: Text(title, maxLines: 1),
         trailing: Text('>',
