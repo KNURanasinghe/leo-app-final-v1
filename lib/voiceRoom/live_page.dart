@@ -12,6 +12,7 @@ import 'package:svgaplayer_flutter/svgaplayer_flutter.dart';
 import '../Account Section/Myitems.dart';
 import '../HomeScreen.dart';
 import '../services/rive_service.dart';
+import '../widgets/chat_message_widget.dart';
 import './gift/gift.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
@@ -21,6 +22,7 @@ import 'dart:math' show pi, cos, sin;
 import 'package:zego_uikit/zego_uikit.dart';
 import 'package:zego_uikit_prebuilt_live_audio_room/zego_uikit_prebuilt_live_audio_room.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'inroom_message.dart';
 import 'memberlist.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter/services.dart';
@@ -234,6 +236,9 @@ class LivePageState extends State<LivePage>
   String? _currentSongName;
 
   final Map<String, String> _userEntryEffects = {};
+
+  late SocketMessageService _messageService;
+  final List<ChatMessage> _messages = [];
 
   void _showMusicPlayerSheet(BuildContext context) {
     showModalBottomSheet(
@@ -1122,6 +1127,17 @@ class LivePageState extends State<LivePage>
           });
         }
       });
+      final welcomeMessage = ChatMessage(
+        userId: 'system', // Special ID for system messages
+        userName: 'Welcome',
+        message: '${widget.username1} has entered the room',
+        timestamp: DateTime.now().millisecondsSinceEpoch,
+      );
+
+      // Add message to message list to display in InlineMessageList
+      setState(() {
+        _messages.add(welcomeMessage);
+      });
     });
 
     socket.on('roomSettingsUpdated', (data) {
@@ -1216,10 +1232,10 @@ class LivePageState extends State<LivePage>
         // SVG Animation - keep in original position at top
         if (itemUrl != null && itemUrl.isNotEmpty)
           Positioned(
-            top: 230, // Original position at top
+            top: 260, // Original position at top
 
-            left: 200,
-            right: 20,
+            left: 20,
+
             child: Center(
               child: SizedBox(
                 width: 130, // Adjust size as needed
@@ -1230,169 +1246,150 @@ class LivePageState extends State<LivePage>
           ),
 
         // Welcome message positioned at bottom
-        Positioned(
-          bottom: MediaQuery.of(context).size.height *
-              0.13, // Position from bottom as requested
-          left: 16, // Position from left as requested
-          child: Container(
-            width: MediaQuery.of(context).size.width * 0.8,
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: Colors.black.withOpacity(0.5),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    if (avatarUrl != null && avatarUrl.isNotEmpty && !isSelf)
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(15),
-                        child: CachedNetworkImage(
-                          imageUrl: avatarUrl,
-                          width: 30,
-                          height: 30,
-                          fit: BoxFit.cover,
-                          placeholder: (context, url) => Container(
-                            color: Colors.grey.shade200,
-                            child: const Icon(Icons.person,
-                                size: 20, color: Colors.grey),
-                          ),
-                          errorWidget: (context, error, stackTrace) =>
-                              const Icon(Icons.person,
-                                  size: 20, color: Colors.white),
-                        ),
-                      ),
-                    const SizedBox(width: 8),
-                    const Text(
-                      'Welcome',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 16,
-                        decoration: TextDecoration.none,
-                      ),
-                    ),
-                    const SizedBox(width: 3),
-                    Text(
-                      userName,
-                      style: const TextStyle(
-                        color: Colors.yellow,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 16,
-                        decoration: TextDecoration.none,
-                      ),
-                    ),
-                    const SizedBox(width: 3),
-                    const Text(
-                      'entered room',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 16,
-                        decoration: TextDecoration.none,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        ),
+        // Positioned(
+        //   bottom: MediaQuery.of(context).size.height *
+        //       0.13, // Position from bottom as requested
+        //   left: 16, // Position from left as requested
+        //   child: Container(
+        //     width: MediaQuery.of(context).size.width * 0.8,
+        //     padding: const EdgeInsets.all(12),
+        //     decoration: BoxDecoration(
+        //       color: Colors.black.withOpacity(0.5),
+        //       borderRadius: BorderRadius.circular(12),
+        //     ),
+        //     child: Column(
+        //       crossAxisAlignment: CrossAxisAlignment.start,
+        //       children: [
+        //         Row(
+        //           children: [
+        //             if (avatarUrl != null && avatarUrl.isNotEmpty && !isSelf)
+        //               ClipRRect(
+        //                 borderRadius: BorderRadius.circular(15),
+        //                 child: CachedNetworkImage(
+        //                   imageUrl: avatarUrl,
+        //                   width: 30,
+        //                   height: 30,
+        //                   fit: BoxFit.cover,
+        //                   placeholder: (context, url) => Container(
+        //                     color: Colors.grey.shade200,
+        //                     child: const Icon(Icons.person,
+        //                         size: 20, color: Colors.grey),
+        //                   ),
+        //                   errorWidget: (context, error, stackTrace) =>
+        //                       const Icon(Icons.person,
+        //                           size: 20, color: Colors.white),
+        //                 ),
+        //               ),
+        //             const SizedBox(width: 8),
+        //             const Text(
+        //               'Welcome',
+        //               style: TextStyle(
+        //                 color: Colors.white,
+        //                 fontWeight: FontWeight.bold,
+        //                 fontSize: 16,
+        //                 decoration: TextDecoration.none,
+        //               ),
+        //             ),
+        //             const SizedBox(width: 3),
+        //             Text(
+        //               userName,
+        //               style: const TextStyle(
+        //                 color: Colors.yellow,
+        //                 fontWeight: FontWeight.bold,
+        //                 fontSize: 16,
+        //                 decoration: TextDecoration.none,
+        //               ),
+        //             ),
+        //             const SizedBox(width: 3),
+        //             const Text(
+        //               'entered room',
+        //               style: TextStyle(
+        //                 color: Colors.white,
+        //                 fontWeight: FontWeight.bold,
+        //                 fontSize: 16,
+        //                 decoration: TextDecoration.none,
+        //                 overflow: TextOverflow.ellipsis,
+        //               ),
+        //             ),
+        //           ],
+        //         ),
+        //       ],
+        //     ),
+        //   ),
+        // ),
       ],
     );
   }
 
-  Widget _buildWelcomeAndAnnouncement() {
-    // Calculate the position based on welcome message visibility
-    double bottomPosition = MediaQuery.of(context).size.height *
-        0.2; // Move up when welcome is hidden
+  // In LivePageState class, modify the _buildWelcomeAndAnnouncement method:
 
-    return Positioned(
-      bottom: bottomPosition,
-      left: 16,
-      right: 16,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Welcome message (visible for 5 seconds)
-          if (_showWelcomeMessage)
-            Container(
-              padding: const EdgeInsets.all(12),
-              width: MediaQuery.of(context).size.width * 0.7,
+  Widget _buildWelcomeAndAnnouncement() {
+    return Column(
+      children: [
+        // Welcome message (visible for 5 seconds)
+        if (_showWelcomeMessage)
+          Container(
+            alignment: Alignment.centerLeft, // Match message alignment
+            margin: const EdgeInsets.symmetric(
+                vertical: 4, horizontal: 16), // Match message margin
+            child: Container(
+              width: MediaQuery.of(context).size.width *
+                  0.6, // Same width as messages
+              padding: const EdgeInsets.symmetric(
+                  vertical: 8, horizontal: 12), // Same padding
               decoration: BoxDecoration(
-                color: Colors.black.withOpacity(0.3),
-                borderRadius: BorderRadius.circular(12),
+                color: Colors.black.withOpacity(0.6), // Similar styling
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: Colors.white24, width: 1),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Row(
-                  //   children: [
-                  //     const Spacer(),
-                  //     GestureDetector(
-                  //       onTap: () {
-                  //         setState(() {
-                  //           _showWelcomeMessage = false;
-                  //         });
-                  //       },
-                  //       child: const Icon(
-                  //         Icons.close,
-                  //         color: Colors.white70,
-                  //         size: 16,
-                  //       ),
-                  //     ),
-                  //   ],
-                  // ),
-                  const SizedBox(
-                    height: 2,
-                  ),
                   Text(
                     _welcomeMessage,
                     style: TextStyle(
-                      color: Colors.blue[400],
-                      height: 1,
-                      fontFamily: 'poppins',
-                      fontSize: 11,
+                      color: Colors.blue[400], // Same color as message text
+                      fontSize: 14,
                       decoration: TextDecoration.none,
+                      fontFamily: 'poppins',
                     ),
-                  ),
-                  const SizedBox(
-                    height: 2,
                   ),
                 ],
               ),
             ),
+          ),
 
-          const SizedBox(height: 15),
-          // Announcement - always shown but position depends on welcome message visibility
-          if (_announcement != null && _announcement!.isNotEmpty)
-            Container(
-              width: MediaQuery.of(context).size.width * 0.6,
-              padding: const EdgeInsets.all(12),
+        // Announcement
+        if (_announcement != null && _announcement!.isNotEmpty)
+          Container(
+            alignment: Alignment.centerLeft, // Match message alignment
+            margin: const EdgeInsets.symmetric(
+                vertical: 4, horizontal: 16), // Match message margin
+            child: Container(
+              width: MediaQuery.of(context).size.width *
+                  0.6, // Same width as messages
+              padding: const EdgeInsets.symmetric(
+                  vertical: 8, horizontal: 12), // Same padding
               decoration: BoxDecoration(
-                color: Colors.black.withOpacity(0.3),
-                borderRadius: BorderRadius.circular(12),
+                color: Colors.black.withOpacity(0.6), // Similar styling
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: Colors.white24, width: 1),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       const Text(
-                        'Announcement:',
+                        "Announcement", // Similar to username in messages
                         style: TextStyle(
-                          color: Colors.white,
+                          color: Colors.white, // Same color as usernames
                           fontWeight: FontWeight.bold,
-                          fontFamily: 'poppins',
-                          fontSize: 16,
+                          fontSize: 13,
                           decoration: TextDecoration.none,
+                          fontFamily: 'poppins',
                         ),
-                      ),
-                      const SizedBox(
-                        width: 3,
                       ),
                       if (isAdmin)
                         GestureDetector(
@@ -1400,27 +1397,27 @@ class LivePageState extends State<LivePage>
                               _showAnnouncementDialog(context);
                             },
                             child: SizedBox(
-                                width: 20,
-                                height: 20,
+                                width: 16,
+                                height: 16,
                                 child:
                                     Image.asset('assets/icons8-edit-32.png'))),
                     ],
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 2),
                   Text(
                     _announcement!,
                     style: const TextStyle(
-                      fontFamily: 'poppins',
-                      color: Colors.white,
-                      fontSize: 12,
+                      color: Colors.white, // Same color as message text
+                      fontSize: 14,
                       decoration: TextDecoration.none,
+                      fontFamily: 'poppins',
                     ),
                   ),
                 ],
               ),
             ),
-        ],
-      ),
+          ),
+      ],
     );
   }
 
@@ -1535,6 +1532,26 @@ class LivePageState extends State<LivePage>
           isConnecting = false;
         });
       }
+
+// Initialize the message service (move this here from initState)
+      _messageService = SocketMessageService(
+        socket: socket,
+        roomId: widget.roomID,
+        userId: widget.userId,
+        userName: widget.username1,
+        userAvatarUrl: _userAvatarUrl,
+      );
+
+      _messageService.messageStream.listen((message) {
+        print(
+            "LivePageState: Received message from stream: ${message.message}");
+        if (mounted) {
+          setState(() {
+            _messages.add(message);
+            print("Messages list now has ${_messages.length} items");
+          });
+        }
+      });
 
       socket.emit('fetchRoomItems', {'roomId': widget.roomID});
       // Send full user details when joining
@@ -2315,6 +2332,8 @@ class LivePageState extends State<LivePage>
   @override
   void dispose() {
     reconnectionTimer?.cancel();
+
+    _messageService.dispose();
 
     socket.emit('leaveRoom', {
       'roomId': widget.roomID,
@@ -3429,6 +3448,28 @@ class LivePageState extends State<LivePage>
                 ),
               ),
 
+            // In your build method, adjust the InlineMessageList positioning
+            Positioned(
+              left: 0,
+              right: 0,
+              bottom: MediaQuery.of(context).size.height * 0.1,
+              child: Column(
+                children: [
+                  // These are completely separate components
+                  // if (_messages.isEmpty) _buildWelcomeAndAnnouncement(),
+
+                  // Only show this when there are messages (replaces welcome/announcement)
+                  if (_messages.isNotEmpty)
+                    InlineMessageList(
+                      messages: _messages,
+                      currentUserId: widget.userId,
+                      maxVisibleMessages: 5,
+                      welcome: _buildWelcomeAndAnnouncement(),
+                    ),
+                ],
+              ),
+            ),
+
             // Power/Logout button
             Positioned(
               top: MediaQuery.of(context).padding.top + 2,
@@ -3452,7 +3493,7 @@ class LivePageState extends State<LivePage>
                 ),
               ),
             ),
-            _buildWelcomeAndAnnouncement(),
+            // _buildWelcomeAndAnnouncement(),
 
             if (_activeEmojis.isNotEmpty)
               SizedBox(
@@ -5180,62 +5221,62 @@ class LivePageState extends State<LivePage>
       //   ZegoLiveAudioRoomMenuBarButtonName.minimizingButton, // Keep only this button
       // ]
       ..userAvatarUrl = _userAvatarUrl
-      ..inRoomMessage = ZegoLiveAudioRoomInRoomMessageConfig(
-        itemBuilder: (
-          BuildContext context,
-          ZegoInRoomMessage message,
-          Map<String, dynamic> extraInfo,
-        ) {
-          /// how to use itemBuilder to custom message view
-          return Text('${message.user.name} : ${message.message}');
-        },
-      )
-      ..inRoomMessage = ZegoLiveAudioRoomInRoomMessageConfig(
-        itemBuilder: (
-          BuildContext context,
-          ZegoInRoomMessage message,
-          Map<String, dynamic> extraInfo,
-        ) {
-          // Custom message view
-          return Container(
-            margin: const EdgeInsets.symmetric(vertical: 6, horizontal: 10),
-            padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
-            decoration: BoxDecoration(
-              color: Colors.black.withOpacity(0.4),
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Message content
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        message.user.name,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 12,
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        message.message,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 14,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          );
-        },
-      )
+      // ..inRoomMessage = ZegoLiveAudioRoomInRoomMessageConfig(
+      //   itemBuilder: (
+      //     BuildContext context,
+      //     ZegoInRoomMessage message,
+      //     Map<String, dynamic> extraInfo,
+      //   ) {
+      //     /// how to use itemBuilder to custom message view
+      //     return Text('${message.user.name} : ${message.message}');
+      //   },
+      // )
+      // ..inRoomMessage = ZegoLiveAudioRoomInRoomMessageConfig(
+      //   itemBuilder: (
+      //     BuildContext context,
+      //     ZegoInRoomMessage message,
+      //     Map<String, dynamic> extraInfo,
+      //   ) {
+      //     // Custom message view
+      //     return Container(
+      //       margin: const EdgeInsets.symmetric(vertical: 6, horizontal: 10),
+      //       padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+      //       decoration: BoxDecoration(
+      //         color: Colors.black.withOpacity(0.4),
+      //         borderRadius: BorderRadius.circular(16),
+      //       ),
+      //       child: Row(
+      //         crossAxisAlignment: CrossAxisAlignment.start,
+      //         children: [
+      //           // Message content
+      //           Expanded(
+      //             child: Column(
+      //               crossAxisAlignment: CrossAxisAlignment.start,
+      //               children: [
+      //                 Text(
+      //                   message.user.name,
+      //                   style: const TextStyle(
+      //                     color: Colors.white,
+      //                     fontWeight: FontWeight.bold,
+      //                     fontSize: 12,
+      //                   ),
+      //                 ),
+      //                 const SizedBox(height: 2),
+      //                 Text(
+      //                   message.message,
+      //                   style: const TextStyle(
+      //                     color: Colors.white,
+      //                     fontSize: 14,
+      //                   ),
+      //                 ),
+      //               ],
+      //             ),
+      //           ),
+      //         ],
+      //       ),
+      //     );
+      //   },
+      // )
       ..bottomMenuBar = ZegoLiveAudioRoomBottomMenuBarConfig(
         maxCount: 7,
         hostExtendButtons: [
@@ -5343,7 +5384,6 @@ class LivePageState extends State<LivePage>
   }
 
   void _showMessageBottomSheet(BuildContext context) {
-    print('Showing message bottom sheet');
     final TextEditingController messageController = TextEditingController();
 
     showModalBottomSheet(
@@ -5393,84 +5433,58 @@ class LivePageState extends State<LivePage>
                 const SizedBox(height: 20),
 
                 // Text field
-                TextField(
-                  controller: messageController,
-                  style: const TextStyle(color: Colors.white),
-                  decoration: InputDecoration(
-                    hintText: 'Type your message...',
-                    hintStyle: TextStyle(color: Colors.grey[400]),
-                    filled: true,
-                    fillColor: Colors.white.withOpacity(0.1),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10),
-                      borderSide: BorderSide.none,
-                    ),
-                    contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 16, vertical: 12),
-                    suffixIcon: IconButton(
-                      icon: Icon(Icons.send, color: Colors.blue[400]),
-                      onPressed: () {
-                        // Get the message text
-                        final message = messageController.text.trim();
-                        if (message.isNotEmpty) {
-                          // Send the message using ZegoUIKit
-                          ZegoUIKit().sendInRoomMessage(message);
-
-                          // Emit message to socket
-                          socket.emit('roomMessage', {
-                            'roomId': widget.roomID,
-                            'userId': widget.userId,
-                            'userName': widget.username1,
-                            'message': message,
-                            'timestamp': DateTime.now().millisecondsSinceEpoch
-                          });
-
-                          // Close the bottom sheet
-                          Navigator.pop(context);
-
-                          // Show a notification or handle message sent
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Message sent'),
-                              duration: Duration(seconds: 1),
-                            ),
-                          );
-                        }
-                      },
-                    ),
-                  ),
-                  maxLines: 3,
-                  minLines: 1,
-                  textInputAction: TextInputAction.send,
-                  onSubmitted: (value) {
-                    final message = value.trim();
-                    if (message.isNotEmpty) {
-                      // Send the message using ZegoUIKit
-                      ZegoUIKit().sendInRoomMessage(message);
-
-                      // Emit message to socket
-                      socket.emit('roomMessage', {
-                        'roomId': widget.roomID,
-                        'userId': widget.userId,
-                        'userName': widget.username1,
-                        'message': message,
-                        'timestamp': DateTime.now().millisecondsSinceEpoch
-                      });
-
-                      // Close the bottom sheet
-                      Navigator.pop(context);
-
-                      // Show a notification or handle message sent
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Message sent'),
-                          duration: Duration(seconds: 1),
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: messageController,
+                        style: const TextStyle(color: Colors.white),
+                        decoration: InputDecoration(
+                          hintText: 'Type your message...',
+                          hintStyle: TextStyle(color: Colors.grey[400]),
+                          filled: true,
+                          fillColor: Colors.white.withOpacity(0.1),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(20),
+                            borderSide: BorderSide.none,
+                          ),
+                          contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 16, vertical: 12),
                         ),
-                      );
-                    }
-                  },
+                        textInputAction: TextInputAction.send,
+                        onSubmitted: (value) {
+                          if (value.trim().isNotEmpty) {
+                            print(
+                                "Sending message from text field submit: $value");
+                            _messageService.sendMessage(value);
+                            messageController.clear();
+                            Navigator.pop(context);
+                          }
+                        },
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Container(
+                      decoration: const BoxDecoration(
+                        color: Colors.blue,
+                        shape: BoxShape.circle,
+                      ),
+                      child: IconButton(
+                        icon: const Icon(Icons.send, color: Colors.white),
+                        onPressed: () {
+                          final message = messageController.text.trim();
+                          if (message.isNotEmpty) {
+                            print(
+                                "Sending message from button press: $message");
+                            _messageService.sendMessage(message);
+                            messageController.clear();
+                            Navigator.pop(context);
+                          }
+                        },
+                      ),
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 20),
               ],
             ),
           ),
@@ -6229,14 +6243,17 @@ class LivePageState extends State<LivePage>
 
   void _handleUserEntry(ZegoUIKitUser user) async {
     final userItemUrl = await _fetchUserActiveItem(user.id);
-    // Announce user entry to everyone via socket
-    socket.emit('announceEntry', {
-      'roomId': widget.roomID,
-      'userId': user.id,
-      'userName': user.name,
-      'userItem': userItemUrl,
-      'timestamp': DateTime.now().millisecondsSinceEpoch
-    });
+    // Only emit if it's not the current user (to avoid duplicates)
+    if (user.id != localUserID) {
+      socket.emit('announceEntry', {
+        'roomId': widget.roomID,
+        'userId': user.id,
+        'userName': user.name,
+        'userAvatar': _userAvatarUrl,
+        'userItem': userItemUrl,
+        'timestamp': DateTime.now().millisecondsSinceEpoch
+      });
+    }
   }
 
   ZegoUIKitPrebuiltLiveAudioRoomEvents get events {
@@ -6247,10 +6264,10 @@ class LivePageState extends State<LivePage>
             'onUserCountOrPropertyChanged:${users.map((e) => e.toString())}',
           );
         },
-        onEnter: (ZegoUIKitUser user) {
-          debugPrint('onEnter: User ${user.id} entered the room');
-          _handleUserEntry(user);
-        },
+        // onEnter: (ZegoUIKitUser user) {
+        //   debugPrint('onEnter: User ${user.id} entered the room');
+        //   _handleUserEntry(user);
+        // },
       ),
       seat: ZegoLiveAudioRoomSeatEvents(
         onClosed: () {
@@ -6397,7 +6414,7 @@ class LivePageState extends State<LivePage>
 
         //gift box
         Positioned(
-          bottom: MediaQuery.of(context).size.width * 0.75, // Adjusted position
+          bottom: MediaQuery.of(context).size.width * 0.7, // Adjusted position
           right: 16, // Adjusted position
           child: SizedBox(
             width: MediaQuery.of(context).size.width *
