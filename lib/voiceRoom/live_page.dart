@@ -240,6 +240,98 @@ class LivePageState extends State<LivePage>
   late SocketMessageService _messageService;
   final List<ChatMessage> _messages = [];
 
+  double _currentPlaybackPosition = 0.0;
+  double _totalDuration = 1.0; // Default to 1 to avoid division by zero
+  Timer? _positionUpdateTimer;
+
+  double _sliderPosition = 0.0; // Add this line to define _sliderPosition
+
+  // Alternative implementation using time estimation
+  void _startPositionTracking() {
+    // Cancel any existing timer
+    _positionUpdateTimer?.cancel();
+
+    // Create a new timer that updates position every 100ms
+    _positionUpdateTimer =
+        Timer.periodic(const Duration(milliseconds: 100), (timer) {
+      if (mounted && _isMusicPlaying) {
+        try {
+          // Try to get the actual position from the media player
+          final currentProgress =
+              ZegoUIKitPrebuiltLiveAudioRoomController().media.currentProgress;
+
+          if (currentProgress >= 0) {
+            setState(() {
+              _currentPlaybackPosition = currentProgress.toDouble();
+
+              // Update total duration if needed
+              if (_totalDuration <= 1.0) {
+                _updateTotalDuration();
+              }
+            });
+          } else {
+            // Fall back to time estimation if we can't get actual position
+            setState(() {
+              _currentPlaybackPosition += 100; // Add 100ms
+            });
+          }
+
+          // If we've reached the end, call _onMusicStopped
+          if (_currentPlaybackPosition >= _totalDuration) {
+            // For non-looping behavior:
+            _onMusicStopped();
+          }
+        } catch (e) {
+          print('Error during position tracking: $e');
+        }
+      }
+    });
+  }
+
+  void _updateTotalDuration() {
+    try {
+      // Get total duration from the media player
+      final durationMillis =
+          ZegoUIKitPrebuiltLiveAudioRoomController().media.totalDuration;
+
+      if (durationMillis > 0) {
+        setState(() {
+          _totalDuration = durationMillis.toDouble();
+        });
+      }
+    } catch (e) {
+      print('Error getting media duration: $e');
+    }
+  }
+
+// Add this method to cancel the timer when appropriate
+  void _stopPositionTracking() {
+    _positionUpdateTimer?.cancel();
+    _positionUpdateTimer = null;
+  }
+
+// Make sure to call this when starting music playback
+  void _onMusicStarted() {
+    setState(() {
+      _isMusicPlaying = true;
+      _currentPlaybackPosition = 0.0;
+    });
+
+    // Get the media duration when playback starts
+    _updateTotalDuration();
+    _startPositionTracking();
+  }
+
+// Make sure to call this when stopping music
+  void _onMusicStopped() {
+    setState(() {
+      _isMusicPlaying = false;
+      _currentPlaybackPosition = 0.0;
+      _currentSongName = null;
+    });
+    _stopPositionTracking();
+  }
+
   void _showMusicPlayerSheet(BuildContext context) {
     showModalBottomSheet(
       context: context,
@@ -495,6 +587,7 @@ class LivePageState extends State<LivePage>
                   filePathOrURL: url,
                   enableRepeat: true,
                 );
+            _onMusicStarted();
             setState(() {
               _isMusicPlaying = true;
               _currentSongName = title;
@@ -523,6 +616,8 @@ class LivePageState extends State<LivePage>
                   filePathOrURL: targetPathOrURL,
                   enableRepeat: true,
                 );
+            _onMusicStarted();
+
             setState(() {
               _isMusicPlaying = true;
               _currentSongName = mediaFile.name;
@@ -1349,8 +1444,9 @@ class LivePageState extends State<LivePage>
                     _welcomeMessage,
                     style: TextStyle(
                       color: Colors.blue[400], // Same color as message text
-                      fontSize: 14,
+                      fontSize: 12,
                       decoration: TextDecoration.none,
+                      fontWeight: FontWeight.normal,
                       fontFamily: 'poppins',
                     ),
                   ),
@@ -1408,8 +1504,9 @@ class LivePageState extends State<LivePage>
                     _announcement!,
                     style: const TextStyle(
                       color: Colors.white, // Same color as message text
-                      fontSize: 14,
+                      fontSize: 12,
                       decoration: TextDecoration.none,
+                      fontWeight: FontWeight.normal,
                       fontFamily: 'poppins',
                     ),
                   ),
@@ -2334,6 +2431,7 @@ class LivePageState extends State<LivePage>
     reconnectionTimer?.cancel();
 
     _messageService.dispose();
+    _stopPositionTracking();
 
     socket.emit('leaveRoom', {
       'roomId': widget.roomID,
@@ -3169,70 +3267,194 @@ class LivePageState extends State<LivePage>
   }
 
   Widget _buildMusicPlayingIndicator() {
-    if (!_isMusicPlaying || _currentSongName == null) {
+    // Only check if a song is loaded, not if it's playing
+    if (_currentSongName == null) {
       return const SizedBox.shrink();
     }
 
-    return Positioned(
-      bottom: MediaQuery.of(context).size.height *
-          0.16, // Position above other controls
-      left: 16,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        decoration: BoxDecoration(
-          color: Colors.black.withOpacity(0.6),
-          borderRadius: BorderRadius.circular(20),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(Icons.music_note, color: Colors.blue, size: 16),
-            const SizedBox(width: 8),
-            Text(
-              _currentSongName!,
-              style: const TextStyle(
-                fontFamily: 'poppins',
-                color: Colors.white,
-                fontSize: 12,
+    // Calculate slider position from current playback and total duration
+    // Avoid division by zero
+    double calculatedSliderPosition = _totalDuration > 0
+        ? (_currentPlaybackPosition / _totalDuration).clamp(0.0, 1.0)
+        : 0.0;
+
+    return FractionallySizedBox(
+      widthFactor: 0.7,
+      alignment: Alignment.centerLeft,
+      child: Material(
+        type: MaterialType.transparency,
+        child: Container(
+          margin: const EdgeInsets.symmetric(horizontal: 16),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          decoration: BoxDecoration(
+            color: Colors.black.withOpacity(0.7),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Top row with power button and song name
+              Row(
+                children: [
+                  // Power button
+                  GestureDetector(
+                    onTap: () {
+                      // Stop the music and hide the player
+                      ZegoUIKitPrebuiltLiveAudioRoomController().media.stop();
+                      _onMusicStopped();
+                      setState(() {
+                        _isMusicPlaying = false;
+                        _currentSongName = null;
+                      });
+                    },
+                    child: const Icon(
+                      Icons.power_settings_new,
+                      color: Colors.white70,
+                      size: 16,
+                    ),
+                  ),
+
+                  const SizedBox(width: 10),
+
+                  // Song name
+                  Expanded(
+                    child: Text(
+                      _currentSongName!,
+                      style: const TextStyle(
+                        fontFamily: 'poppins',
+                        color: Colors.white,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w500,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
               ),
-            ),
-            const SizedBox(width: 8),
-            GestureDetector(
-              onTap: () {
-                if (_isMusicPlaying) {
-                  ZegoUIKitPrebuiltLiveAudioRoomController().media.pause();
-                  setState(() {
-                    _isMusicPlaying = false;
-                  });
-                } else {
-                  ZegoUIKitPrebuiltLiveAudioRoomController().media.resume();
-                  setState(() {
-                    _isMusicPlaying = true;
-                  });
-                }
-              },
-              child: Icon(
-                _isMusicPlaying ? Icons.pause : Icons.play_arrow,
-                color: Colors.white,
-                size: 16,
+
+              const SizedBox(height: 6),
+
+              // Progress bar and controls row
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  // Volume button
+                  GestureDetector(
+                    onTap: () {
+                      // Toggle mute/unmute
+                      // Implementation can be added here
+                    },
+                    child: const Icon(
+                      Icons.volume_up,
+                      color: Colors.white70,
+                      size: 16,
+                    ),
+                  ),
+
+                  // Progress slider - improved
+                  Expanded(
+                    child: SliderTheme(
+                      data: SliderTheme.of(context).copyWith(
+                        trackHeight: 2,
+                        thumbShape:
+                            const RoundSliderThumbShape(enabledThumbRadius: 6),
+                        overlayShape:
+                            const RoundSliderOverlayShape(overlayRadius: 10),
+                        activeTrackColor: Colors.teal,
+                        inactiveTrackColor: Colors.grey.withOpacity(0.3),
+                        thumbColor: Colors.teal,
+                        overlayColor: Colors.teal.withOpacity(0.2),
+                      ),
+                      child: Slider(
+                        value: calculatedSliderPosition,
+                        onChanged: (value) {
+                          // Update the UI during drag
+                          setState(() {
+                            _sliderPosition = value;
+                          });
+                        },
+                        onChangeEnd: (value) {
+                          // Only seek when user releases the slider
+                          if (_totalDuration <= 0) {
+                            // Get the total duration if not already set
+                            _updateTotalDuration();
+                            return;
+                          }
+
+                          final seekPos = (value * _totalDuration).toInt();
+                          try {
+                            // Stop the timer during seeking to avoid conflicts
+                            _stopPositionTracking();
+
+                            // Use the correct API from ZegoUIKit
+                            ZegoUIKitPrebuiltLiveAudioRoomController()
+                                .media
+                                .seekTo(seekPos);
+
+                            // Update our position tracker
+                            setState(() {
+                              _currentPlaybackPosition = seekPos.toDouble();
+                              _sliderPosition = value;
+                            });
+
+                            // Restart the position tracking from this point
+                            if (_isMusicPlaying) {
+                              _startPositionTracking();
+                            }
+                          } catch (e) {
+                            print('Error seeking: $e');
+                          }
+                        },
+                      ),
+                    ),
+                  ),
+
+                  // Play/Pause button
+                  GestureDetector(
+                    onTap: () {
+                      if (_isMusicPlaying) {
+                        ZegoUIKitPrebuiltLiveAudioRoomController()
+                            .media
+                            .pause();
+                        setState(() {
+                          _isMusicPlaying = false;
+                        });
+                        _stopPositionTracking();
+                      } else {
+                        ZegoUIKitPrebuiltLiveAudioRoomController()
+                            .media
+                            .resume();
+                        setState(() {
+                          _isMusicPlaying = true;
+                        });
+                        _startPositionTracking();
+                      }
+                    },
+                    child: Icon(
+                      _isMusicPlaying ? Icons.pause : Icons.play_arrow,
+                      color: Colors.white,
+                      size: 22,
+                    ),
+                  ),
+
+                  const SizedBox(width: 10),
+
+                  // Playlist button
+                  GestureDetector(
+                    onTap: () {
+                      _showMusicPlayerSheet(context);
+                    },
+                    child: const Icon(
+                      Icons.playlist_play,
+                      color: Colors.white,
+                      size: 22,
+                    ),
+                  ),
+                ],
               ),
-            ),
-            const SizedBox(width: 4),
-            GestureDetector(
-              onTap: () {
-                ZegoUIKitPrebuiltLiveAudioRoomController().media.stop();
-                setState(() {
-                  _isMusicPlaying = false;
-                  _currentSongName = null;
-                });
-              },
-              child: const Icon(
-                Icons.stop,
-                color: Colors.white,
-                size: 16,
-              ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -3452,7 +3674,7 @@ class LivePageState extends State<LivePage>
             Positioned(
               left: 0,
               right: 0,
-              bottom: MediaQuery.of(context).size.height * 0.1,
+              bottom: MediaQuery.of(context).size.height * 0.12,
               child: Column(
                 children: [
                   // These are completely separate components
@@ -3468,6 +3690,14 @@ class LivePageState extends State<LivePage>
                     ),
                 ],
               ),
+            ),
+            // In your build method, replace the current music player position with this
+            Positioned(
+              left: 0,
+              right: 0,
+              bottom: MediaQuery.of(context).size.height * 0.06 +
+                  10, // Position it above the bottom controls
+              child: _buildMusicPlayingIndicator(),
             ),
 
             // Power/Logout button
@@ -3595,7 +3825,7 @@ class LivePageState extends State<LivePage>
                 ),
               ),
             ),
-            _buildMusicPlayingIndicator(),
+
             // Emoji bottom sheet
             // Positioned(
             //   bottom:
@@ -5398,39 +5628,39 @@ class LivePageState extends State<LivePage>
           child: Container(
             decoration: BoxDecoration(
               color: Colors.black.withOpacity(0.9),
-              borderRadius: const BorderRadius.only(
-                topLeft: Radius.circular(20),
-                topRight: Radius.circular(20),
-              ),
+              // borderRadius: const BorderRadius.only(
+              //   topLeft: Radius.circular(20),
+              //   topRight: Radius.circular(20),
+              // ),
             ),
-            padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
+            padding: const EdgeInsets.fromLTRB(14, 10, 14, 14),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 // Handle bar
-                Center(
-                  child: Container(
-                    width: 40,
-                    height: 4,
-                    margin: const EdgeInsets.only(bottom: 16),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.3),
-                      borderRadius: BorderRadius.circular(2),
-                    ),
-                  ),
-                ),
+                // Center(
+                //   child: Container(
+                //     width: 40,
+                //     height: 4,
+                //     margin: const EdgeInsets.only(bottom: 16),
+                //     decoration: BoxDecoration(
+                //       color: Colors.white.withOpacity(0.3),
+                //       borderRadius: BorderRadius.circular(2),
+                //     ),
+                //   ),
+                // ),
 
-                // Title
-                const Text(
-                  'Send Message',
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                  ),
-                ),
-                const SizedBox(height: 20),
+                // // Title
+                // const Text(
+                //   'Send Message',
+                //   style: TextStyle(
+                //     fontSize: 20,
+                //     fontWeight: FontWeight.bold,
+                //     color: Colors.white,
+                //   ),
+                // ),
+                // const SizedBox(height: 20),
 
                 // Text field
                 Row(
