@@ -11,6 +11,8 @@ class CallButtons extends StatefulWidget {
   final String targetUserId;
   final String name;
   final String image;
+  final bool showAudioOnly; // New parameter to show only audio button
+  final bool showVideoOnly; // New parameter to show only video button
 
   const CallButtons({
     super.key,
@@ -18,6 +20,8 @@ class CallButtons extends StatefulWidget {
     required this.targetUserId,
     required this.name,
     required this.image,
+    this.showAudioOnly = false,
+    this.showVideoOnly = false,
   });
 
   @override
@@ -75,6 +79,11 @@ class _CallButtonsState extends State<CallButtons> {
   String _generateRoomId() {
     final sortedIds = [widget.currentUserId, widget.targetUserId]..sort();
     return 'room_${sortedIds[0]}_${sortedIds[1]}';
+  }
+
+  // PUBLIC METHOD - Make this accessible from outside
+  Future<void> startCall(BuildContext context, bool isVideoCall) async {
+    await _startCall(context, isVideoCall);
   }
 
   Future<void> _startCall(BuildContext context, bool isVideoCall) async {
@@ -240,6 +249,45 @@ class _CallButtonsState extends State<CallButtons> {
 
   @override
   Widget build(BuildContext context) {
+    // If showAudioOnly is true, only show audio button
+    if (widget.showAudioOnly) {
+      return GestureDetector(
+        onTap: isInitializing ? null : () => _startCall(context, false),
+        child: Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: isInitializing ? Colors.grey : Colors.blue,
+            shape: BoxShape.circle,
+          ),
+          child: const Icon(
+            Icons.phone,
+            color: Colors.white,
+            size: 20,
+          ),
+        ),
+      );
+    }
+
+    // If showVideoOnly is true, only show video button
+    if (widget.showVideoOnly) {
+      return GestureDetector(
+        onTap: isInitializing ? null : () => _startCall(context, true),
+        child: Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: isInitializing ? Colors.grey : Colors.blue,
+            shape: BoxShape.circle,
+          ),
+          child: const Icon(
+            Icons.videocam,
+            color: Colors.white,
+            size: 20,
+          ),
+        ),
+      );
+    }
+
+    // Default: Show both buttons
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [

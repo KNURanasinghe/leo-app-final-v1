@@ -9,6 +9,9 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 import '../widgets/chat_request_screen.dart';
+// Import your existing CallButtons widget
+
+import '../widgets/custom_call_button.dart'; // Adjust the path as needed
 
 class ChatListScreenUser extends StatefulWidget {
   final String currentUserId;
@@ -616,41 +619,56 @@ class _ChatListScreenState extends State<ChatListScreenUser>
                 color: isOnline ? Colors.green : Colors.grey,
               ),
             ),
-      trailing: Column(
-        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-        crossAxisAlignment: CrossAxisAlignment.end,
+      trailing: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          // Show timestamp
-          if (hasLatestMessage)
-            Text(
-              _formatTimestamp(latestMessage!.timestamp),
-              style: TextStyle(
-                fontSize: 12,
-                color: unreadCount > 0 ? Colors.green : Colors.grey.shade600,
-                fontWeight:
-                    unreadCount > 0 ? FontWeight.bold : FontWeight.normal,
-              ),
-            ),
-          // Show unread count in WhatsApp style
-          if (unreadCount > 0)
-            Container(
-              margin: const EdgeInsets.only(top: 4),
-              padding: const EdgeInsets.all(6),
-              decoration: const BoxDecoration(
-                color: Colors.green,
-                shape: BoxShape.circle,
-              ),
-              child: Text(
-                unreadCount > 99 ? '99+' : '$unreadCount',
-                style: const TextStyle(
-                  color: Colors
-                      .white, // Standard WhatsApp uses white text on green
-                  fontSize: 12,
-                  fontWeight: FontWeight.bold,
+          // Timestamp and unread count column
+          Column(
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            crossAxisAlignment: CrossAxisAlignment.end,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Show timestamp
+              if (hasLatestMessage)
+                Text(
+                  _formatTimestamp(latestMessage!.timestamp),
+                  style: TextStyle(
+                    fontSize: 12,
+                    color:
+                        unreadCount > 0 ? Colors.green : Colors.grey.shade600,
+                    fontWeight:
+                        unreadCount > 0 ? FontWeight.bold : FontWeight.normal,
+                  ),
                 ),
-              ),
-            ),
+              // Show unread count in WhatsApp style
+              if (unreadCount > 0)
+                Container(
+                  margin: const EdgeInsets.only(top: 4),
+                  padding: const EdgeInsets.all(6),
+                  decoration: const BoxDecoration(
+                    color: Colors.green,
+                    shape: BoxShape.circle,
+                  ),
+                  child: Text(
+                    unreadCount > 99 ? '99+' : '$unreadCount',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(width: 8),
+          // Use your existing CallButtons widget but only show audio call
+          CallButtons(
+            currentUserId: widget.currentUserId,
+            targetUserId: userId,
+            name: displayName,
+            image: profileImageUrl ?? '',
+            showAudioOnly: true, // Only show the audio call button
+          ),
         ],
       ),
       onTap: () {
@@ -704,6 +722,8 @@ class _ChatListScreenState extends State<ChatListScreenUser>
     }
   }
 }
+
+// No need for separate AudioCallButton widget anymore
 
 class ChatRequestIndicator extends StatefulWidget {
   final String userId;

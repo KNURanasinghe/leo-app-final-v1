@@ -118,6 +118,7 @@ class _AdminListScreenState extends State<AdminListScreen>
         setState(() {
           _isLoading = false;
           _isBroadCastLoading = false;
+          _isLoadingChatRequests = false;
         });
       }
     });
@@ -175,6 +176,7 @@ class _AdminListScreenState extends State<AdminListScreen>
   }
 
   void _loadPendingChatRequests() {
+    print('_pendingChatRequests $_pendingChatRequests');
     _socketService.getPendingChatRequests(widget.currentUserId);
   }
 
@@ -542,8 +544,14 @@ class _AdminListScreenState extends State<AdminListScreen>
           icon: CupertinoIcons.person_add,
           iconColor: Colors.green[600],
           title: 'Chat Requests',
+          badge: _isLoadingChatRequests
+              ? null
+              : (_pendingChatRequests > 0 ? _pendingChatRequests : null),
           ontap: () {
             Future.delayed(Duration.zero, () {
+              setState(() {
+                _pendingChatRequests = 0;
+              });
               Navigator.push(
                 context,
                 MaterialPageRoute(
