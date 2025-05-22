@@ -4,6 +4,7 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'ProfileCreationScreen.dart';
+import 'package:leo_app_01/services/firebase_service.dart'; // Import your FirebaseService
 
 class OtpScreen extends StatefulWidget {
   final String phoneNumber;
@@ -19,6 +20,9 @@ class _OtpScreenState extends State<OtpScreen> {
   final List<TextEditingController> _controllers =
       List.generate(6, (index) => TextEditingController());
   final List<FocusNode> _focusNodes = List.generate(6, (index) => FocusNode());
+
+  // Add FirebaseService instance
+  final FirebaseService _firebaseService = FirebaseService();
 
   @override
   void initState() {
@@ -56,54 +60,50 @@ class _OtpScreenState extends State<OtpScreen> {
         headers: {'Content-Type': 'application/json'},
       );
 
+      String userId;
+      bool isExistingUser = false;
+
       if (checkResponse.statusCode == 200) {
         final checkData = json.decode(checkResponse.body);
 
         // If phone number exists
         if (checkData['items'] != null && checkData['items'].length > 0) {
           final existingUser = checkData['items'][0];
-          final existingUserId = existingUser['id'];
-
-          // Save existing user ID to SharedPreferences
-          final prefs = await SharedPreferences.getInstance();
-          await prefs.setString('userId', existingUserId);
-
-          // Navigate to appropriate screen
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(
-                builder: (context) =>
-                    ProfileCreationScreen(userId: existingUserId)),
+          userId = existingUser['id'];
+          isExistingUser = true;
+        } else {
+          // If phone number doesn't exist, create new user
+          final createResponse = await http.post(
+            checkUrl,
+            headers: {'Content-Type': 'application/json'},
+            body: json.encode({
+              'phonenumber': phoneNumberInt,
+            }),
           );
-          return;
+
+          if (createResponse.statusCode == 200) {
+            final responseData = json.decode(createResponse.body);
+            userId = responseData['id'];
+          } else {
+            throw Exception('Failed to create user');
+          }
         }
-      }
 
-      // If phone number doesn't exist, create new user
-      final createResponse = await http.post(
-        checkUrl,
-        headers: {'Content-Type': 'application/json'},
-        body: json.encode({
-          'phonenumber': phoneNumberInt,
-        }),
-      );
-
-      if (createResponse.statusCode == 200) {
-        final responseData = json.decode(createResponse.body);
-        String userId = responseData['id'];
-
-        // Save new user ID to SharedPreferences
+        // Save user ID to SharedPreferences
         final prefs = await SharedPreferences.getInstance();
         await prefs.setString('userId', userId);
 
-        // Navigate to profile creation
+        // **IMPORTANT: Update FCM token after successful verification**
+        await _updateFCMToken(userId);
+
+        // Navigate to appropriate screen
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(
               builder: (context) => ProfileCreationScreen(userId: userId)),
         );
       } else {
-        throw Exception('Failed to create user');
+        throw Exception('Failed to check user existence');
       }
     } catch (e) {
       print('Error updating phone number: $e');
@@ -113,6 +113,19 @@ class _OtpScreenState extends State<OtpScreen> {
           backgroundColor: Colors.red,
         ),
       );
+    }
+  }
+
+  // Method to update FCM token
+  Future<void> _updateFCMToken(String userId) async {
+    try {
+      // Set the user ID in FirebaseService which will automatically update the token
+      _firebaseService.setUserId(userId);
+
+      print('FCM token update initiated for user: $userId');
+    } catch (e) {
+      print('Error updating FCM token: $e');
+      // Don't show error to user as this is not critical for the flow
     }
   }
 

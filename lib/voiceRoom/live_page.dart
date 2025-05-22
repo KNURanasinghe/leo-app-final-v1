@@ -246,6 +246,412 @@ class LivePageState extends State<LivePage>
 
   double _sliderPosition = 0.0; // Add this line to define _sliderPosition
 
+  // Fixed parallel initialization method
+  Future<void> _initializeParallel() async {
+    try {
+      // Show loading indicator
+      setState(() {
+        _isLoading = true;
+      });
+
+      // Group 1: Convert all functions to return Future<void>
+      await Future.wait<void>([
+        _initializeSocketAsync(),
+        _fetchInitialUsersAsync(),
+        _fetchAndSetUserAvatarAsync(),
+        _fetchVoiceRoomDetailsAsync(),
+        _fetchLanguageDetailsAsync(widget.roomID),
+        _createOnlineUserRecordAsync(),
+        _checkAdminStatusAsync(),
+        _fetchOwnBorderAsync(),
+      ]);
+
+      // Hide loading indicator
+      setState(() {
+        _isLoading = false;
+      });
+    } catch (e) {
+      print('Error in parallel initialization: $e');
+      setState(() {
+        _isLoading = false;
+      });
+    }
+  }
+
+// Convert existing methods to return Future<void> consistently
+
+  Future<void> _initializeSocketAsync() async {
+    try {
+      _initializeSocket(); // Your existing sync method
+      // If _initializeSocket is already async, just call it directly
+    } catch (e) {
+      print('Error initializing socket: $e');
+    }
+  }
+
+  Future<void> _fetchInitialUsersAsync() async {
+    try {
+      await _fetchInitialUsers();
+    } catch (e) {
+      print('Error fetching initial users: $e');
+    }
+  }
+
+  Future<void> _fetchAndSetUserAvatarAsync() async {
+    try {
+      await _fetchAndSetUserAvatar();
+    } catch (e) {
+      print('Error fetching user avatar: $e');
+    }
+  }
+
+  Future<void> _fetchVoiceRoomDetailsAsync() async {
+    try {
+      await _fetchVoiceRoomDetails();
+    } catch (e) {
+      print('Error fetching voice room details: $e');
+    }
+  }
+
+  Future<void> _fetchLanguageDetailsAsync(String roomId) async {
+    try {
+      await _fetchLanguageDetails(roomId);
+    } catch (e) {
+      print('Error fetching language details: $e');
+    }
+  }
+
+  Future<void> _createOnlineUserRecordAsync() async {
+    try {
+      await _createOnlineUserRecord();
+    } catch (e) {
+      print('Error creating online user record: $e');
+    }
+  }
+
+  Future<void> _checkAdminStatusAsync() async {
+    try {
+      await _checkAdminStatus();
+    } catch (e) {
+      print('Error checking admin status: $e');
+    }
+  }
+
+  Future<void> _fetchOwnBorderAsync() async {
+    try {
+      await _fetchOwnBorder();
+    } catch (e) {
+      print('Error fetching own border: $e');
+    }
+  }
+
+// Load current user's active item for entry animations
+  Future<void> _fetchAndSetUserActiveItemAsync() async {
+    try {
+      final itemUrl = await _fetchUserActiveItem(widget.userId);
+      if (itemUrl != null) {
+        setState(() {
+          _userEntryEffects[widget.userId] = itemUrl;
+        });
+        print('User active item loaded: $itemUrl');
+      }
+    } catch (e) {
+      print('Error fetching user active item: $e');
+    }
+  }
+
+// Load all users' borders in parallel
+  Future<void> _fetchAllUsersBordersAsync() async {
+    try {
+      // Fetch borders for all online users
+      for (var user in onlineUsers) {
+        final borderUrl = await _fetchUserBorder(user.id);
+        if (borderUrl != null) {
+          setState(() {
+            _userBorders[user.id] = borderUrl;
+          });
+        }
+      }
+      print('All users borders loaded: ${_userBorders.length} borders');
+    } catch (e) {
+      print('Error fetching all users borders: $e');
+    }
+  }
+
+// Helper method to fetch individual user border
+  Future<String?> _fetchUserBorder(String userId) async {
+    try {
+      final response = await http.get(
+        Uri.parse('$POCKETBASE_URL/api/collections/myItems/records')
+            .replace(queryParameters: {
+          'filter': 'userId="$userId" && isborder_used=true',
+        }),
+        headers: {'Content-Type': 'application/json'},
+      );
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        final items = List<Map<String, dynamic>>.from(data['items']);
+
+        if (items.isNotEmpty && items[0]['border'] != null) {
+          final item = items[0];
+          return '$POCKETBASE_URL/api/files/myItems/${item['id']}/${item['border']}';
+        }
+      }
+      return null;
+    } catch (e) {
+      print('Error fetching border for user $userId: $e');
+      return null;
+    }
+  }
+
+// Load room items (borders, themes, effects)
+  Future<void> _fetchRoomItemsAsync() async {
+    try {
+      if (socket.connected) {
+        socket.emit('fetchRoomItems', {'roomId': widget.roomID});
+        print('Room items fetch requested');
+      }
+    } catch (e) {
+      print('Error fetching room items: $e');
+    }
+  }
+
+// Preload entry animation assets
+  Future<void> _preloadAnimationAssetsAsync() async {
+    try {
+      // You can preload common animation assets here
+      // This is useful if you have frequently used animations
+      const commonAnimations = [
+        'assets/smile.gif',
+        // Add other common animation assets
+      ];
+
+      for (String assetPath in commonAnimations) {
+        // Preload the asset
+        await precacheImage(AssetImage(assetPath), context);
+      }
+      print('Animation assets preloaded');
+    } catch (e) {
+      print('Error preloading animation assets: $e');
+    }
+  }
+
+// Helper methods that return specific types
+
+  Future<String?> _fetchUserAvatarUrl() async {
+    try {
+      final uri = Uri.parse('$POCKETBASE_URL/api/collections/users/records')
+          .replace(queryParameters: {
+        'filter': 'id="${widget.userId}"',
+        'fields': 'id,avatar,collectionId',
+      });
+
+      final response =
+          await http.get(uri, headers: {'Content-Type': 'application/json'});
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        if (data['items'] != null && data['items'].isNotEmpty) {
+          final userData = data['items'][0];
+          if (userData['avatar'] != null) {
+            return '$POCKETBASE_URL/api/files/${userData['collectionId']}/${userData['id']}/${userData['avatar']}';
+          }
+        }
+      }
+      return null;
+    } catch (e) {
+      print('Error fetching user avatar URL: $e');
+      return null;
+    }
+  }
+
+  Future<String?> _fetchOwnBorderUrl() async {
+    try {
+      final response = await http.get(
+        Uri.parse('$POCKETBASE_URL/api/collections/myItems/records')
+            .replace(queryParameters: {
+          'filter': 'userId="${widget.userId}" && isborder_used=true',
+        }),
+        headers: {'Content-Type': 'application/json'},
+      );
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        final items = List<Map<String, dynamic>>.from(data['items']);
+
+        if (items.isNotEmpty && items[0]['border'] != null) {
+          final item = items[0];
+          return '$POCKETBASE_URL/api/files/myItems/${item['id']}/${item['border']}';
+        }
+      }
+      return null;
+    } catch (e) {
+      print('Error fetching own border URL: $e');
+      return null;
+    }
+  }
+
+  Future<String?> _fetchRoomBackgroundUrl() async {
+    try {
+      final response = await http.get(
+        Uri.parse(
+            '$POCKETBASE_URL/api/collections/voiceRooms/records/${widget.roomID}'),
+        headers: {'Content-Type': 'application/json'},
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        if (data['background_images'] != null) {
+          return '$POCKETBASE_URL/api/files/voiceRooms/${widget.roomID}/${data['background_images']}';
+        }
+      }
+      return null;
+    } catch (e) {
+      print('Error fetching room background URL: $e');
+      return null;
+    }
+  }
+
+  Future<Map<String, dynamic>?> _fetchVoiceRoomData() async {
+    try {
+      final uri = Uri.parse(
+              '$POCKETBASE_URL/api/collections/voiceRooms/records/${widget.roomID}')
+          .replace(queryParameters: {
+        'fields':
+            'voice_room_name,background_images,group_photo,voiceRoom_id,announcement'
+      });
+
+      final response =
+          await http.get(uri, headers: {'Content-Type': 'application/json'});
+
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body);
+      }
+      return null;
+    } catch (e) {
+      print('Error fetching voice room data: $e');
+      return null;
+    }
+  }
+
+  Future<Map<String, dynamic>?> _fetchLanguageData(String roomId) async {
+    try {
+      final uri = Uri.parse(
+              '$POCKETBASE_URL/api/collections/voiceRooms/records/$roomId')
+          .replace(queryParameters: {
+        'fields': 'language',
+      });
+
+      final response =
+          await http.get(uri, headers: {'Content-Type': 'application/json'});
+
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body);
+      }
+      return null;
+    } catch (e) {
+      print('Error fetching language data: $e');
+      return null;
+    }
+  }
+
+// Process results methods
+  void _processStringResults(List<String?> results) {
+    final avatarUrl = results[0];
+    final borderUrl = results[1];
+    final backgroundUrl = results[2];
+
+    setState(() {
+      if (avatarUrl != null) _userAvatarUrl = avatarUrl;
+      if (borderUrl != null) _userBorders[widget.userId] = borderUrl;
+      if (backgroundUrl != null) _backgroundImageUrl = backgroundUrl;
+    });
+  }
+
+  void _processMapResults(List<Map<String, dynamic>?> results) {
+    final roomData = results[0];
+    final languageData = results[1];
+
+    setState(() {
+      if (roomData != null) {
+        _voiceRoomName = roomData['voice_room_name'];
+        _voiceroomid = roomData['voiceRoom_id'];
+        if (roomData['announcement'] != null) {
+          _announcement = roomData['announcement'];
+        }
+        if (roomData['group_photo'] != null) {
+          _groupPhotoUrl =
+              '$POCKETBASE_URL/api/files/voiceRooms/${widget.roomID}/${roomData['group_photo']}';
+        }
+      }
+
+      if (languageData != null && languageData['language'] != null) {
+        _language = languageData['language'];
+      }
+    });
+  }
+
+// Most robust approach: Using dynamic types with error handling
+  // Future<void> _initializeParallelRobust() async {
+  //   try {
+  //     setState(() {
+  //       _isLoading = true;
+  //     });
+
+  //     // Create a list of functions that return Future<dynamic>
+  //     final List<Future<dynamic>> futures = [
+  //       _safeExecute(() => _initializeSocket()),
+  //       _safeExecute(() => _fetchInitialUsers()),
+  //       _safeExecute(() => _fetchAndSetUserAvatar()),
+  //       _safeExecute(() => _fetchVoiceRoomDetails()),
+  //       _safeExecute(() => _fetchLanguageDetails(widget.roomID)),
+  //       _safeExecute(() => _createOnlineUserRecord()),
+  //       _safeExecute(() => _checkAdminStatus()),
+  //       _safeExecute(() => _fetchOwnBorder()),
+  //     ];
+
+  //     // Wait for all futures
+  //     final results = await Future.wait<dynamic>(futures);
+
+  //     // Process results if needed
+  //     _processInitializationResults(results);
+
+  //     setState(() {
+  //       _isLoading = false;
+  //     });
+  //   } catch (e) {
+  //     print('Error in robust parallel initialization: $e');
+  //     setState(() {
+  //       _isLoading = false;
+  //     });
+  //   }
+  // }
+
+// Safe execution wrapper
+  Future<dynamic> _safeExecute(Future<dynamic> Function() operation) async {
+    try {
+      return await operation();
+    } catch (e) {
+      print('Safe execution error: $e');
+      return null; // Return null on error
+    }
+  }
+
+// Process initialization results
+  void _processInitializationResults(List<dynamic> results) {
+    // Handle results based on their index/position
+    for (int i = 0; i < results.length; i++) {
+      final result = results[i];
+      if (result != null) {
+        // Process successful results
+        print('Operation $i completed successfully');
+      } else {
+        print('Operation $i failed or returned null');
+      }
+    }
+  }
+
   // Alternative implementation using time estimation
   void _startPositionTracking() {
     // Cancel any existing timer
@@ -985,15 +1391,34 @@ class LivePageState extends State<LivePage>
   @override
   void initState() {
     super.initState();
-    _initializeSocket();
-    _fetchInitialUsers();
+    // _initializeSocket();
+    // _fetchInitialUsers();
     print('Room ID usern: ${widget.username1}');
-    Timer.periodic(const Duration(seconds: 1), (_) {
-      if (mounted && socket.connected) {
-        _fetchOwnBorder();
+    // Timer.periodic(const Duration(seconds: 1), (_) {
+    //   if (mounted && socket.connected) {
+    //     _fetchOwnBorder();
+    //   }
+    // });
+
+    _initializeParallelRobust();
+    _initializeBackgroundAndUI();
+    _setupSocketListeners();
+
+    socket.on('announcementUpdated', (data) {
+      if (mounted && data['updatedBy'] != widget.userId) {
+        setState(() {
+          _announcement = data['announcement'];
+        });
+
+        // Show notification that announcement was updated
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Room announcement has been updated'),
+            backgroundColor: Colors.blue,
+          ),
+        );
       }
     });
-
     socket.on('roomItems', (data) {
       if (mounted) {
         // Process existing borders
@@ -1145,12 +1570,13 @@ class LivePageState extends State<LivePage>
     });
 
     //_createOnlineUserRecord().then((_) => _fetchInitialUsers());
-    _checkAdminStatus();
-    _fetchOnlineUsers();
+    // _checkAdminStatus();
+    // _fetchOnlineUsers();
     // ZegoGiftManager().cache.cacheAllFiles(giftItemList);
     // ZegoGiftManager().service.recvNotifier.addListener(onGiftReceived);
 
     WidgetsBinding.instance.addPostFrameCallback((timeStamp) {
+      _initializePostFrameParallel();
       ZegoGiftManager().service.init(
             appID: 2069292420,
             liveID: widget.roomID,
@@ -1162,10 +1588,10 @@ class LivePageState extends State<LivePage>
       print(localUserID);
       // Fetch avatar URL when component mounts
       updateStartTime(widget.userId, widget.roomID);
-      _fetchAndSetUserAvatar();
-      _fetchVoiceRoomDetails();
-      _fetchLanguageDetails(widget.roomID);
-      _createOnlineUserRecord();
+      // _fetchAndSetUserAvatar();
+      // _fetchVoiceRoomDetails();
+      // _fetchLanguageDetails(widget.roomID);
+      // _createOnlineUserRecord();
     });
 
     _controller = AnimationController(
@@ -1191,48 +1617,39 @@ class LivePageState extends State<LivePage>
     //   ));
     // });
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      _announceUserEntryAsync();
+      _addWelcomeMessage();
       // Delay slightly to ensure room is joined first
-      Future.delayed(const Duration(milliseconds: 800), () async {
-        final userItemUrl = await _fetchUserActiveItem(widget.userId);
-        socket.emit('announceEntry', {
-          'roomId': widget.roomID,
-          'userId': widget.userId,
-          'userName': widget.username1,
-          'userAvatar': _userAvatarUrl,
-          'userItem': userItemUrl,
-          'timestamp': DateTime.now().millisecondsSinceEpoch
-        });
-        if (mounted) {
-          setState(() {
-            _activeEntries[widget.userId] = _buildEntryAnimation(
-              widget.username1,
-              _userAvatarUrl,
-              userItemUrl,
-            );
-          });
+      // Future.delayed(const Duration(milliseconds: 800), () async {
+      //   final userItemUrl = await _fetchUserActiveItem(widget.userId);
+      //   socket.emit('announceEntry', {
+      //     'roomId': widget.roomID,
+      //     'userId': widget.userId,
+      //     'userName': widget.username1,
+      //     'userAvatar': _userAvatarUrl,
+      //     'userItem': userItemUrl,
+      //     'timestamp': DateTime.now().millisecondsSinceEpoch
+      //   });
+      //   if (mounted) {
+      //     setState(() {
+      //       _activeEntries[widget.userId] = _buildEntryAnimation(
+      //         widget.username1,
+      //         _userAvatarUrl,
+      //         userItemUrl,
+      //       );
+      //     });
 
-          // Remove after specified duration
-          _entryTimers[widget.userId]?.cancel();
-          _entryTimers[widget.userId] = Timer(const Duration(seconds: 15), () {
-            if (mounted) {
-              setState(() {
-                _activeEntries.remove(widget.userId);
-              });
-            }
-          });
-        }
-      });
-      final welcomeMessage = ChatMessage(
-        userId: 'system', // Special ID for system messages
-        userName: 'Welcome',
-        message: '${widget.username1} has entered the room',
-        timestamp: DateTime.now().millisecondsSinceEpoch,
-      );
-
-      // Add message to message list to display in InlineMessageList
-      setState(() {
-        _messages.add(welcomeMessage);
-      });
+      //     // Remove after specified duration
+      //     _entryTimers[widget.userId]?.cancel();
+      //     _entryTimers[widget.userId] = Timer(const Duration(seconds: 15), () {
+      //       if (mounted) {
+      //         setState(() {
+      //           _activeEntries.remove(widget.userId);
+      //         });
+      //       }
+      //     });
+      //   }
+      // });
     });
 
     socket.on('roomSettingsUpdated', (data) {
@@ -1295,6 +1712,301 @@ class LivePageState extends State<LivePage>
     }
   }
 
+  Future<void> _fetchAndSetBackgroundImageAsync() async {
+    try {
+      final response = await http.get(
+        Uri.parse(
+            '$POCKETBASE_URL/api/collections/voiceRooms/records/${widget.roomID}'),
+        headers: {'Content-Type': 'application/json'},
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        if (data['background_images'] != null) {
+          setState(() {
+            _backgroundImageUrl =
+                '$POCKETBASE_URL/api/files/voiceRooms/${widget.roomID}/${data['background_images']}';
+          });
+          print('Background image loaded: $_backgroundImageUrl');
+        }
+      }
+    } catch (e) {
+      print('Error fetching background image: $e');
+    }
+  }
+
+  Future<void> _initializeBackgroundAndUI() async {
+    try {
+      // Load background image and other UI-related data in parallel
+      await Future.wait<dynamic>([
+        _safeExecute(() => _fetchAndSetBackgroundImageAsync()),
+        _safeExecute(() =>
+            _fetchGroupPhotoAsync()), // If you want to load group photo separately
+        // Add other UI-related async operations here
+      ]);
+    } catch (e) {
+      print('Error loading background and UI elements: $e');
+    }
+  }
+
+  Future<void> _fetchGroupPhotoAsync() async {
+    try {
+      final response = await http.get(
+        Uri.parse(
+            '$POCKETBASE_URL/api/collections/voiceRooms/records/${widget.roomID}'),
+        headers: {'Content-Type': 'application/json'},
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        if (data['group_photo'] != null) {
+          setState(() {
+            _groupPhotoUrl =
+                '$POCKETBASE_URL/api/files/voiceRooms/${widget.roomID}/${data['group_photo']}';
+          });
+        }
+      }
+    } catch (e) {
+      print('Error fetching group photo: $e');
+    }
+  }
+
+  Future<void> _initializePostFrameParallel() async {
+    try {
+      // Initialize ZEGO first (this must be sequential)
+      ZegoGiftManager().service.init(
+            appID: 2069292420,
+            liveID: widget.roomID,
+            localUserID: localUserID,
+            localUserName: widget.username1,
+          );
+
+      print("------------------------------------------");
+      print(localUserID);
+
+      // ✅ Run these in parallel instead of sequentially:
+      await Future.wait([
+        updateStartTime(widget.userId, widget.roomID),
+        // Don't duplicate these - they're already in _initializeParallelRobust():
+        // _fetchAndSetUserAvatar(),
+        // _fetchVoiceRoomDetails(),
+        // _fetchLanguageDetails(widget.roomID),
+        // _createOnlineUserRecord(),
+      ]);
+    } catch (e) {
+      print('Post-frame initialization error: $e');
+    }
+  }
+
+  Future<void> _initializeParallelRobust() async {
+    try {
+      setState(() {
+        _isLoading = true;
+      });
+
+      // Phase 1: Critical operations that must complete first
+      await Future.wait<dynamic>([
+        _safeExecute(() => _initializeSocket()),
+        _safeExecute(() =>
+            _fetchAndSetUserAvatar()), // Need avatar for socket connection
+      ]);
+
+      // Phase 2: Main data loading (parallel)
+      await Future.wait<dynamic>([
+        _safeExecute(() => _fetchInitialUsers()),
+        _safeExecute(() => _fetchVoiceRoomDetails()),
+        _safeExecute(() => _fetchLanguageDetails(widget.roomID)),
+        _safeExecute(() => _createOnlineUserRecord()),
+        _safeExecute(() => _checkAdminStatus()),
+        _safeExecute(() => _fetchOnlineUsers()),
+        _safeExecute(() => _fetchOwnBorder()),
+      ]);
+
+      await Future.wait<dynamic>([
+        _safeExecute(() => _fetchAndSetUserActiveItemAsync()),
+        _safeExecute(() => _fetchAllUsersBordersAsync()),
+        _safeExecute(() => _fetchRoomItemsAsync()),
+        _safeExecute(() => _preloadAnimationAssetsAsync()),
+      ]);
+
+      setState(() {
+        _isLoading = false;
+      });
+    } catch (e) {
+      print('Error in robust parallel initialization: $e');
+      setState(() {
+        _isLoading = false;
+      });
+    }
+  }
+
+// ✅ ADD socket listeners setup as separate method:
+  void _setupSocketListeners() {
+    socket.on('announcementUpdated', (data) {
+      if (mounted && data['updatedBy'] != widget.userId) {
+        setState(() {
+          _announcement = data['announcement'];
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Room announcement has been updated'),
+            backgroundColor: Colors.blue,
+          ),
+        );
+      }
+    });
+
+    socket.on('roomItems', (data) {
+      if (mounted) {
+        if (data['borders'] != null) {
+          final borders = data['borders'] as Map<String, dynamic>;
+          borders.forEach((userId, borderUrl) {
+            _userBorders[userId] = borderUrl;
+          });
+        }
+        if (data['theme'] != null && isAdmin) {
+          setState(() {
+            _backgroundImageUrl = data['theme']['url'];
+          });
+        }
+        _updateSeatDisplays();
+      }
+    });
+
+    socket.on('seatTaken', (data) {
+      print(
+          'seat taken ${data['seatIndex']} ${data['userId']} ${data['userName']} ${data['userAvatar']} ${data['borderUrl']}');
+      if (mounted) {
+        setState(() {
+          _seatOccupants[data['seatIndex']] = {
+            'userId': data['userId'],
+            'userName': data['userName'],
+            'userAvatar': data['userAvatar'],
+            'borderUrl': data['borderUrl']
+          };
+        });
+      }
+    });
+
+    socket.on('entryEffectChange', (data) {
+      if (mounted && data['userId'] != null && data['itemUrl'] != null) {
+        print('Received entryEffectChange: ${data['itemUrl']}');
+      }
+    });
+
+    socket.on('seatReleased', (data) {
+      if (mounted) {
+        setState(() {
+          _seatOccupants.remove(data['seatIndex']);
+        });
+      }
+    });
+
+    socket.on('seatStatusUpdate', (data) {
+      if (mounted) {
+        setState(() {
+          if (data['isTaken']) {
+            _seatOccupants[data['seatIndex']] = {
+              'userId': data['userId'],
+              'userName': data['userName'],
+              'userAvatar': data['userAvatar'],
+              'borderUrl': data['borderUrl']
+            };
+          } else {
+            _seatOccupants.remove(data['seatIndex']);
+          }
+        });
+      }
+    });
+
+    socket.on('borderChange', (data) {
+      if (mounted && data['userId'] != null && data['borderUrl'] != null) {
+        if (data['userId'] != widget.userId &&
+            _seatOccupants.values
+                .any((seat) => seat['userId'] == data['userId'])) {
+          _showUpdateEffect(data['userId']);
+        }
+        setState(() {
+          _userBorders[data['userId']] = data['borderUrl'];
+          _seatOccupants.forEach((seatIndex, userInfo) {
+            if (userInfo['userId'] == data['userId']) {
+              userInfo['borderUrl'] = data['borderUrl'];
+            }
+          });
+        });
+      }
+    });
+
+    socket.on('userEntry', (data) {
+      print('Received user entry: $data');
+      if (mounted) {
+        setState(() {
+          _activeEntries[data['userId']] = _buildEntryAnimation(
+            data['userName'],
+            data['userAvatar'],
+            data['userItem'],
+          );
+        });
+        _entryTimers[data['userId']]?.cancel();
+        _entryTimers[data['userId']] = Timer(const Duration(seconds: 15), () {
+          if (mounted) {
+            setState(() {
+              _activeEntries.remove(data['userId']);
+            });
+          }
+        });
+      }
+    });
+
+    socket.on('gifReaction', (data) {
+      print('Received emoji data: $data');
+      if (mounted) {
+        setState(() {
+          _activeEmojis[data['userId']] = SizedBox(
+            width: 50,
+            height: 50,
+            child: Image.asset('assets/smile.gif', fit: BoxFit.cover),
+          );
+        });
+        _emojiTimers[data['userId']]?.cancel();
+        _emojiTimers[data['userId']] = Timer(const Duration(seconds: 2), () {
+          if (mounted) {
+            setState(() {
+              _activeEmojis.remove(data['userId']);
+            });
+          }
+        });
+      }
+    });
+
+    socket.on('roomSettingsUpdated', (data) {
+      if (!mounted) return;
+      final settings = data['settings'];
+      final type = settings['type'];
+      switch (type) {
+        case 'name':
+          setState(() {
+            _voiceRoomName = settings['value'];
+          });
+          break;
+        case 'photo':
+        case 'background':
+          _fetchVoiceRoomDetails();
+          break;
+      }
+      if (data['updatedBy'] != widget.userId) {
+        final message = type == 'name'
+            ? 'Room name has been updated'
+            : type == 'photo'
+                ? 'Room photo has been updated'
+                : 'Room background has been updated';
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(message)),
+        );
+      }
+    });
+  }
+
   void _updateSeatDisplays() {
     setState(() {
       _seatOccupants.forEach((seatIndex, userInfo) {
@@ -1327,9 +2039,10 @@ class LivePageState extends State<LivePage>
         // SVG Animation - keep in original position at top
         if (itemUrl != null && itemUrl.isNotEmpty)
           Positioned(
-            top: 260, // Original position at top
+            top: MediaQuery.of(context).size.height *
+                0.4, // Original position at top
 
-            left: 20,
+            left: MediaQuery.of(context).size.width * 0.35,
 
             child: Center(
               child: SizedBox(
@@ -1609,7 +2322,121 @@ class LivePageState extends State<LivePage>
     }
   }
 
-  void _initializeSocket() {
+//   Future<void> _initializeSocket() async {
+//     socket = IO.io('http://145.223.21.62:3000', <String, dynamic>{
+//       'transports': ['websocket'],
+//       'autoConnect': true,
+//       'reconnection': true,
+//       'reconnectionDelay': 1000,
+//       'reconnectionDelayMax': 5000,
+//       'reconnectionAttempts': maxReconnectAttempts,
+//     });
+
+//     socket.onConnect((_) async {
+//       print('Connected to Socket.IO server');
+//       reconnectAttempts = 0;
+//       isReconnecting = false;
+
+//       if (mounted) {
+//         setState(() {
+//           isConnecting = false;
+//         });
+//       }
+
+// // Initialize the message service (move this here from initState)
+//       _messageService = SocketMessageService(
+//         socket: socket,
+//         roomId: widget.roomID,
+//         userId: widget.userId,
+//         userName: widget.username1,
+//         userAvatarUrl: _userAvatarUrl,
+//       );
+
+//       _messageService.messageStream.listen((message) {
+//         print(
+//             "LivePageState: Received message from stream: ${message.message}");
+//         if (mounted) {
+//           setState(() {
+//             _messages.add(message);
+//             print("Messages list now has ${_messages.length} items");
+//           });
+//         }
+//       });
+
+//       socket.emit('fetchRoomItems', {'roomId': widget.roomID});
+//       // Send full user details when joining
+//       await _fetchAndSetUserAvatar(); // Make sure we have avatar URL
+//       await _fetchOwnBorder();
+//       socket.emit('joinRoom', {
+//         'roomId': widget.roomID,
+//         'userId': widget.userId,
+//         'userName': widget.username1,
+//         'userAvatar': _userAvatarUrl,
+//         'userMotto': '' // Add any other user details you want to track
+//       });
+//     });
+
+//     socket.on('roomUpdate', (data) {
+//       if (!mounted) return;
+
+//       try {
+//         final List<dynamic> usersList = data['users'] as List;
+//         final users = usersList
+//             .map((userData) => OnlineUser(
+//                   id: userData['id'] as String,
+//                   name: userData['name'] as String,
+//                   avatarUrl: userData['avatarUrl'] as String,
+//                   motto: userData['motto'] as String? ?? '',
+//                 ))
+//             .toList();
+
+//         setState(() {
+//           onlineUsers = users;
+//           userCount = data['count'] as int;
+//           isLoadingUsers = false;
+//         });
+//       } catch (e) {
+//         print('Error processing room update: $e');
+//       }
+//     });
+
+//     // Handle individual user join/leave events
+//     socket.on('userJoined', (userData) {
+//       if (!mounted) return;
+
+//       try {
+//         final newUser = OnlineUser(
+//           id: userData['id'],
+//           name: userData['name'],
+//           avatarUrl: userData['avatarUrl'],
+//           motto: userData['motto'] ?? '',
+//         );
+
+//         setState(() {
+//           // Add user if not already in list
+//           if (!onlineUsers.any((user) => user.id == newUser.id)) {
+//             onlineUsers.add(newUser);
+//             userCount = onlineUsers.length;
+//           }
+//         });
+//       } catch (e) {
+//         print('Error processing user join: $e');
+//       }
+//     });
+
+//     socket.on('userLeft', (userData) {
+//       if (!mounted) return;
+
+//       setState(() {
+//         onlineUsers.removeWhere((user) => user.id == userData['id']);
+//         userCount = onlineUsers.length;
+//       });
+//     });
+
+//     socket.connect();
+//   }
+
+  Future<void> _initializeSocket() async {
     socket = IO.io('http://145.223.21.62:3000', <String, dynamic>{
       'transports': ['websocket'],
       'autoConnect': true,
@@ -1618,6 +2445,9 @@ class LivePageState extends State<LivePage>
       'reconnectionDelayMax': 5000,
       'reconnectionAttempts': maxReconnectAttempts,
     });
+
+    // Use completer to wait for connection
+    final completer = Completer<void>();
 
     socket.onConnect((_) async {
       print('Connected to Socket.IO server');
@@ -1630,7 +2460,7 @@ class LivePageState extends State<LivePage>
         });
       }
 
-// Initialize the message service (move this here from initState)
+      // Initialize message service
       _messageService = SocketMessageService(
         socket: socket,
         roomId: widget.roomID,
@@ -1651,76 +2481,134 @@ class LivePageState extends State<LivePage>
       });
 
       socket.emit('fetchRoomItems', {'roomId': widget.roomID});
-      // Send full user details when joining
-      await _fetchAndSetUserAvatar(); // Make sure we have avatar URL
+
+      // Wait for avatar URL to be ready
+      await _ensureAvatarReady();
       await _fetchOwnBorder();
+
       socket.emit('joinRoom', {
         'roomId': widget.roomID,
         'userId': widget.userId,
         'userName': widget.username1,
         'userAvatar': _userAvatarUrl,
-        'userMotto': '' // Add any other user details you want to track
+        'userMotto': ''
       });
+
+      completer.complete();
     });
 
-    socket.on('roomUpdate', (data) {
-      if (!mounted) return;
-
-      try {
-        final List<dynamic> usersList = data['users'] as List;
-        final users = usersList
-            .map((userData) => OnlineUser(
-                  id: userData['id'] as String,
-                  name: userData['name'] as String,
-                  avatarUrl: userData['avatarUrl'] as String,
-                  motto: userData['motto'] as String? ?? '',
-                ))
-            .toList();
-
-        setState(() {
-          onlineUsers = users;
-          userCount = data['count'] as int;
-          isLoadingUsers = false;
-        });
-      } catch (e) {
-        print('Error processing room update: $e');
-      }
-    });
-
-    // Handle individual user join/leave events
-    socket.on('userJoined', (userData) {
-      if (!mounted) return;
-
-      try {
-        final newUser = OnlineUser(
-          id: userData['id'],
-          name: userData['name'],
-          avatarUrl: userData['avatarUrl'],
-          motto: userData['motto'] ?? '',
-        );
-
-        setState(() {
-          // Add user if not already in list
-          if (!onlineUsers.any((user) => user.id == newUser.id)) {
-            onlineUsers.add(newUser);
-            userCount = onlineUsers.length;
-          }
-        });
-      } catch (e) {
-        print('Error processing user join: $e');
-      }
-    });
-
-    socket.on('userLeft', (userData) {
-      if (!mounted) return;
-
-      setState(() {
-        onlineUsers.removeWhere((user) => user.id == userData['id']);
-        userCount = onlineUsers.length;
-      });
+    socket.onConnectError((error) {
+      print('Socket connection error: $error');
+      completer.completeError(error);
     });
 
     socket.connect();
+
+    // Wait for connection with timeout
+    return completer.future.timeout(
+      const Duration(seconds: 10),
+      onTimeout: () => throw TimeoutException('Socket connection timeout'),
+    );
+  }
+
+// ✅ ADD helper method to ensure avatar is ready:
+  Future<void> _ensureAvatarReady() async {
+    int attempts = 0;
+    while (_userAvatarUrl == null && attempts < 10) {
+      await Future.delayed(const Duration(milliseconds: 100));
+      attempts++;
+    }
+  }
+
+// ✅ ADD optimized border fetching with timer:
+  void _startPeriodicBorderFetching() {
+    Timer.periodic(const Duration(seconds: 5), (_) {
+      // Less frequent
+      if (mounted && socket.connected) {
+        _fetchOwnBorder().catchError((e) {
+          print('Border fetch error: $e');
+        });
+      }
+    });
+  }
+
+// ✅ ADD this method for user entry announcement:
+  Future<void> _announceUserEntryAsync() async {
+    try {
+      final userItemUrl = await _fetchUserActiveItem(widget.userId);
+      await Future.delayed(const Duration(milliseconds: 800));
+
+      socket.emit('announceEntry', {
+        'roomId': widget.roomID,
+        'userId': widget.userId,
+        'userName': widget.username1,
+        'userAvatar': _userAvatarUrl,
+        'userItem': userItemUrl,
+        'timestamp': DateTime.now().millisecondsSinceEpoch
+      });
+
+      if (mounted) {
+        setState(() {
+          _activeEntries[widget.userId] = _buildEntryAnimation(
+            widget.username1,
+            _userAvatarUrl,
+            userItemUrl,
+          );
+        });
+
+        _entryTimers[widget.userId]?.cancel();
+        _entryTimers[widget.userId] = Timer(const Duration(seconds: 15), () {
+          if (mounted) {
+            setState(() {
+              _activeEntries.remove(widget.userId);
+            });
+          }
+        });
+      }
+    } catch (e) {
+      print('Error announcing user entry: $e');
+    }
+  }
+
+// ✅ ADD this method for welcome message:
+  void _addWelcomeMessage() {
+    final welcomeMessage = ChatMessage(
+      userId: 'system',
+      userName: 'Welcome',
+      message: '${widget.username1} has entered the room',
+      timestamp: DateTime.now().millisecondsSinceEpoch,
+    );
+
+    setState(() {
+      _messages.add(welcomeMessage);
+    });
+  }
+
+// // ✅ OPTIMIZE room update handling:
+// void _updateUserList(Map<String, dynamic> data) {
+//   if (data['users'] != null) {
+//     final List<dynamic> usersList = data['users'] as List;
+//     final users = usersList
+//         .map((userData) => OnlineUser(
+//               id: userData['id'] as String,
+//               name: userData['name'] as String,
+//               avatarUrl: userData['avatarUrl'] as String,
+//               motto: userData['motto'] as String? ?? '',
+//             ))
+//         .toList();
+
+//     setState(() {
+//       onlineUsers = users;
+//       userCount = data['count'] as int;
+//     });
+//   }
+// }
+
+// ✅ ADD connection timeout handling:
+  Future<T> _withTimeout<T>(Future<T> future, Duration timeout) {
+    return future.timeout(timeout, onTimeout: () {
+      throw TimeoutException('Operation timed out');
+    });
   }
 
   // void _handleReconnection() {
@@ -2966,6 +3854,12 @@ class LivePageState extends State<LivePage>
         setState(() {
           _announcement = announcement;
         });
+        socket.emit('announcementUpdate', {
+          'roomId': widget.roomID,
+          'userId': widget.userId,
+          'announcement': announcement,
+          'timestamp': DateTime.now().millisecondsSinceEpoch
+        });
 
         // Show success message
         if (mounted) {
@@ -3659,16 +4553,6 @@ class LivePageState extends State<LivePage>
             //       }).toList(),
             //     ),
             //   ),
-            if (_activeEntries.isNotEmpty)
-              SizedBox(
-                width: double.infinity,
-                height: double.infinity,
-                child: Stack(
-                  children: _activeEntries.entries.map((entry) {
-                    return entry.value;
-                  }).toList(),
-                ),
-              ),
 
             // In your build method, adjust the InlineMessageList positioning
             Positioned(
@@ -3968,6 +4852,16 @@ class LivePageState extends State<LivePage>
                       ),
                     ),
                   ),
+                ),
+              ),
+            if (_activeEntries.isNotEmpty)
+              SizedBox(
+                width: double.infinity,
+                height: double.infinity,
+                child: Stack(
+                  children: _activeEntries.entries.map((entry) {
+                    return entry.value;
+                  }).toList(),
                 ),
               ),
 
@@ -5516,14 +6410,67 @@ class LivePageState extends State<LivePage>
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
+                GestureDetector(
+                  onTap: () {
+                    _showMessageBottomSheet(context);
+                  },
+                  child: Padding(
+                    padding: const EdgeInsets.only(left: 10),
+                    child: Container(
+                      width: MediaQuery.of(context).size.width * 0.25,
+                      height: MediaQuery.of(context).size.width * 0.1,
+                      decoration: BoxDecoration(
+                        color: Colors.black
+                            .withOpacity(0.7), // Dark background like in image
+                        border: Border.all(
+                          width: 1,
+                        ),
+                        borderRadius: const BorderRadius.all(
+                          Radius.circular(25),
+                        ),
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 6,
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            // Text
+                            const Expanded(
+                              child: Text(
+                                'Add a Comment',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                                maxLines: 1,
+                              ),
+                            ),
+                            const SizedBox(width: 2),
+                            // Arrow icon
+                            Icon(
+                              Icons.send_rounded,
+                              color: Colors
+                                  .pink[300], // Pink/purple color like in image
+                              size: 12,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
                 // Group 1: First 4 icons without spacing
                 _buildCustomButton(0, customIcons[0]),
-                _buildCustomButton(3, customIcons[3]),
+                // _buildCustomButton(3, customIcons[3]),
 
                 _buildCustomButton(2, customIcons[2]),
 
                 // Space between groups - explicit width
-                const SizedBox(width: 60),
+                const SizedBox(width: 40),
 
                 // Group 2: Mail icon
                 _buildCustomButton(1, customIcons[1]),
@@ -5584,11 +6531,64 @@ class LivePageState extends State<LivePage>
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
+                GestureDetector(
+                  onTap: () {
+                    _showMessageBottomSheet(context);
+                  },
+                  child: Padding(
+                    padding: const EdgeInsets.only(left: 10),
+                    child: Container(
+                      width: MediaQuery.of(context).size.width * 0.6,
+                      height: MediaQuery.of(context).size.width * 0.1,
+                      decoration: BoxDecoration(
+                        color: Colors.black
+                            .withOpacity(0.7), // Dark background like in image
+                        border: Border.all(
+                          width: 1,
+                        ),
+                        borderRadius: const BorderRadius.all(
+                          Radius.circular(25),
+                        ),
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 6,
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            // Text
+                            const Expanded(
+                              child: Text(
+                                'Add a Comment',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                                maxLines: 1,
+                              ),
+                            ),
+                            const SizedBox(width: 2),
+                            // Arrow icon
+                            Icon(
+                              Icons.send_rounded,
+                              color: Colors
+                                  .pink[300], // Pink/purple color like in image
+                              size: 12,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
                 // Group 1: First 4 icons without spacing
                 _buildCustomButton(0, customIcons[0]),
 
                 _buildCustomButton(1, customIcons[1]),
-                _buildCustomButton(3, customIcons[3]),
+                //_buildCustomButton(3, customIcons[3]),
               ],
             ),
           ),
@@ -5601,11 +6601,64 @@ class LivePageState extends State<LivePage>
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
+                GestureDetector(
+                  onTap: () {
+                    _showMessageBottomSheet(context);
+                  },
+                  child: Padding(
+                    padding: const EdgeInsets.only(left: 10),
+                    child: Container(
+                      width: MediaQuery.of(context).size.width * 0.25,
+                      height: MediaQuery.of(context).size.width * 0.1,
+                      decoration: BoxDecoration(
+                        color: Colors.black
+                            .withOpacity(0.7), // Dark background like in image
+                        border: Border.all(
+                          width: 1,
+                        ),
+                        borderRadius: const BorderRadius.all(
+                          Radius.circular(25),
+                        ),
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 6,
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            // Text
+                            const Expanded(
+                              child: Text(
+                                'Add a Comment',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                                maxLines: 1,
+                              ),
+                            ),
+                            const SizedBox(width: 2),
+                            // Arrow icon
+                            Icon(
+                              Icons.send_rounded,
+                              color: Colors
+                                  .pink[300], // Pink/purple color like in image
+                              size: 12,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
                 // Group 1: First 4 icons without spacing
                 _buildCustomButton(0, customIcons[0]),
 
                 _buildCustomButton(1, customIcons[1]),
-                _buildCustomButton(3, customIcons[3]),
+                // _buildCustomButton(3, customIcons[3]),
               ],
             ),
           ),
@@ -5764,12 +6817,12 @@ class LivePageState extends State<LivePage>
       case Icons.message_outlined:
         //_showMessageDialog(context);
         print('Mail button clicked - should show bottom sheet');
-        _showMessageBottomSheet(context);
+        // _showMessageBottomSheet(context);
         break;
       case Icons.message_rounded:
         //_showMessageDialog(context);
         print('Mail button clicked - should show bottom sheet');
-        _showMessageBottomSheet(context);
+        // _showMessageBottomSheet(context);
         break;
       case Icons.open_with_sharp:
         _showMoreOptionsBottomSheet(context);

@@ -45,9 +45,15 @@ class FirebaseService {
 
   // Method to set the user ID when user logs in
   void setUserId(String userId) async {
-    _userId = await HttpService.getUserId();
-    // Update token when user ID is set
-    _updateTokenOnServer();
+    print('Setting user ID: $userId');
+    _userId = userId;
+
+    // Update token on server
+    bool success = await updateUserFCMToken(userId);
+    if (!success) {
+      print('Failed to update FCM token, will retry later');
+      // You could implement a retry mechanism here
+    }
   }
 
   Future<void> initNotifications() async {
@@ -374,6 +380,50 @@ class FirebaseService {
       }
     } catch (e) {
       print('Error updating FCM token on server: $e');
+    }
+  }
+
+  Future<bool> updateUserFCMToken(String userId) async {
+    try {
+      // Get the current FCM token
+      final fcmToken = await _firebaseMessaging.getToken();
+      if (fcmToken == null) {
+        print('FCM token is null, cannot update on server');
+        return false;
+      }
+
+      print('Updating FCM token for user $userId: $fcmToken');
+
+      // Update user record with FCM token
+      final response = await http.patch(
+        Uri.parse('$_apiUrl/api/collections/users/records/$userId'),
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode({
+          'fcm_token': fcmToken,
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        print('FCM token updated on server successfully');
+
+        // Store the updated user ID for future use
+        _userId = userId;
+
+        // Also store token locally
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('fcm_token', fcmToken);
+
+        return true;
+      } else {
+        print(
+            'Failed to update FCM token on server: ${response.statusCode} ${response.body}');
+        return false;
+      }
+    } catch (e) {
+      print('Error updating FCM token on server: $e');
+      return false;
     }
   }
 }

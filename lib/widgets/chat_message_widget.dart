@@ -93,6 +93,7 @@ class _InlineMessageListState extends State<InlineMessageList> {
               message.message,
               style: const TextStyle(
                 color: Colors.white,
+                fontWeight: FontWeight.normal,
                 fontSize: 14,
                 decoration: TextDecoration.none,
                 fontFamily: 'poppins',
