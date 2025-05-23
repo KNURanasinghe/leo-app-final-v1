@@ -53,8 +53,8 @@ void main() async {
 
   // Initialize the ZEGOCLOUD SDK
   ZIMKit().init(
-    appID: 50134611,
-    appSign: '3c478217fcd4ec348ae0783f6c12fb7171978dc4cc1399f5ca2f9f5234332d83',
+    appID: 1497118937,
+    appSign: 'eff8e02b1ab622037d7721dc42050426e08c071299982f4f6751a41eaaa4882a',
   );
 
   ZegoUIKit().initLog().then((value) {

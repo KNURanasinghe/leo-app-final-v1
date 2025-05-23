@@ -246,104 +246,7 @@ class LivePageState extends State<LivePage>
 
   double _sliderPosition = 0.0; // Add this line to define _sliderPosition
 
-  // Fixed parallel initialization method
-  Future<void> _initializeParallel() async {
-    try {
-      // Show loading indicator
-      setState(() {
-        _isLoading = true;
-      });
-
-      // Group 1: Convert all functions to return Future<void>
-      await Future.wait<void>([
-        _initializeSocketAsync(),
-        _fetchInitialUsersAsync(),
-        _fetchAndSetUserAvatarAsync(),
-        _fetchVoiceRoomDetailsAsync(),
-        _fetchLanguageDetailsAsync(widget.roomID),
-        _createOnlineUserRecordAsync(),
-        _checkAdminStatusAsync(),
-        _fetchOwnBorderAsync(),
-      ]);
-
-      // Hide loading indicator
-      setState(() {
-        _isLoading = false;
-      });
-    } catch (e) {
-      print('Error in parallel initialization: $e');
-      setState(() {
-        _isLoading = false;
-      });
-    }
-  }
-
 // Convert existing methods to return Future<void> consistently
-
-  Future<void> _initializeSocketAsync() async {
-    try {
-      _initializeSocket(); // Your existing sync method
-      // If _initializeSocket is already async, just call it directly
-    } catch (e) {
-      print('Error initializing socket: $e');
-    }
-  }
-
-  Future<void> _fetchInitialUsersAsync() async {
-    try {
-      await _fetchInitialUsers();
-    } catch (e) {
-      print('Error fetching initial users: $e');
-    }
-  }
-
-  Future<void> _fetchAndSetUserAvatarAsync() async {
-    try {
-      await _fetchAndSetUserAvatar();
-    } catch (e) {
-      print('Error fetching user avatar: $e');
-    }
-  }
-
-  Future<void> _fetchVoiceRoomDetailsAsync() async {
-    try {
-      await _fetchVoiceRoomDetails();
-    } catch (e) {
-      print('Error fetching voice room details: $e');
-    }
-  }
-
-  Future<void> _fetchLanguageDetailsAsync(String roomId) async {
-    try {
-      await _fetchLanguageDetails(roomId);
-    } catch (e) {
-      print('Error fetching language details: $e');
-    }
-  }
-
-  Future<void> _createOnlineUserRecordAsync() async {
-    try {
-      await _createOnlineUserRecord();
-    } catch (e) {
-      print('Error creating online user record: $e');
-    }
-  }
-
-  Future<void> _checkAdminStatusAsync() async {
-    try {
-      await _checkAdminStatus();
-    } catch (e) {
-      print('Error checking admin status: $e');
-    }
-  }
-
-  Future<void> _fetchOwnBorderAsync() async {
-    try {
-      await _fetchOwnBorder();
-    } catch (e) {
-      print('Error fetching own border: $e');
-    }
-  }
 
 // Load current user's active item for entry animations
   Future<void> _fetchAndSetUserActiveItemAsync() async {
@@ -365,6 +268,7 @@ class LivePageState extends State<LivePage>
     try {
       // Fetch borders for all online users
       for (var user in onlineUsers) {
+        print('border id user ${user.id}');
         final borderUrl = await _fetchUserBorder(user.id);
         if (borderUrl != null) {
           setState(() {
@@ -439,158 +343,158 @@ class LivePageState extends State<LivePage>
 
 // Helper methods that return specific types
 
-  Future<String?> _fetchUserAvatarUrl() async {
-    try {
-      final uri = Uri.parse('$POCKETBASE_URL/api/collections/users/records')
-          .replace(queryParameters: {
-        'filter': 'id="${widget.userId}"',
-        'fields': 'id,avatar,collectionId',
-      });
+//   Future<String?> _fetchUserAvatarUrl() async {
+//     try {
+//       final uri = Uri.parse('$POCKETBASE_URL/api/collections/users/records')
+//           .replace(queryParameters: {
+//         'filter': 'id="${widget.userId}"',
+//         'fields': 'id,avatar,collectionId',
+//       });
 
-      final response =
-          await http.get(uri, headers: {'Content-Type': 'application/json'});
+//       final response =
+//           await http.get(uri, headers: {'Content-Type': 'application/json'});
 
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        if (data['items'] != null && data['items'].isNotEmpty) {
-          final userData = data['items'][0];
-          if (userData['avatar'] != null) {
-            return '$POCKETBASE_URL/api/files/${userData['collectionId']}/${userData['id']}/${userData['avatar']}';
-          }
-        }
-      }
-      return null;
-    } catch (e) {
-      print('Error fetching user avatar URL: $e');
-      return null;
-    }
-  }
+//       if (response.statusCode == 200) {
+//         final data = jsonDecode(response.body);
+//         if (data['items'] != null && data['items'].isNotEmpty) {
+//           final userData = data['items'][0];
+//           if (userData['avatar'] != null) {
+//             return '$POCKETBASE_URL/api/files/${userData['collectionId']}/${userData['id']}/${userData['avatar']}';
+//           }
+//         }
+//       }
+//       return null;
+//     } catch (e) {
+//       print('Error fetching user avatar URL: $e');
+//       return null;
+//     }
+//   }
 
-  Future<String?> _fetchOwnBorderUrl() async {
-    try {
-      final response = await http.get(
-        Uri.parse('$POCKETBASE_URL/api/collections/myItems/records')
-            .replace(queryParameters: {
-          'filter': 'userId="${widget.userId}" && isborder_used=true',
-        }),
-        headers: {'Content-Type': 'application/json'},
-      );
+//   Future<String?> _fetchOwnBorderUrl() async {
+//     try {
+//       final response = await http.get(
+//         Uri.parse('$POCKETBASE_URL/api/collections/myItems/records')
+//             .replace(queryParameters: {
+//           'filter': 'userId="${widget.userId}" && isborder_used=true',
+//         }),
+//         headers: {'Content-Type': 'application/json'},
+//       );
 
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        final items = List<Map<String, dynamic>>.from(data['items']);
+//       if (response.statusCode == 200) {
+//         final data = json.decode(response.body);
+//         final items = List<Map<String, dynamic>>.from(data['items']);
 
-        if (items.isNotEmpty && items[0]['border'] != null) {
-          final item = items[0];
-          return '$POCKETBASE_URL/api/files/myItems/${item['id']}/${item['border']}';
-        }
-      }
-      return null;
-    } catch (e) {
-      print('Error fetching own border URL: $e');
-      return null;
-    }
-  }
+//         if (items.isNotEmpty && items[0]['border'] != null) {
+//           final item = items[0];
+//           return '$POCKETBASE_URL/api/files/myItems/${item['id']}/${item['border']}';
+//         }
+//       }
+//       return null;
+//     } catch (e) {
+//       print('Error fetching own border URL: $e');
+//       return null;
+//     }
+//   }
 
-  Future<String?> _fetchRoomBackgroundUrl() async {
-    try {
-      final response = await http.get(
-        Uri.parse(
-            '$POCKETBASE_URL/api/collections/voiceRooms/records/${widget.roomID}'),
-        headers: {'Content-Type': 'application/json'},
-      );
+//   Future<String?> _fetchRoomBackgroundUrl() async {
+//     try {
+//       final response = await http.get(
+//         Uri.parse(
+//             '$POCKETBASE_URL/api/collections/voiceRooms/records/${widget.roomID}'),
+//         headers: {'Content-Type': 'application/json'},
+//       );
 
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        if (data['background_images'] != null) {
-          return '$POCKETBASE_URL/api/files/voiceRooms/${widget.roomID}/${data['background_images']}';
-        }
-      }
-      return null;
-    } catch (e) {
-      print('Error fetching room background URL: $e');
-      return null;
-    }
-  }
+//       if (response.statusCode == 200) {
+//         final data = jsonDecode(response.body);
+//         if (data['background_images'] != null) {
+//           return '$POCKETBASE_URL/api/files/voiceRooms/${widget.roomID}/${data['background_images']}';
+//         }
+//       }
+//       return null;
+//     } catch (e) {
+//       print('Error fetching room background URL: $e');
+//       return null;
+//     }
+//   }
 
-  Future<Map<String, dynamic>?> _fetchVoiceRoomData() async {
-    try {
-      final uri = Uri.parse(
-              '$POCKETBASE_URL/api/collections/voiceRooms/records/${widget.roomID}')
-          .replace(queryParameters: {
-        'fields':
-            'voice_room_name,background_images,group_photo,voiceRoom_id,announcement'
-      });
+//   Future<Map<String, dynamic>?> _fetchVoiceRoomData() async {
+//     try {
+//       final uri = Uri.parse(
+//               '$POCKETBASE_URL/api/collections/voiceRooms/records/${widget.roomID}')
+//           .replace(queryParameters: {
+//         'fields':
+//             'voice_room_name,background_images,group_photo,voiceRoom_id,announcement'
+//       });
 
-      final response =
-          await http.get(uri, headers: {'Content-Type': 'application/json'});
+//       final response =
+//           await http.get(uri, headers: {'Content-Type': 'application/json'});
 
-      if (response.statusCode == 200) {
-        return jsonDecode(response.body);
-      }
-      return null;
-    } catch (e) {
-      print('Error fetching voice room data: $e');
-      return null;
-    }
-  }
+//       if (response.statusCode == 200) {
+//         return jsonDecode(response.body);
+//       }
+//       return null;
+//     } catch (e) {
+//       print('Error fetching voice room data: $e');
+//       return null;
+//     }
+//   }
 
-  Future<Map<String, dynamic>?> _fetchLanguageData(String roomId) async {
-    try {
-      final uri = Uri.parse(
-              '$POCKETBASE_URL/api/collections/voiceRooms/records/$roomId')
-          .replace(queryParameters: {
-        'fields': 'language',
-      });
+//   Future<Map<String, dynamic>?> _fetchLanguageData(String roomId) async {
+//     try {
+//       final uri = Uri.parse(
+//               '$POCKETBASE_URL/api/collections/voiceRooms/records/$roomId')
+//           .replace(queryParameters: {
+//         'fields': 'language',
+//       });
 
-      final response =
-          await http.get(uri, headers: {'Content-Type': 'application/json'});
+//       final response =
+//           await http.get(uri, headers: {'Content-Type': 'application/json'});
 
-      if (response.statusCode == 200) {
-        return jsonDecode(response.body);
-      }
-      return null;
-    } catch (e) {
-      print('Error fetching language data: $e');
-      return null;
-    }
-  }
+//       if (response.statusCode == 200) {
+//         return jsonDecode(response.body);
+//       }
+//       return null;
+//     } catch (e) {
+//       print('Error fetching language data: $e');
+//       return null;
+//     }
+//   }
 
-// Process results methods
-  void _processStringResults(List<String?> results) {
-    final avatarUrl = results[0];
-    final borderUrl = results[1];
-    final backgroundUrl = results[2];
+// // Process results methods
+//   void _processStringResults(List<String?> results) {
+//     final avatarUrl = results[0];
+//     final borderUrl = results[1];
+//     final backgroundUrl = results[2];
 
-    setState(() {
-      if (avatarUrl != null) _userAvatarUrl = avatarUrl;
-      if (borderUrl != null) _userBorders[widget.userId] = borderUrl;
-      if (backgroundUrl != null) _backgroundImageUrl = backgroundUrl;
-    });
-  }
+//     setState(() {
+//       if (avatarUrl != null) _userAvatarUrl = avatarUrl;
+//       if (borderUrl != null) _userBorders[widget.userId] = borderUrl;
+//       if (backgroundUrl != null) _backgroundImageUrl = backgroundUrl;
+//     });
+//   }
 
-  void _processMapResults(List<Map<String, dynamic>?> results) {
-    final roomData = results[0];
-    final languageData = results[1];
+//   void _processMapResults(List<Map<String, dynamic>?> results) {
+//     final roomData = results[0];
+//     final languageData = results[1];
 
-    setState(() {
-      if (roomData != null) {
-        _voiceRoomName = roomData['voice_room_name'];
-        _voiceroomid = roomData['voiceRoom_id'];
-        if (roomData['announcement'] != null) {
-          _announcement = roomData['announcement'];
-        }
-        if (roomData['group_photo'] != null) {
-          _groupPhotoUrl =
-              '$POCKETBASE_URL/api/files/voiceRooms/${widget.roomID}/${roomData['group_photo']}';
-        }
-      }
+//     setState(() {
+//       if (roomData != null) {
+//         _voiceRoomName = roomData['voice_room_name'];
+//         _voiceroomid = roomData['voiceRoom_id'];
+//         if (roomData['announcement'] != null) {
+//           _announcement = roomData['announcement'];
+//         }
+//         if (roomData['group_photo'] != null) {
+//           _groupPhotoUrl =
+//               '$POCKETBASE_URL/api/files/voiceRooms/${widget.roomID}/${roomData['group_photo']}';
+//         }
+//       }
 
-      if (languageData != null && languageData['language'] != null) {
-        _language = languageData['language'];
-      }
-    });
-  }
+//       if (languageData != null && languageData['language'] != null) {
+//         _language = languageData['language'];
+//       }
+//     });
+//   }
 
 // Most robust approach: Using dynamic types with error handling
   // Future<void> _initializeParallelRobust() async {
@@ -639,18 +543,18 @@ class LivePageState extends State<LivePage>
   }
 
 // Process initialization results
-  void _processInitializationResults(List<dynamic> results) {
-    // Handle results based on their index/position
-    for (int i = 0; i < results.length; i++) {
-      final result = results[i];
-      if (result != null) {
-        // Process successful results
-        print('Operation $i completed successfully');
-      } else {
-        print('Operation $i failed or returned null');
-      }
-    }
-  }
+  // void _processInitializationResults(List<dynamic> results) {
+  //   // Handle results based on their index/position
+  //   for (int i = 0; i < results.length; i++) {
+  //     final result = results[i];
+  //     if (result != null) {
+  //       // Process successful results
+  //       print('Operation $i completed successfully');
+  //     } else {
+  //       print('Operation $i failed or returned null');
+  //     }
+  //   }
+  // }
 
   // Alternative implementation using time estimation
   void _startPositionTracking() {
@@ -1069,7 +973,7 @@ class LivePageState extends State<LivePage>
           setState(() {
             _userBorders[widget.userId] = borderUrl;
           });
-
+          print('bordersvv $_userBorders');
           // Notify others about our border
           if (socket.connected) {
             socket.emit('borderChange', {
@@ -4525,9 +4429,9 @@ class LivePageState extends State<LivePage>
           children: [
             // Main Zego UIKit widget
             ZegoUIKitPrebuiltLiveAudioRoom(
-              appID: 1650323814,
+              appID: 1497118937,
               appSign:
-                  '61c1d2d1813c834ba6e587cdfb7be4c784b543fc3b3ee45a9828fdd03650de95',
+                  'eff8e02b1ab622037d7721dc42050426e08c071299982f4f6751a41eaaa4882a',
               userID: localUserID,
               userName: widget.username1,
               roomID: widget.roomID,
@@ -6538,7 +6442,7 @@ class LivePageState extends State<LivePage>
                   child: Padding(
                     padding: const EdgeInsets.only(left: 10),
                     child: Container(
-                      width: MediaQuery.of(context).size.width * 0.6,
+                      width: MediaQuery.of(context).size.width * 0.28,
                       height: MediaQuery.of(context).size.width * 0.1,
                       decoration: BoxDecoration(
                         color: Colors.black
@@ -7574,7 +7478,7 @@ class LivePageState extends State<LivePage>
             // Handle seat taken events for our own user
             takenSeats.forEach((index, user) {
               if (user.id == localUserID) {
-                _handleSeatTaken(user.id, index);
+                _handleSeatTaken(widget.userId, index);
               }
             });
 

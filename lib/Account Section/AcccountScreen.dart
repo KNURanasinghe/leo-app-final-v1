@@ -115,6 +115,30 @@ class _AccountScreen1State extends State<AccountScreen1> {
           '$baseUrl/api/files/${userData!['collectionId']}/${userData!['id']}/${userData!['avatar']}';
     }
 
+    int? intId;
+    String displayId = 'N/A';
+
+    try {
+      if (userData != null && userData!['id'] != null) {
+        String userId = userData!['id'].toString();
+        intId = int.parse(userId, radix: 36);
+        displayId = intId.toString();
+        print('Converted ID: $intId');
+      }
+    } catch (e) {
+      print('Error converting ID to integer: $e');
+      // Fallback: use hash code or show original ID
+      if (userData != null && userData!['id'] != null) {
+        try {
+          intId = userData!['id'].toString().hashCode.abs();
+          displayId = intId.toString();
+        } catch (e2) {
+          displayId =
+              userData!['id'].toString(); // Show original ID as fallback
+        }
+      }
+    }
+
     return Material(
       color: darkModeEnabled ? kDarkBoxColor : kLightBlueColor,
       shadowColor: Colors.black26,
@@ -161,6 +185,13 @@ class _AccountScreen1State extends State<AccountScreen1> {
                     ),
                     Text(
                       userData?['phonenumber'] ?? '94769146421',
+                      style: TextStyle(
+                        fontSize: 14.sp,
+                        color: kAltTextColor,
+                      ),
+                    ),
+                    Text(
+                      'ID:$intId',
                       style: TextStyle(
                         fontSize: 14.sp,
                         color: kAltTextColor,
