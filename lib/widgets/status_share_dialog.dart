@@ -4,6 +4,7 @@ import 'dart:math';
 
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_contacts/flutter_contacts.dart';
 import 'package:leo_app_01/HomeScreen.dart';
 import 'package:leo_app_01/chat/chatting.dart';
 import 'package:leo_app_01/models/message.dart';
@@ -180,27 +181,59 @@ class _StatusShareDialogState extends State<StatusShareDialog> {
       return;
     }
 
-    // Get current user ID first
-    final prefs = await SharedPreferences.getInstance();
-    final currentUserId = prefs.getString('userId');
+    // Show loading indicator
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return const Center(
+          child: CircularProgressIndicator(
+            valueColor: AlwaysStoppedAnimation<Color>(Colors.blue),
+          ),
+        );
+      },
+    );
 
-    if (currentUserId == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Error: Could not identify current user')),
-      );
-      return;
-    }
-
-    // Print debug information about the status being shared
-    print("DEBUG: Sharing status with the following information:");
-    print("Status ID: ${widget.statusId}");
-    print("Media Type: ${widget.mediaType}");
-    print("Caption: ${widget.caption}");
-    print("Media URL: ${widget.mediaUrl}");
-    print("Owner Name: ${widget.statusOwnerName}");
-
-    // Fetch users before closing the dialog
     try {
+      // Request contacts permission using flutter_contacts
+      final hasPermission = await FlutterContacts.requestPermission();
+      if (!hasPermission) {
+        print('Contacts permission not granted');
+        Navigator.of(context).pop(); // Close loading dialog
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content:
+                  Text('Contacts permission is required to find your contacts'),
+              backgroundColor: Colors.orange,
+            ),
+          );
+        }
+        return;
+      }
+
+      // Get current user ID first
+      final prefs = await SharedPreferences.getInstance();
+      final currentUserId = prefs.getString('userId');
+
+      if (currentUserId == null) {
+        Navigator.of(context).pop(); // Close loading dialog
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+              content: Text('Error: Could not identify current user')),
+        );
+        return;
+      }
+
+      // Print debug information about the status being shared
+      print("DEBUG: Sharing status with the following information:");
+      print("Status ID: ${widget.statusId}");
+      print("Media Type: ${widget.mediaType}");
+      print("Caption: ${widget.caption}");
+      print("Media URL: ${widget.mediaUrl}");
+      print("Owner Name: ${widget.statusOwnerName}");
+
+      // Fetch users from database
       final response = await http.get(
         Uri.parse('http://145.223.21.62:8090/api/collections/users/records'),
         headers: {'Content-Type': 'application/json'},
@@ -209,144 +242,188 @@ class _StatusShareDialogState extends State<StatusShareDialog> {
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         final List<dynamic> userItems = data['items'] as List;
+        print('Total users from DB: ${userItems.length}');
 
-        // Filter out current user
-        final List<_UserListItem> users = userItems
-            .where((item) => item['id'] != currentUserId)
-            .map((item) => _UserListItem(
-                  id: item['id'],
-                  name: '${item['firstname'] ?? ''} ${item['lastname'] ?? ''}'
-                      .trim(),
-                  avatar: item['avatar'],
-                  bio: item['bio'],
-                ))
-            .toList();
+        // Get contacts from device using flutter_contacts
+        List<Contact> contacts = await FlutterContacts.getContacts(
+            withProperties: true, withThumbnail: false);
+        print('Total contacts found: ${contacts.length}');
 
-        // Now that we have all the data, close the first dialog
+        Set<String> contactPhoneNumbers = {};
+
+        // Extract phone numbers from contacts and normalize them
+        for (var contact in contacts) {
+          for (var phone in contact.phones) {
+            if (phone.number.isNotEmpty) {
+              // Normalize phone number (remove spaces, dashes, etc.)
+              String normalizedNumber =
+                  phone.number.replaceAll(RegExp(r'[^\d+]'), '');
+              contactPhoneNumbers.add(normalizedNumber);
+
+              // Debug log for phone numbers
+              print(
+                  'Contact: ${contact.displayName}, Normalized Number: $normalizedNumber');
+            }
+          }
+        }
+
+        print(
+            'Total unique phone numbers from contacts: ${contactPhoneNumbers.length}');
+
+        // Filter users whose phone numbers are in contacts
+        final List<_UserListItem> filteredUsers = [];
+
+        for (var item in userItems) {
+          if (item['id'] == currentUserId) continue;
+
+          // Get the phone number from user data - using the correct field name "phonenumber"
+          String? phoneNumber = item['phonenumber']?.toString();
+
+          if (phoneNumber != null && phoneNumber.isNotEmpty) {
+            // Sri Lankan numbers may start with "94" instead of "+94", so add the "+" if needed
+            if (phoneNumber.startsWith('94') &&
+                !phoneNumber.startsWith('+94')) {
+              phoneNumber = '+$phoneNumber';
+            }
+
+            // Normalize the phone number for comparison
+            String normalizedNumber =
+                phoneNumber.replaceAll(RegExp(r'[^\d+]'), '');
+            print(
+                'User: ${item['firstname']} ${item['lastname']}, Phone: $normalizedNumber');
+
+            // Check if this number is in contacts with various matching strategies
+            bool isInContacts = false;
+
+            for (String contactNumber in contactPhoneNumbers) {
+              // Strategy 1: Exact match
+              if (normalizedNumber == contactNumber) {
+                isInContacts = true;
+                print('MATCH FOUND - Exact match: $normalizedNumber');
+                break;
+              }
+
+              // Strategy 2: Last digits match (for handling country code differences)
+              // For Sri Lankan numbers, compare last 9 digits (typical mobile number length)
+              final lastDigitsUser = normalizedNumber.length >= 9
+                  ? normalizedNumber.substring(normalizedNumber.length - 9)
+                  : normalizedNumber;
+              final lastDigitsContact = contactNumber.length >= 9
+                  ? contactNumber.substring(contactNumber.length - 9)
+                  : contactNumber;
+
+              if (lastDigitsUser == lastDigitsContact &&
+                  lastDigitsUser.length >= 9) {
+                isInContacts = true;
+                print(
+                    'MATCH FOUND - Last digits match: User=$normalizedNumber, Contact=$contactNumber');
+                break;
+              }
+
+              // Strategy 3: One ends with the other (original logic)
+              if (normalizedNumber.endsWith(contactNumber) ||
+                  contactNumber.endsWith(normalizedNumber)) {
+                isInContacts = true;
+                print(
+                    'MATCH FOUND - One ends with other: User=$normalizedNumber, Contact=$contactNumber');
+                break;
+              }
+            }
+
+            if (isInContacts) {
+              filteredUsers.add(_UserListItem(
+                id: item['id'],
+                name: '${item['firstname'] ?? ''} ${item['lastname'] ?? ''}'
+                    .trim(),
+                avatar: item['avatar'],
+                bio: item['bio'],
+              ));
+              print(
+                  'Added ${item['firstname']} ${item['lastname']} to filtered users');
+            }
+          } else {
+            print(
+                'User has no phone number: ${item['firstname']} ${item['lastname']}');
+          }
+        }
+
+        print('Filtered users count: ${filteredUsers.length}');
+
+        // Close loading dialog
         Navigator.of(context).pop();
 
-        // Use a delayed call to show the new dialog
-        Future.delayed(Duration.zero, () {
-          // Get a fresh BuildContext by pushing a new page instead of showing a dialog
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              fullscreenDialog: true,
-              builder: (context) => ContactSelectionPage(
-                users: users,
-                currentUserId: currentUserId,
-                statusId: widget.statusId,
-                mediaUrl: widget.mediaUrl,
-                mediaType: widget.mediaType,
-                caption: widget.caption,
-                statusOwnerName: widget.statusOwnerName,
+        // Close the original share dialog
+        Navigator.of(context).pop();
+
+        // Show contact selection with filtered users or all users if filter is empty
+        if (context.mounted) {
+          List<_UserListItem> usersToShow;
+
+          if (filteredUsers.isEmpty) {
+            print('No matches found between contacts and users.');
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content:
+                    Text('No contacts found in your app. Showing all users.'),
+                backgroundColor: Colors.orange,
               ),
-            ),
-          );
-        });
+            );
+
+            // Show all users if no matches found
+            usersToShow = userItems
+                .where((item) => item['id'] != currentUserId)
+                .map((item) => _UserListItem(
+                      id: item['id'],
+                      name:
+                          '${item['firstname'] ?? ''} ${item['lastname'] ?? ''}'
+                              .trim(),
+                      avatar: item['avatar'],
+                      bio: item['bio'],
+                    ))
+                .toList();
+          } else {
+            // Use filtered users if matches found
+            usersToShow = filteredUsers;
+          }
+
+          // Navigate to contact selection page
+          Future.delayed(Duration.zero, () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                fullscreenDialog: true,
+                builder: (context) => ContactSelectionPage(
+                  users: usersToShow,
+                  currentUserId: currentUserId,
+                  statusId: widget.statusId,
+                  mediaUrl: widget.mediaUrl,
+                  mediaType: widget.mediaType,
+                  caption: widget.caption,
+                  statusOwnerName: widget.statusOwnerName,
+                ),
+              ),
+            );
+          });
+        }
       } else {
+        Navigator.of(context).pop(); // Close loading dialog
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
               content: Text('Error fetching users: ${response.statusCode}')),
         );
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error: ${e.toString()}')),
-      );
-    }
-  }
+      print('Error loading users or contacts: $e');
+      Navigator.of(context).pop(); // Close loading dialog
 
-  // Update the _sendStatusToUser method in your ContactSelectionPage
-
-  void _sendStatusToUser(String receiverId) async {
-    final prefs = await SharedPreferences.getInstance();
-    final currentUserId = prefs.getString('userId');
-    print("=== CREATING STATUS SHARE MESSAGE ===");
-    print("- statusId: '${widget.statusId}'");
-    print("- mediaType: '${widget.mediaType}'");
-    print("- caption: '${widget.caption}'");
-    print("- mediaUrl: '${widget.mediaUrl}'");
-    print("- statusOwnerName: '${widget.statusOwnerName}'");
-    print("- currentUserId: '$currentUserId'");
-    print("- receiverId: '$receiverId'");
-
-    try {
-      // Generate a unique message ID with timestamp and random string
-      String messageId =
-          "msg_${DateTime.now().millisecondsSinceEpoch}_${_generateRandomString(8)}";
-      print("Generated messageId: $messageId");
-
-      // Create a message that references the status - using explicit Map first
-      Map<String, dynamic> messageData = {
-        'messageId': messageId,
-        'senderId': currentUserId,
-        'receiverId': receiverId,
-        'message': 'Shared a status with you', // Default message text
-        'timestamp': DateTime.now().millisecondsSinceEpoch,
-        'delivered': false,
-        'read': false,
-        'messageType': 'status_share', // Special type for shared statuses
-
-        // Explicitly set status fields with String values to avoid null or conversion issues
-        'statusId': widget.statusId,
-        'statusType': widget.mediaType,
-        'statusContent':
-            "Shared from ${widget.statusOwnerName}: ${widget.caption}",
-        'statusFileUrl': widget.mediaUrl,
-      };
-
-      // Print message data for debugging
-      print("Message data map: $messageData");
-      print("statusId in map: ${messageData['statusId']}");
-
-      // Create a Message object from this data
-      final Message message = Message.fromJson(messageData);
-
-      // Verify all fields were properly set
-      print("Created message object with:");
-      print("- message.messageId: '${message.messageId}'");
-      print("- message.messageType: '${message.messageType}'");
-      print("- message.statusId: '${message.statusId}'");
-      print("- message.statusType: '${message.statusType}'");
-      print("- message.statusContent: '${message.statusContent}'");
-      print("- message.statusFileUrl: '${message.statusFileUrl}'");
-
-      // Convert back to JSON to verify all fields are present
-      final Map<String, dynamic> json = message.toJson();
-      print("Message converted to JSON: $json");
-      print(
-          "JSON contains statusId: ${json.containsKey('statusId')} = '${json['statusId']}'");
-
-      // Using SocketService to send the message
-      final SocketService socketService = SocketService();
-
-      // Ensure socket is connected
-      if (!socketService.isConnected) {
-        print("Socket not connected, connecting...");
-        socketService.connect(currentUserId!);
-        // Give some time for connection to establish
-        await Future.delayed(const Duration(milliseconds: 500));
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to load contacts: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
+        );
       }
-
-      print("Sending message via socket...");
-      // Send the message
-      socketService.sendMessage(message);
-
-      // Show confirmation and close
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Status shared successfully')),
-      );
-
-      Navigator.pop(context);
-    } catch (e) {
-      print('Error sending status: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Failed to share status: ${e.toString()}'),
-          backgroundColor: Colors.red,
-        ),
-      );
     }
   }
 

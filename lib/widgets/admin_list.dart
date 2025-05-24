@@ -550,7 +550,7 @@ class _AdminListScreenState extends State<AdminListScreen>
           ontap: () {
             Future.delayed(Duration.zero, () {
               setState(() {
-                _pendingChatRequests = 0;
+                // _pendingChatRequests = 0;
               });
               Navigator.push(
                 context,

@@ -325,11 +325,17 @@ class _UserSelectionDialogState extends State<_UserSelectionDialog> {
   Future<void> _loadCurrentUserData() async {
     try {
       final prefs = await SharedPreferences.getInstance();
+
       setState(() {
         _currentUserId = prefs.getString('userId') ?? '';
         _currentUserName = prefs.getString('name') ?? '';
       });
-
+      final response = await http.get(
+        Uri.parse(
+            'http://145.223.21.62:8090/api/collections/users/records/$_currentUserId'),
+        headers: {'Content-Type': 'application/json'},
+      );
+      print('response users 1 ${json.decode(response.body)}');
       // Make sure socket is connected
       if (!_socketService.isConnected) {
         print('⚠️ Socket not connected in user dialog, connecting...');
@@ -485,10 +491,25 @@ class _UserSelectionDialogState extends State<_UserSelectionDialog> {
     String? currentUserAvatar;
     try {
       final prefs = await SharedPreferences.getInstance();
-      final avatar = prefs.getString('avatar');
+
+      setState(() {
+        _currentUserId = prefs.getString('userId') ?? '';
+      });
+      final response = await http.get(
+        Uri.parse(
+            'http://145.223.21.62:8090/api/collections/users/records/$_currentUserId'),
+        headers: {'Content-Type': 'application/json'},
+      );
+      print('response users 1 ${json.decode(response.body)}');
+
+      final userData = json.decode(response.body);
+      final avatar = userData['avatar'];
       if (avatar != null && avatar.isNotEmpty) {
-        currentUserAvatar =
-            'http://145.223.21.62:8090/api/files/users/$_currentUserId/$avatar';
+        setState(() {
+          currentUserAvatar =
+              'http://145.223.21.62:8090/api/files/users/$_currentUserId/$avatar';
+          _currentUserName = '${userData['firstname']} ${userData['lastname']}';
+        });
       }
     } catch (e) {
       print('Error getting avatar: $e');
