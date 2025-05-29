@@ -423,11 +423,6 @@ class _StoreScreenState extends State<StoreScreen>
           eventType = "themeChange";
           itemUrl =
               '$baseUrl/api/files/myItems/$itemId/${itemData.data['theme']}';
-
-          // Reset other themes if needed
-          // if (!alreadyUsed) {
-          //   await _resetOtherThemes(itemId);
-          // }
           break;
 
         case 2: // Entry Effects (Rive)
@@ -436,11 +431,6 @@ class _StoreScreenState extends State<StoreScreen>
           eventType = "entryEffectChange";
           itemUrl =
               '$baseUrl/api/files/myItems/$itemId/${itemData.data['rive_file']}';
-
-          // Reset other entry effects if needed
-          // if (!alreadyUsed) {
-          //   await _resetOtherEntryEffects(itemId);
-          // }
           break;
       }
 
@@ -454,14 +444,28 @@ class _StoreScreenState extends State<StoreScreen>
       if (widget.socket != null &&
           widget.socket!.connected &&
           widget.roomId != null) {
-        widget.socket!.emit(eventType, {
+        // ✅ FIX: Send the correct field names based on event type
+        Map<String, dynamic> eventData = {
           'roomId': widget.roomId,
           'userId': widget.userId,
           'userName': widget.userName,
-          'itemUrl': itemUrl,
           'timestamp': DateTime.now().millisecondsSinceEpoch
-        });
+        };
 
+        // Add the appropriate URL field based on event type
+        switch (eventType) {
+          case 'borderChange':
+            eventData['borderUrl'] = itemUrl; // ✅ Use borderUrl, not itemUrl
+            break;
+          case 'themeChange':
+            eventData['itemUrl'] = itemUrl;
+            break;
+          case 'entryEffectChange':
+            eventData['itemUrl'] = itemUrl;
+            break;
+        }
+
+        widget.socket!.emit(eventType, eventData);
         print('Emitted $eventType event with URL: $itemUrl');
       }
 

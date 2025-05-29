@@ -12,6 +12,7 @@ class ChatMessage {
   final String? avatarUrl;
   final String? itemUrl; // Add this for entry animations
   final MessageType type; // Add this for message types
+  final bool isEmojiReaction;
 
   ChatMessage({
     required this.userId,
@@ -20,6 +21,7 @@ class ChatMessage {
     required this.timestamp,
     this.avatarUrl,
     this.itemUrl,
+    this.isEmojiReaction = false,
     this.type = MessageType.normal,
   });
 

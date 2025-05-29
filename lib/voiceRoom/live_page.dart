@@ -1346,9 +1346,8 @@ class LivePageState extends State<LivePage>
     });
 
     socket.on('seatTaken', (data) {
-      print(
-          'seat taken ${data['seatIndex']} ${data['userId']} ${data['userName']} ${data['userAvatar']} ${data['borderUrl']}');
-      if (mounted) {
+      print('seat taken: $data');
+      if (mounted && data['seatIndex'] != null) {
         setState(() {
           _seatOccupants[data['seatIndex']] = {
             'userId': data['userId'],
@@ -1357,6 +1356,7 @@ class LivePageState extends State<LivePage>
             'borderUrl': data['borderUrl']
           };
         });
+        print('Seat taken updated: $_seatOccupants');
       }
     });
 
@@ -1369,10 +1369,12 @@ class LivePageState extends State<LivePage>
     });
 
     socket.on('seatReleased', (data) {
-      if (mounted) {
+      print('seat released: $data');
+      if (mounted && data['seatIndex'] != null) {
         setState(() {
           _seatOccupants.remove(data['seatIndex']);
         });
+        print('Seat released updated: $_seatOccupants');
       }
     });
     socket.on('seatStatusUpdate', (data) {
@@ -1395,22 +1397,55 @@ class LivePageState extends State<LivePage>
     });
 
     socket.on('borderChange', (data) {
-      if (mounted && data['userId'] != null && data['borderUrl'] != null) {
-        if (data['userId'] != widget.userId &&
-            _seatOccupants.values
-                .any((seat) => seat['userId'] == data['userId'])) {
-          // Flash effect on their seat
-          _showUpdateEffect(data['userId']);
-        }
-        setState(() {
-          _userBorders[data['userId']] = data['borderUrl'];
+      print('🔄 Received borderChange event: $data');
 
-          // Update any active seats this user might be in
-          _seatOccupants.forEach((seatIndex, userInfo) {
-            if (userInfo['userId'] == data['userId']) {
-              userInfo['borderUrl'] = data['borderUrl'];
+      if (mounted && data['userId'] != null && data['borderUrl'] != null) {
+        final String userId = data['userId'];
+        final String borderUrl = data['borderUrl'];
+
+        // Show flash effect if it's not the current user and they're in a seat
+        if (userId != widget.userId) {
+          bool userInSeat = false;
+          _seatOccupants.forEach((seatIndex, seatData) {
+            if (seatData['userId'] == userId) {
+              userInSeat = true;
             }
           });
+
+          if (userInSeat) {
+            _showUpdateEffect(userId);
+          }
+        }
+
+        setState(() {
+          // Update the user borders map
+          _userBorders[userId] = borderUrl;
+
+          // CRITICAL: Update all active seats this user might be occupying
+          bool seatUpdated = false;
+          _seatOccupants.forEach((seatIndex, userInfo) {
+            if (userInfo['userId'] == userId) {
+              userInfo['borderUrl'] = borderUrl;
+              seatUpdated = true;
+              print('✅ Updated border for user $userId in seat $seatIndex');
+            }
+          });
+
+          if (seatUpdated) {
+            print('🎨 Border updated in seat occupants, triggering UI refresh');
+          } else {
+            print(
+                '⚠️ User $userId not found in any seat, only updated _userBorders');
+          }
+        });
+
+        // Force a rebuild of the seat UI
+        Future.delayed(const Duration(milliseconds: 100), () {
+          if (mounted) {
+            setState(() {
+              // This empty setState forces a rebuild
+            });
+          }
         });
       }
     });
@@ -1692,7 +1727,7 @@ class LivePageState extends State<LivePage>
       await Future.wait([
         updateStartTime(widget.userId, widget.roomID),
         // Don't duplicate these - they're already in _initializeParallelRobust():
-        // _fetchAndSetUserAvatar(),
+        _fetchAndSetUserAvatar(),
         // _fetchVoiceRoomDetails(),
         // _fetchLanguageDetails(widget.roomID),
         // _createOnlineUserRecord(),
@@ -1816,6 +1851,8 @@ class LivePageState extends State<LivePage>
               'userAvatar': data['userAvatar'],
               'borderUrl': data['borderUrl']
             };
+            print(
+                'Seat istaken ${data['seatIndex']} taken by ${data['userId']} - ${data['userName']}');
           } else {
             _seatOccupants.remove(data['seatIndex']);
           }
@@ -1824,19 +1861,55 @@ class LivePageState extends State<LivePage>
     });
 
     socket.on('borderChange', (data) {
+      print('🔄 Received borderChange event: $data');
+
       if (mounted && data['userId'] != null && data['borderUrl'] != null) {
-        if (data['userId'] != widget.userId &&
-            _seatOccupants.values
-                .any((seat) => seat['userId'] == data['userId'])) {
-          _showUpdateEffect(data['userId']);
-        }
-        setState(() {
-          _userBorders[data['userId']] = data['borderUrl'];
-          _seatOccupants.forEach((seatIndex, userInfo) {
-            if (userInfo['userId'] == data['userId']) {
-              userInfo['borderUrl'] = data['borderUrl'];
+        final String userId = data['userId'];
+        final String borderUrl = data['borderUrl'];
+
+        // Show flash effect if it's not the current user and they're in a seat
+        if (userId != widget.userId) {
+          bool userInSeat = false;
+          _seatOccupants.forEach((seatIndex, seatData) {
+            if (seatData['userId'] == userId) {
+              userInSeat = true;
             }
           });
+
+          if (userInSeat) {
+            _showUpdateEffect(userId);
+          }
+        }
+
+        setState(() {
+          // Update the user borders map
+          _userBorders[userId] = borderUrl;
+
+          // CRITICAL: Update all active seats this user might be occupying
+          bool seatUpdated = false;
+          _seatOccupants.forEach((seatIndex, userInfo) {
+            if (userInfo['userId'] == userId) {
+              userInfo['borderUrl'] = borderUrl;
+              seatUpdated = true;
+              print('✅ Updated border for user $userId in seat $seatIndex');
+            }
+          });
+
+          if (seatUpdated) {
+            print('🎨 Border updated in seat occupants, triggering UI refresh');
+          } else {
+            print(
+                '⚠️ User $userId not found in any seat, only updated _userBorders');
+          }
+        });
+
+        // Force a rebuild of the seat UI
+        Future.delayed(const Duration(milliseconds: 100), () {
+          if (mounted) {
+            setState(() {
+              // This empty setState forces a rebuild
+            });
+          }
         });
       }
     });
@@ -1914,26 +1987,75 @@ class LivePageState extends State<LivePage>
       print('Received current seats data: $data');
       if (mounted && data['seats'] != null) {
         final seats = data['seats'] as Map<String, dynamic>;
-
         setState(() {
-          // Clear existing seat data
-          _seatOccupants.clear();
-
-          // Populate with current seat occupancy
+          // Update only changed seats
           seats.forEach((seatIndexStr, seatData) {
-            final seatIndex = int.parse(seatIndexStr);
-            _seatOccupants[seatIndex] = {
-              'userId': seatData['userId'],
-              'userName': seatData['userName'],
-              'userAvatar': seatData['userAvatar'],
-              'borderUrl': seatData['borderUrl']
-            };
+            final seatIndex =
+                int.parse(seatIndexStr.toString()); // Ensure integer
+            if (seatData != null && seatData['userId'] != null) {
+              _seatOccupants[seatIndex] = {
+                'userId': seatData['userId'],
+                'userName': seatData['userName'],
+                'userAvatar': seatData['userAvatar'],
+                'borderUrl': seatData['borderUrl']
+              };
+            } else {
+              _seatOccupants.remove(seatIndex); // Remove if seat is empty
+            }
           });
+          // Remove seats not in the received data
+          _seatOccupants
+              .removeWhere((index, _) => !seats.containsKey(index.toString()));
         });
-
-        print('Updated seat occupants with current state: $_seatOccupants');
+        print('Updated seat occupants: $_seatOccupants');
       }
     });
+
+    socket.on('seatDataSync', (data) {
+      print('Received seat data sync: $data');
+      if (mounted && data['seats'] != null) {
+        final seats = data['seats'] as Map<String, dynamic>;
+        setState(() {
+          seats.forEach((seatIndexStr, seatData) {
+            final seatIndex = int.parse(seatIndexStr.toString());
+            if (seatData != null && seatData['userId'] != null) {
+              _seatOccupants[seatIndex] = {
+                'userId': seatData['userId'],
+                'userName': seatData['userName'],
+                'userAvatar': seatData['userAvatar'],
+                'borderUrl': seatData['borderUrl']
+              };
+            } else {
+              _seatOccupants.remove(seatIndex);
+            }
+          });
+          _seatOccupants
+              .removeWhere((index, _) => !seats.containsKey(index.toString()));
+        });
+        print('Updated seat occupants from sync: $_seatOccupants');
+      }
+    });
+  }
+
+  Future<void> _fetchCurrentSeats() async {
+    try {
+      if (socket.connected) {
+        socket.emit('fetchCurrentSeats', {'roomId': widget.roomID});
+        print('Requested current seats for room ${widget.roomID}');
+        // Retry if no response within 2 seconds
+        await Future.any([
+          Future.delayed(const Duration(seconds: 2)),
+          Future(() => socket.once('currentSeats', (_) => null)),
+        ]).then((_) {
+          if (_seatOccupants.isEmpty && socket.connected) {
+            print('No seat data received, retrying...');
+            socket.emit('fetchCurrentSeats', {'roomId': widget.roomID});
+          }
+        });
+      }
+    } catch (e) {
+      print('Error fetching current seats: $e');
+    }
   }
 
   void _updateSeatDisplays() {
@@ -2982,33 +3104,25 @@ class LivePageState extends State<LivePage>
         'fields': 'id,avatar,collectionId',
       });
 
-      final response = await http.get(
-        uri,
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      );
+      final response =
+          await http.get(uri, headers: {'Content-Type': 'application/json'});
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        print('------------------------');
-        print(data);
         if (data['items'] != null && data['items'].isNotEmpty) {
           final userData = data['items'][0];
           if (userData['avatar'] != null) {
             setState(() {
+              // <--- Ensure setState is called to update the state
               _userAvatarUrl =
                   '$POCKETBASE_URL/api/files/${userData['collectionId']}/${userData['id']}/${userData['avatar']}';
-              print('------------------------');
-              print('user avatAr $_userAvatarUrl');
             });
+            print('Local user avatar URL fetched: $_userAvatarUrl');
           }
         }
-      } else {
-        print('Failed to fetch user avatar: ${response.statusCode}');
       }
     } catch (e) {
-      print('Error fetching user avatar: $e');
+      print('Error fetching local user avatar URL: $e');
     }
   }
 
@@ -3119,9 +3233,9 @@ class LivePageState extends State<LivePage>
     } catch (e) {
       print('Error during logout: $e');
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error during logout: $e')),
-        );
+        // ScaffoldMessenger.of(context).showSnackBar(
+        //   SnackBar(content: Text('Error during logout: $e')),
+        // );
         Navigator.of(context).pop();
       }
     }
@@ -4058,10 +4172,12 @@ class LivePageState extends State<LivePage>
               'roomId': widget.roomID,
               'userId': widget.userId,
               'userName': widget.username1,
-              'emoji': emoji,
+              'emoji': emoji, // CRITICAL: Include the actual emoji
               'timestamp': DateTime.now().millisecondsSinceEpoch
             });
-
+            setState(() {
+              _messageService.sendMessage(emoji);
+            });
             // Don't show locally - wait for socket response
             Navigator.pop(context);
           },
@@ -7868,51 +7984,51 @@ class LivePageState extends State<LivePage>
     );
   }
 
-  Widget avatarBuilder(
-    BuildContext context,
-    Size size,
-    ZegoUIKitUser? user,
-    Map<String, dynamic> extraInfo,
-  ) {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(size.width / 2),
-      child: SizedBox(
-        width: size.width,
-        height: size.width,
-        child: Stack(
-          children: [
-            // Base avatar container
-            Container(
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                border: Border.all(
-                  color: Colors.white,
-                  width: 2,
-                ),
-              ),
-              child: _userAvatarUrl != null
-                  ? CachedNetworkImage(
-                      imageUrl: _userAvatarUrl!,
-                      width: size.width,
-                      height: size.width,
-                      fit: BoxFit.cover,
-                      placeholder: (context, url) =>
-                          const CircularProgressIndicator(),
-                      errorWidget: (context, url, error) =>
-                          const Icon(Icons.error),
-                    )
-                  : Container(
-                      color: Colors.grey[300],
-                      child: Icon(Icons.group, color: Colors.grey[400]),
-                    ),
-            ),
+  // Widget avatarBuilder(
+  //   BuildContext context,
+  //   Size size,
+  //   ZegoUIKitUser? user,
+  //   Map<String, dynamic> extraInfo,
+  // ) {
+  //   return ClipRRect(
+  //     borderRadius: BorderRadius.circular(size.width / 2),
+  //     child: SizedBox(
+  //       width: size.width,
+  //       height: size.width,
+  //       child: Stack(
+  //         children: [
+  //           // Base avatar container
+  //           Container(
+  //             decoration: BoxDecoration(
+  //               shape: BoxShape.circle,
+  //               border: Border.all(
+  //                 color: Colors.white,
+  //                 width: 2,
+  //               ),
+  //             ),
+  //             child: _userAvatarUrl != null
+  //                 ? CachedNetworkImage(
+  //                     imageUrl: _userAvatarUrl!,
+  //                     width: size.width,
+  //                     height: size.width,
+  //                     fit: BoxFit.cover,
+  //                     placeholder: (context, url) =>
+  //                         const CircularProgressIndicator(),
+  //                     errorWidget: (context, url, error) =>
+  //                         const Icon(Icons.error),
+  //                   )
+  //                 : Container(
+  //                     color: Colors.grey[300],
+  //                     child: Icon(Icons.group, color: Colors.grey[400]),
+  //                   ),
+  //           ),
 
-            // Emoji overlay
-          ],
-        ),
-      ),
-    );
-  }
+  //           // Emoji overlay
+  //         ],
+  //       ),
+  //     ),
+  //   );
+  // }
 
   int getHostSeatIndex() {
     if (widget.layoutMode == LayoutMode.hostCenter) {
