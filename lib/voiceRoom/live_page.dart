@@ -1909,6 +1909,31 @@ class LivePageState extends State<LivePage>
         );
       }
     });
+
+    socket.on('currentSeats', (data) {
+      print('Received current seats data: $data');
+      if (mounted && data['seats'] != null) {
+        final seats = data['seats'] as Map<String, dynamic>;
+
+        setState(() {
+          // Clear existing seat data
+          _seatOccupants.clear();
+
+          // Populate with current seat occupancy
+          seats.forEach((seatIndexStr, seatData) {
+            final seatIndex = int.parse(seatIndexStr);
+            _seatOccupants[seatIndex] = {
+              'userId': seatData['userId'],
+              'userName': seatData['userName'],
+              'userAvatar': seatData['userAvatar'],
+              'borderUrl': seatData['borderUrl']
+            };
+          });
+        });
+
+        print('Updated seat occupants with current state: $_seatOccupants');
+      }
+    });
   }
 
   void _updateSeatDisplays() {
@@ -2386,6 +2411,8 @@ class LivePageState extends State<LivePage>
 
       socket.emit('fetchRoomItems', {'roomId': widget.roomID});
 
+      _fetchCurrentSeatOccupancy();
+
       // Wait for avatar URL to be ready
       await _ensureAvatarReady();
       await _fetchOwnBorder();
@@ -2396,6 +2423,49 @@ class LivePageState extends State<LivePage>
         'userName': widget.username1,
         'userAvatar': _userAvatarUrl,
         'userMotto': ''
+      });
+
+      // Find this in your _updateUserList method or wherever you handle roomUpdate
+      socket.on('roomUpdate', (data) {
+        if (!mounted) return;
+
+        try {
+          final List<dynamic> usersList = data['users'] as List;
+          final users = usersList
+              .map((userData) => OnlineUser(
+                    id: userData['id'] as String,
+                    name: userData['name'] as String,
+                    avatarUrl: userData['avatarUrl'] as String,
+                    motto: userData['motto'] as String? ?? '',
+                  ))
+              .toList();
+
+          // ADD THIS SECTION - Handle seat data if provided
+          if (data['seats'] != null) {
+            final seats = data['seats'] as Map<String, dynamic>;
+            setState(() {
+              _seatOccupants.clear();
+              seats.forEach((seatIndexStr, seatData) {
+                final seatIndex = int.parse(seatIndexStr);
+                _seatOccupants[seatIndex] = {
+                  'userId': seatData['userId'],
+                  'userName': seatData['userName'],
+                  'userAvatar': seatData['userAvatar'],
+                  'borderUrl': seatData['borderUrl']
+                };
+              });
+            });
+            print('Updated seats from room update: $_seatOccupants');
+          }
+
+          setState(() {
+            onlineUsers = users;
+            userCount = data['count'] as int;
+            isLoadingUsers = false;
+          });
+        } catch (e) {
+          print('Error processing room update: $e');
+        }
       });
 
       completer.complete();
@@ -2421,6 +2491,13 @@ class LivePageState extends State<LivePage>
     while (_userAvatarUrl == null && attempts < 10) {
       await Future.delayed(const Duration(milliseconds: 100));
       attempts++;
+    }
+  }
+
+  Future<void> _fetchCurrentSeatOccupancy() async {
+    if (socket.connected) {
+      socket.emit('fetchCurrentSeats', {'roomId': widget.roomID});
+      print('Requested current seat occupancy');
     }
   }
 
@@ -3305,7 +3382,7 @@ class LivePageState extends State<LivePage>
       // Create a larger container for the entire seat area to allow border to expand
       const double nameLabelHeight = 20;
       final double avatarSize =
-          size.width * 0.73; // Make avatar 60% of seat width
+          size.width * 0.66; // Make avatar 60% of seat width
 
       return Column(
         children: [
@@ -3320,28 +3397,31 @@ class LivePageState extends State<LivePage>
               children: [
                 // Avatar on top of border
                 if (seatData['userAvatar'] != null)
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(avatarSize / 2),
-                    child: Container(
-                      width: avatarSize,
-                      height: avatarSize,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        border: Border.all(
-                          color: Colors.white,
-                          width: 1,
+                  Positioned(
+                    top: 9,
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(avatarSize / 2),
+                      child: Container(
+                        width: avatarSize,
+                        height: avatarSize,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: Colors.white,
+                            width: 1,
+                          ),
                         ),
-                      ),
-                      child: CachedNetworkImage(
-                        imageUrl: seatData['userAvatar'],
-                        fit: BoxFit.cover,
-                        placeholder: (context, url) => Container(
-                          color: Colors.grey[300],
-                          child: const Icon(Icons.person, color: Colors.grey),
-                        ),
-                        errorWidget: (context, url, error) => Container(
-                          color: Colors.grey[300],
-                          child: const Icon(Icons.person, color: Colors.grey),
+                        child: CachedNetworkImage(
+                          imageUrl: seatData['userAvatar'],
+                          fit: BoxFit.cover,
+                          placeholder: (context, url) => Container(
+                            color: Colors.grey[300],
+                            child: const Icon(Icons.person, color: Colors.grey),
+                          ),
+                          errorWidget: (context, url, error) => Container(
+                            color: Colors.grey[300],
+                            child: const Icon(Icons.person, color: Colors.grey),
+                          ),
                         ),
                       ),
                     ),
