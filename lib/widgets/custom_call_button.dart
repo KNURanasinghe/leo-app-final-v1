@@ -30,9 +30,9 @@ class CallButtons extends StatefulWidget {
 
 class _CallButtonsState extends State<CallButtons> {
   // Replace with your SDKAppID and SecretKey from Tencent Cloud console
-  final int sdkAppID = 20023286;
+  final int sdkAppID = 20023928;
   final String secretKey =
-      "f1dfa25d414d6fd2185c686d05f90e83fe086459d29ae9bad911588736346fb4";
+      "12f420b47c0f737451807d63f42b98969bc81755a7baaf3ae41f9f27559fa477";
 
   bool isInitialized = false;
   bool isInitializing = false;
@@ -136,10 +136,10 @@ class _CallButtonsState extends State<CallButtons> {
 
     // Add timeout for status check
     bool receivedResponse = false;
-    Future.delayed(const Duration(seconds: 5), () {
+    Future.delayed(const Duration(seconds: 2), () {
       if (!receivedResponse) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-            content: Text("No response from server. Making direct call...")));
+        // ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        //     content: Text("No response from server. Making direct call...")));
         _makeTencentCall(context, isVideoCall);
       }
     });

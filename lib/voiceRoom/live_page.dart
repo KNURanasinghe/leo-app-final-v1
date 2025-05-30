@@ -1002,7 +1002,12 @@ class LivePageState extends State<LivePage>
   void _handleSeatTaken(String userId, int seatIndex) {
     if (socket.connected) {
       print('Handling seat taken: User $userId taking seat $seatIndex');
+      String? borderUrl = _userBorders[userId];
 
+      if (userId == widget.userId && borderUrl == null) {
+        // Try to get from any recent fetch
+        borderUrl = _userBorders[widget.userId];
+      }
       // Emit the seat taken event with complete information
       socket.emit('seatTaken', {
         'roomId': widget.roomID,
@@ -1010,7 +1015,7 @@ class LivePageState extends State<LivePage>
         'seatIndex': seatIndex,
         'userAvatar': _userAvatarUrl,
         'userName': widget.username1,
-        'borderUrl': _userBorders[userId]
+        'borderUrl': borderUrl
       });
 
       // Update our local state immediately for responsive UI
@@ -1019,7 +1024,7 @@ class LivePageState extends State<LivePage>
           'userId': userId,
           'userName': widget.username1,
           'userAvatar': _userAvatarUrl,
-          'borderUrl': _userBorders[userId]
+          'borderUrl': borderUrl
         };
       });
 
@@ -1748,6 +1753,7 @@ class LivePageState extends State<LivePage>
         _safeExecute(() => _initializeSocket()),
         _safeExecute(() =>
             _fetchAndSetUserAvatar()), // Need avatar for socket connection
+        _safeExecute(() => _fetchOwnBorder()),
       ]);
 
       // Phase 2: Main data loading (parallel)
@@ -1758,7 +1764,6 @@ class LivePageState extends State<LivePage>
         _safeExecute(() => _createOnlineUserRecord()),
         _safeExecute(() => _checkAdminStatus()),
         _safeExecute(() => _fetchOnlineUsers()),
-        _safeExecute(() => _fetchOwnBorder()),
       ]);
 
       await Future.wait<dynamic>([
@@ -6707,7 +6712,7 @@ class LivePageState extends State<LivePage>
                 _buildCustomButton(2, customIcons[2]),
 
                 // Space between groups - explicit width
-                const SizedBox(width: 40),
+                const SizedBox(width: 10),
 
                 // Group 2: Mail icon
                 _buildCustomButton(1, customIcons[1]),
@@ -6826,7 +6831,7 @@ class LivePageState extends State<LivePage>
                 _buildCustomButton(2, customIcons[2]),
 
                 // Space between groups - explicit width
-                const SizedBox(width: 40),
+                const SizedBox(width: 10),
 
                 // Group 2: Mail icon
                 _buildCustomButton(1, customIcons[1]),
