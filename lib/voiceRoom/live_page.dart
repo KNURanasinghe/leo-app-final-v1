@@ -229,7 +229,7 @@ class LivePageState extends State<LivePage>
     Icons.emoji_emotions,
     Icons.message_rounded,
     Icons.open_with_sharp,
-    //Icons.lock_outline,
+    Icons.lock_outline,
   ];
 
   bool _isMusicPlaying = false;
@@ -2585,6 +2585,7 @@ class LivePageState extends State<LivePage>
             userCount = data['count'] as int;
             isLoadingUsers = false;
           });
+          print('online users $onlineUsers  $userCount  ');
         } catch (e) {
           print('Error processing room update: $e');
         }
@@ -3562,9 +3563,9 @@ class LivePageState extends State<LivePage>
                 if (seatData['borderUrl'] != null)
                   Positioned.fill(
                     // Expand beyond container bounds
-                    left: -4,
-                    right: -4,
-                    top: -28,
+                    left: -2,
+                    right: -2,
+                    top: -27,
                     bottom: -34, // Slight adjustment for name label
                     child: Container(
                       decoration: const BoxDecoration(shape: BoxShape.circle),
@@ -4797,7 +4798,7 @@ class LivePageState extends State<LivePage>
                         )
                       else
                         Text(
-                          '${onlineUsers.length}',
+                          '${_getCorrectUserCount()}', // Use the helper function
                           style: const TextStyle(
                             color: Colors.white,
                             fontSize: 12,
@@ -5233,6 +5234,19 @@ class LivePageState extends State<LivePage>
         ),
       ),
     );
+  }
+
+  int _getCorrectUserCount() {
+    // Remove duplicates by user ID, excluding current user (same logic as bottom sheet)
+    final uniqueUsers = <String, OnlineUser>{};
+    for (var user in onlineUsers) {
+      if (user.id != widget.userId && !uniqueUsers.containsKey(user.id)) {
+        uniqueUsers[user.id] = user;
+      }
+    }
+
+    // Return deduplicated count + 1 for current user
+    return uniqueUsers.length + 1;
   }
 
   void _showOnlineUsersBottomSheet(BuildContext context) {
@@ -6570,7 +6584,7 @@ class LivePageState extends State<LivePage>
                 _buildCustomButton(2, customIcons[2]),
 
                 // Space between groups - explicit width
-                const SizedBox(width: 40),
+                const SizedBox(width: 7),
 
                 // Group 2: Mail icon
                 _buildCustomButton(1, customIcons[1]),
@@ -6618,11 +6632,14 @@ class LivePageState extends State<LivePage>
                 // Group 3: Open with icon
                 //_buildCustomButton(5, customIcons[5]),
                 _buildCustomButton(4, customIcons[4]),
+                _buildCustomSeatLockButton(),
               ],
             ),
           ),
         ],
-        hostButtons: [ZegoLiveAudioRoomMenuBarButtonName.closeSeatButton],
+        hostButtons: [
+          //ZegoLiveAudioRoomMenuBarButtonName.closeSeatButton
+        ],
         speakerButtons: [],
         speakerExtendButtons: [
           SizedBox(
@@ -6864,6 +6881,47 @@ class LivePageState extends State<LivePage>
       );
   }
 
+  Widget _buildCustomSeatLockButton() {
+    return Padding(
+      padding: const EdgeInsets.all(5.0),
+      child: ElevatedButton(
+        style: ElevatedButton.styleFrom(
+          fixedSize: const Size(40, 40),
+          backgroundColor: const Color(0xff2C2F3E).withOpacity(0.6),
+          iconColor: Colors.white,
+          shape: const CircleBorder(),
+          padding: EdgeInsets.zero,
+          elevation: 0,
+          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+          minimumSize: const Size(40, 40),
+        ),
+        onPressed: () => _handleSeatLockToggle(),
+        child: Center(
+          child: Icon(
+            _areSeatsLocked ? Icons.lock : Icons.lock_open,
+            size: 20,
+          ),
+        ),
+      ),
+    );
+  }
+
+// Add state variable
+  bool _areSeatsLocked = false;
+
+  void _handleSeatLockToggle() {
+    setState(() {
+      _areSeatsLocked = !_areSeatsLocked;
+    });
+
+    // Use ZegoUIKit controller to lock/unlock seats
+    if (_areSeatsLocked) {
+      ZegoUIKitPrebuiltLiveAudioRoomController().seat.host.close();
+    } else {
+      ZegoUIKitPrebuiltLiveAudioRoomController().seat.host.open();
+    }
+  }
+
   void _showMessageBottomSheet(BuildContext context) {
     final TextEditingController messageController = TextEditingController();
 
@@ -7026,7 +7084,7 @@ class LivePageState extends State<LivePage>
         _showMoreOptionsBottomSheet(context);
         break;
       case Icons.lock_outline: // Add case for the padlock icon
-        // _showSeatLockOptions(context);
+        _handleSeatLockToggle();
         break;
       // Handle other icons as needed
       default:
