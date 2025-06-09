@@ -37,6 +37,12 @@ void showDefaultNewPeerChatDialog(BuildContext context) {
     try {
       // Request contacts permission using flutter_contacts
       final hasPermission = await FlutterContacts.requestPermission();
+
+      // Dismiss loading dialog first
+      if (context.mounted) {
+        Navigator.of(context, rootNavigator: true).pop();
+      }
+
       if (!hasPermission) {
         print('permission not granted');
         if (context.mounted) {
@@ -48,7 +54,23 @@ void showDefaultNewPeerChatDialog(BuildContext context) {
             ),
           );
         }
+        // Don't show any users if permission not granted
         return;
+      }
+
+      // Show loading again for the actual data fetching
+      if (context.mounted) {
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (BuildContext context) {
+            return const Center(
+              child: CircularProgressIndicator(
+                valueColor: AlwaysStoppedAnimation<Color>(Colors.blue),
+              ),
+            );
+          },
+        );
       }
 
       // Get current user ID
@@ -67,9 +89,25 @@ void showDefaultNewPeerChatDialog(BuildContext context) {
         print('Total users from DB: ${userItems.length}');
 
         // Get contacts from device using flutter_contacts
-        List<Contact> contacts = await FlutterContacts.getContacts(
-            withProperties: true, withThumbnail: false);
-        print('Total contacts found: ${contacts.length}');
+        List<Contact> contacts = [];
+        try {
+          contacts = await FlutterContacts.getContacts(
+              withProperties: true, withThumbnail: false);
+          print('Total contacts found: ${contacts.length}');
+        } catch (e) {
+          print('Error accessing contacts even with permission: $e');
+          // If we can't access contacts even with permission, don't show any users
+          if (context.mounted) {
+            Navigator.of(context, rootNavigator: true).pop();
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Unable to access contacts. Please try again.'),
+                backgroundColor: Colors.red,
+              ),
+            );
+          }
+          return;
+        }
 
         Set<String> contactPhoneNumbers = {};
 
@@ -172,38 +210,18 @@ void showDefaultNewPeerChatDialog(BuildContext context) {
         print('Filtered users count: ${filteredUsers.length}');
         Navigator.of(context, rootNavigator: true).pop();
 
-        // Show dialog with filtered users or all users if filter is empty
+        // Show dialog with filtered users ONLY - don't show all users if no matches
         if (context.mounted) {
           if (filteredUsers.isEmpty) {
             print('No matches found between contacts and users.');
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(
-                content:
-                    Text('No contacts found in your app. Showing all users.'),
+                content: Text('No contacts found in your app.'),
                 backgroundColor: Colors.orange,
               ),
             );
-
-            // Show all users if no matches found
-            final allUsers = userItems
-                .where((item) => item['id'] != currentUserId)
-                .map((item) => _UserListItem(
-                      id: item['id'],
-                      name:
-                          '${item['firstname'] ?? ''} ${item['lastname'] ?? ''}'
-                              .trim(),
-                      avatar: item['avatar'],
-                      bio: item['bio'],
-                    ))
-                .toList();
-
-            showDialog<String>(
-              useRootNavigator: false,
-              context: context,
-              builder: (BuildContext context) {
-                return _UserSelectionDialog(users: allUsers);
-              },
-            );
+            // Don't show any dialog if no filtered users found
+            return;
           } else {
             // Show filtered users if matches found
             showDialog<String>(
@@ -219,13 +237,14 @@ void showDefaultNewPeerChatDialog(BuildContext context) {
     } catch (e) {
       print('Error loading users or contacts: $e');
       if (context.mounted) {
+        // Make sure to dismiss loading dialog
+        Navigator.of(context, rootNavigator: true).pop();
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Failed to load users: ${e.toString()}'),
             backgroundColor: Colors.red,
           ),
         );
-        Navigator.of(context, rootNavigator: true).pop();
       }
     }
   });

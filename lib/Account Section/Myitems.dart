@@ -423,6 +423,11 @@ class _StoreScreenState extends State<StoreScreen>
           eventType = "themeChange";
           itemUrl =
               '$baseUrl/api/files/myItems/$itemId/${itemData.data['theme']}';
+
+          // Reset other themes if needed
+          if (!alreadyUsed) {
+            await _resetOtherThemes(itemId);
+          }
           break;
 
         case 2: // Entry Effects (Rive)
@@ -431,6 +436,11 @@ class _StoreScreenState extends State<StoreScreen>
           eventType = "entryEffectChange";
           itemUrl =
               '$baseUrl/api/files/myItems/$itemId/${itemData.data['rive_file']}';
+
+          // Reset other entry effects if needed
+          if (!alreadyUsed) {
+            await _resetOtherEntryEffects(itemId);
+          }
           break;
       }
 
@@ -505,6 +515,39 @@ class _StoreScreenState extends State<StoreScreen>
     }
   }
 
+// Reset other themes when a new one is selected
+  Future<void> _resetOtherThemes(String exceptItemId) async {
+    try {
+      final filter =
+          'userId = "$userId" && is_theme=true && is_theme_used=true && id != "$exceptItemId"';
+      final result = await pb.collection('myItems').getList(filter: filter);
+
+      for (final item in result.items) {
+        await pb
+            .collection('myItems')
+            .update(item.id, body: {'is_theme_used': false});
+      }
+    } catch (e) {
+      print('Error resetting other themes: $e');
+    }
+  }
+
+// Reset other entry effects when a new one is selected
+  Future<void> _resetOtherEntryEffects(String exceptItemId) async {
+    try {
+      final filter =
+          'userId = "$userId" && is_rive=true && is_rive_used=true && id != "$exceptItemId"';
+      final result = await pb.collection('myItems').getList(filter: filter);
+
+      for (final item in result.items) {
+        await pb
+            .collection('myItems')
+            .update(item.id, body: {'is_rive_used': false});
+      }
+    } catch (e) {
+      print('Error resetting other entry effects: $e');
+    }
+  }
 // Similar methods for themes and entry effects
 
   void nextPage() {

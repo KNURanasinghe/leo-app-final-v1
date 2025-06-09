@@ -526,20 +526,20 @@ class _AdminListScreenState extends State<AdminListScreen>
         Divider(
           color: Colors.grey.withOpacity(0.3),
         ),
-        CustomListTile(
-          icon: CupertinoIcons.delete,
-          iconColor: Colors.red[600],
-          title: 'Delete All',
-          ontap: () {
-            ZIMKit().deleteAllConversation(
-              isAlsoDeleteFromServer: true,
-              isAlsoDeleteMessages: true,
-            );
-          },
-        ),
-        Divider(
-          color: Colors.grey.withOpacity(0.3),
-        ),
+        // CustomListTile(
+        //   icon: CupertinoIcons.delete,
+        //   iconColor: Colors.red[600],
+        //   title: 'Delete All',
+        //   ontap: () {
+        //     ZIMKit().deleteAllConversation(
+        //       isAlsoDeleteFromServer: true,
+        //       isAlsoDeleteMessages: true,
+        //     );
+        //   },
+        // ),
+        // Divider(
+        //   color: Colors.grey.withOpacity(0.3),
+        // ),
         CustomListTile(
           icon: CupertinoIcons.person_add,
           iconColor: Colors.green[600],

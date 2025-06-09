@@ -3573,7 +3573,7 @@ class LivePageState extends State<LivePage>
                     // Expand beyond container bounds
                     left: -2,
                     right: -2,
-                    top: -27,
+                    top: -26,
                     bottom: -34, // Slight adjustment for name label
                     child: Container(
                       decoration: const BoxDecoration(shape: BoxShape.circle),
