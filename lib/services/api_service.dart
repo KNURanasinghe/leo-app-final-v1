@@ -170,6 +170,31 @@ class UserApiService {
     }
   }
 
+  Future<void> deleteUserBack(String userId) async {
+    const baseUrl =
+        'http://82.25.180.10:4003'; // Replace with your actual base URL
+
+    final response = await http.delete(
+      Uri.parse('$baseUrl/api/delete-user/$userId'),
+      headers: {
+        'Content-Type': 'application/json',
+        // Add if you need admin auth:
+        // 'Authorization': 'Bearer your_admin_token_here',
+      },
+    );
+    print('Response status: ${response.body}');
+    if (response.statusCode == 200) {
+      final responseData = jsonDecode(response.body);
+      if (responseData['success'] != true) {
+        throw Exception('Failed to delete user: ${responseData['message']}');
+      }
+    } else {
+      throw Exception(
+        'Failed to delete user (Status ${response.statusCode}): ${response.body}',
+      );
+    }
+  }
+
   Future<User?> getUserByPhoneNumber(String phoneNumber) async {
     // Clean the phone number - remove any non-digit characters
     String cleanedNumber = phoneNumber.replaceAll(RegExp(r'[^0-9]'), '');

@@ -654,6 +654,7 @@ class MessageBubble extends StatelessWidget {
                       style: TextStyle(
                         fontSize: 10,
                         color: Colors.blue[700],
+                        overflow: TextOverflow.ellipsis,
                         fontStyle: FontStyle.italic,
                       ),
                     ),
@@ -688,16 +689,33 @@ class MessageBubble extends StatelessWidget {
     else if (message.statusType == AppConstants.messageTypeImage) {
       return Row(
         children: [
-          const Icon(Icons.image, size: 14, color: Colors.grey),
-          const SizedBox(width: 4),
+          if (message.statusFileUrl == null ||
+              message.statusFileUrl!.isEmpty) ...[
+            const Icon(Icons.image, size: 14, color: Colors.grey),
+            const SizedBox(width: 4),
+            Text(
+              message.statusContent ?? 'Photo',
+            ),
+            const SizedBox(width: 4),
+          ],
           Expanded(
-            child: Text(
-              message.statusContent?.isNotEmpty == true
-                  ? message.statusContent!
-                  : 'Photo',
-              style: const TextStyle(fontSize: 14),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(4),
+              child: CachedNetworkImage(
+                imageUrl: message.statusFileUrl!,
+                fit: BoxFit.cover,
+                placeholder: (context, url) => const Center(
+                  child: SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  ),
+                ),
+                errorWidget: (context, url, error) => const Icon(
+                  Icons.image_not_supported,
+                  color: Colors.grey,
+                ),
+              ),
             ),
           ),
         ],

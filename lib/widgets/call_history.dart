@@ -131,12 +131,12 @@ class _CallHistoryScreenState extends State<CallHistoryScreen>
               Text(timeString),
             ],
           ),
-          trailing: IconButton(
-            icon: Icon(call.isVideoCall ? Icons.videocam : Icons.call),
-            onPressed: () {
-              // Implement call back functionality
-            },
-          ),
+          // trailing: IconButton(
+          //   icon: Icon(call.isVideoCall ? Icons.videocam : Icons.call),
+          //   onPressed: () {
+          //     // Implement call back functionality
+          //   },
+          // ),
           onTap: () {
             // Show call details or initiate a new call
           },

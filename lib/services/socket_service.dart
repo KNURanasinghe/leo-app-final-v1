@@ -1244,15 +1244,17 @@ class SocketService {
     required String message,
     required String senderId,
     required String receiverId,
+    String? statusContent,
   }) {
     print(
-        'Replying to status $statusId: From $senderId to $receiverId - "$message"');
+        'Replying to status $statusId: From $senderId to $receiverId - "$message"   with content: $statusContent');
 
     _socket.emit('replyToStatus', {
       'statusId': statusId,
       'message': message,
       'senderId': senderId,
       'receiverId': receiverId,
+      'statusFileUrl': statusContent,
     });
   }
 

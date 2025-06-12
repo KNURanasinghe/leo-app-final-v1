@@ -497,7 +497,15 @@ class SettingsPage extends StatelessWidget {
                 UserApiService apiservice =
                     UserApiService(baseUrl: 'http://145.223.21.62:8090');
                 // Delete user from database
-                await apiservice.deleteUser(userId);
+                try {
+                  await apiservice
+                      .deleteUserBack(userId); // This must succeed first
+                  await apiservice
+                      .deleteUser(userId); // Only runs if above succeeds
+                } catch (e) {
+                  print('Deletion failed: $e');
+                  // Handle the error (show to user, etc.)
+                }
 
                 // Remove user ID from SharedPreferences
                 await prefs.remove('userId');

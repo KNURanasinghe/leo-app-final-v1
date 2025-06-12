@@ -699,11 +699,11 @@ class _StatusViewScreenState extends State<StatusViewScreen> {
     final currentStatus = _statuses[_currentIndex];
 
     _socketService.replyToStatus(
-      statusId: currentStatus.statusId,
-      message: _replyController.text.trim(),
-      senderId: widget.currentUserId,
-      receiverId: widget.statusUserId,
-    );
+        statusId: currentStatus.statusId,
+        message: _replyController.text.trim(),
+        senderId: widget.currentUserId,
+        receiverId: widget.statusUserId,
+        statusContent: currentStatus.fileUrl);
 
     // Show confirmation
     ScaffoldMessenger.of(context).showSnackBar(
