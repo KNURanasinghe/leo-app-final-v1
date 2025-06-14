@@ -2052,8 +2052,8 @@ class LivePageState extends State<LivePage>
         print('Requested current seats for room ${widget.roomID}');
         // Retry if no response within 2 seconds
         await Future.any([
-          Future.delayed(const Duration(seconds: 2)),
-          Future(() => socket.once('currentSeats', (_) => null)),
+          Future.delayed(const Duration(seconds: 1)),
+          Future(() => socket.emit('currentSeats', (_) => null)),
         ]).then((_) {
           if (_seatOccupants.isEmpty && socket.connected) {
             print('No seat data received, retrying...');
@@ -2540,6 +2540,7 @@ class LivePageState extends State<LivePage>
       });
 
       socket.emit('fetchRoomItems', {'roomId': widget.roomID});
+      print('🔍 Requested room items after join');
 
       _fetchCurrentSeatOccupancy();
 
@@ -2572,6 +2573,7 @@ class LivePageState extends State<LivePage>
 
           // ADD THIS SECTION - Handle seat data if provided
           if (data['seats'] != null) {
+            print('seat data provide; ${data['seats']}');
             final seats = data['seats'] as Map<String, dynamic>;
             setState(() {
               _seatOccupants.clear();
@@ -7841,6 +7843,7 @@ class LivePageState extends State<LivePage>
             takenSeats.forEach((index, user) {
               if (user.id == localUserID) {
                 _handleSeatTaken(widget.userId, index);
+
               }
             });
 
