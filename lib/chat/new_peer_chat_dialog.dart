@@ -1,24 +1,25 @@
-// new_peer_chat_dialog.dart
 part of 'default_dialogs.dart';
 
-// Make sure to import flutter_contacts in your imports section
-// import 'package:flutter_contacts/flutter_contacts.dart';
+// Assuming SocketService, HomeScreen, and DemoChattingMessageListPage are defined elsewhere
+// import 'socket_service.dart';
+// import 'home_screen.dart';
+// import 'demo_chatting_message_list_page.dart';
 
 class _UserListItem {
   final String id;
   final String name;
   final String? avatar;
   final String? bio;
+  final String? phoneNumber;
 
   _UserListItem({
     required this.id,
     required this.name,
     this.avatar,
     this.bio,
+    this.phoneNumber,
   });
 }
-
-// Update your showDefaultNewPeerChatDialog function to use the chat request flow
 
 void showDefaultNewPeerChatDialog(BuildContext context) {
   showDialog(
@@ -35,10 +36,8 @@ void showDefaultNewPeerChatDialog(BuildContext context) {
 
   Timer.run(() async {
     try {
-      // Request contacts permission using flutter_contacts
       final hasPermission = await FlutterContacts.requestPermission();
 
-      // Dismiss loading dialog first
       if (context.mounted) {
         Navigator.of(context, rootNavigator: true).pop();
       }
@@ -54,11 +53,9 @@ void showDefaultNewPeerChatDialog(BuildContext context) {
             ),
           );
         }
-        // Don't show any users if permission not granted
         return;
       }
 
-      // Show loading again for the actual data fetching
       if (context.mounted) {
         showDialog(
           context: context,
@@ -73,11 +70,9 @@ void showDefaultNewPeerChatDialog(BuildContext context) {
         );
       }
 
-      // Get current user ID
       final prefs = await SharedPreferences.getInstance();
       final currentUserId = prefs.getString('userId');
 
-      // Fetch users
       final response = await http.get(
         Uri.parse('http://145.223.21.62:8090/api/collections/users/records'),
         headers: {'Content-Type': 'application/json'},
@@ -88,7 +83,6 @@ void showDefaultNewPeerChatDialog(BuildContext context) {
         final List<dynamic> userItems = data['items'] as List;
         print('Total users from DB: ${userItems.length}');
 
-        // Get contacts from device using flutter_contacts
         List<Contact> contacts = [];
         try {
           contacts = await FlutterContacts.getContacts(
@@ -96,7 +90,6 @@ void showDefaultNewPeerChatDialog(BuildContext context) {
           print('Total contacts found: ${contacts.length}');
         } catch (e) {
           print('Error accessing contacts even with permission: $e');
-          // If we can't access contacts even with permission, don't show any users
           if (context.mounted) {
             Navigator.of(context, rootNavigator: true).pop();
             ScaffoldMessenger.of(context).showSnackBar(
@@ -111,16 +104,12 @@ void showDefaultNewPeerChatDialog(BuildContext context) {
 
         Set<String> contactPhoneNumbers = {};
 
-        // Extract phone numbers from contacts and normalize them
         for (var contact in contacts) {
           for (var phone in contact.phones) {
             if (phone.number.isNotEmpty) {
-              // Normalize phone number (remove spaces, dashes, etc.)
               String normalizedNumber =
                   phone.number.replaceAll(RegExp(r'[^\d+]'), '');
               contactPhoneNumbers.add(normalizedNumber);
-
-              // Debug log for phone numbers
               print(
                   'Contact: ${contact.displayName}, Normalized Number: $normalizedNumber');
             }
@@ -130,41 +119,33 @@ void showDefaultNewPeerChatDialog(BuildContext context) {
         print(
             'Total unique phone numbers from contacts: ${contactPhoneNumbers.length}');
 
-        // Filter users whose phone numbers are in contacts
         final List<_UserListItem> filteredUsers = [];
 
         for (var item in userItems) {
           if (item['id'] == currentUserId) continue;
 
-          // Get the phone number from user data - using the correct field name "phonenumber"
           String? phoneNumber = item['phonenumber']?.toString();
 
           if (phoneNumber != null && phoneNumber.isNotEmpty) {
-            // Sri Lankan numbers may start with "94" instead of "+94", so add the "+" if needed
             if (phoneNumber.startsWith('94') &&
                 !phoneNumber.startsWith('+94')) {
               phoneNumber = '+$phoneNumber';
             }
 
-            // Normalize the phone number for comparison
             String normalizedNumber =
                 phoneNumber.replaceAll(RegExp(r'[^\d+]'), '');
             print(
                 'User: ${item['firstname']} ${item['lastname']}, Phone: $normalizedNumber');
 
-            // Check if this number is in contacts with various matching strategies
             bool isInContacts = false;
 
             for (String contactNumber in contactPhoneNumbers) {
-              // Strategy 1: Exact match
               if (normalizedNumber == contactNumber) {
                 isInContacts = true;
                 print('MATCH FOUND - Exact match: $normalizedNumber');
                 break;
               }
 
-              // Strategy 2: Last digits match (for handling country code differences)
-              // For Sri Lankan numbers, compare last 9 digits (typical mobile number length)
               final lastDigitsUser = normalizedNumber.length >= 9
                   ? normalizedNumber.substring(normalizedNumber.length - 9)
                   : normalizedNumber;
@@ -180,7 +161,6 @@ void showDefaultNewPeerChatDialog(BuildContext context) {
                 break;
               }
 
-              // Strategy 3: One ends with the other (original logic)
               if (normalizedNumber.endsWith(contactNumber) ||
                   contactNumber.endsWith(normalizedNumber)) {
                 isInContacts = true;
@@ -197,6 +177,7 @@ void showDefaultNewPeerChatDialog(BuildContext context) {
                     .trim(),
                 avatar: item['avatar'],
                 bio: item['bio'],
+                phoneNumber: item['phonenumber']?.toString(),
               ));
               print(
                   'Added ${item['firstname']} ${item['lastname']} to filtered users');
@@ -210,7 +191,6 @@ void showDefaultNewPeerChatDialog(BuildContext context) {
         print('Filtered users count: ${filteredUsers.length}');
         Navigator.of(context, rootNavigator: true).pop();
 
-        // Show dialog with filtered users ONLY - don't show all users if no matches
         if (context.mounted) {
           if (filteredUsers.isEmpty) {
             print('No matches found between contacts and users.');
@@ -220,10 +200,8 @@ void showDefaultNewPeerChatDialog(BuildContext context) {
                 backgroundColor: Colors.orange,
               ),
             );
-            // Don't show any dialog if no filtered users found
             return;
           } else {
-            // Show filtered users if matches found
             showDialog<String>(
               useRootNavigator: false,
               context: context,
@@ -237,7 +215,6 @@ void showDefaultNewPeerChatDialog(BuildContext context) {
     } catch (e) {
       print('Error loading users or contacts: $e');
       if (context.mounted) {
-        // Make sure to dismiss loading dialog
         Navigator.of(context, rootNavigator: true).pop();
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -250,7 +227,6 @@ void showDefaultNewPeerChatDialog(BuildContext context) {
   });
 }
 
-// Complete _UserSelectionDialog implementation
 class _UserSelectionDialog extends StatefulWidget {
   final List<_UserListItem> users;
   final bool showingAllUsers;
@@ -271,8 +247,8 @@ class _UserSelectionDialogState extends State<_UserSelectionDialog> {
   bool isLoading = false;
   String _currentUserId = '';
   String _currentUserName = '';
-  // Add a map to track request status per user
   final Map<String, bool> _requestInProgress = {};
+  Timer? _debounce; // Add debounce timer
 
   @override
   void initState() {
@@ -283,33 +259,25 @@ class _UserSelectionDialogState extends State<_UserSelectionDialog> {
   }
 
   void _setupSocketListeners() {
-    // Clear any existing listeners first
     _socketService.onChatRequestUpdated = null;
     _socketService.onChatRequestReceived = null;
 
-    // Set up new listener
     _socketService.onChatRequestUpdated = (request) {
-      print('📋 Chat request updated in dialog: ${request.status}');
-
-      // Update the request status and loading state
+      print('SetState: Chat request updated in dialog: ${request.status}');
       setState(() {
         isLoading = false;
-        // Clear the in-progress flag for this user
         _requestInProgress[request.receiverId] = false;
       });
 
       if (request.status == 'pending') {
-        // Show success dialog
         _showRequestSentDialog(request.receiverId, request.senderName);
       } else if (request.status == 'approved') {
-        // Request was already approved or auto-approved
         final user = widget.users.firstWhere(
           (u) => u.id == request.receiverId,
-          orElse: () => _UserListItem(id: request.receiverId, name: "User"),
+          orElse: () => _UserListItem(id: '', name: ''),
         );
         _navigateToChat(user);
       } else if (request.status == 'rejected') {
-        // Show rejection message
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Chat request was rejected'),
@@ -319,16 +287,13 @@ class _UserSelectionDialogState extends State<_UserSelectionDialog> {
       }
     };
 
-    // Also listen for errors
     _socketService.onError = (errorData) {
-      print('❌ Socket error in chat request: $errorData');
+      print('Socket error: $errorData');
       setState(() {
         isLoading = false;
-        // Clear all in-progress flags
         _requestInProgress.clear();
       });
 
-      // Show error message
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -344,7 +309,6 @@ class _UserSelectionDialogState extends State<_UserSelectionDialog> {
   Future<void> _loadCurrentUserData() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-
       setState(() {
         _currentUserId = prefs.getString('userId') ?? '';
         _currentUserName = prefs.getString('name') ?? '';
@@ -355,9 +319,8 @@ class _UserSelectionDialogState extends State<_UserSelectionDialog> {
         headers: {'Content-Type': 'application/json'},
       );
       print('response users 1 ${json.decode(response.body)}');
-      // Make sure socket is connected
       if (!_socketService.isConnected) {
-        print('⚠️ Socket not connected in user dialog, connecting...');
+        print('Socket not connected in user dialog, connecting...');
         _socketService.connect(_currentUserId);
       }
     } catch (e) {
@@ -365,14 +328,13 @@ class _UserSelectionDialogState extends State<_UserSelectionDialog> {
     }
   }
 
-  // Helper method to normalize phone numbers
   String _normalizePhoneNumber(String phoneNumber) {
-    // Remove all non-digit characters except '+'
     return phoneNumber.replaceAll(RegExp(r'[^\d+]'), '');
   }
 
   Future<void> _filterUsers(String query) async {
-    // If query is empty, reset to original list
+    _debounce?.cancel();
+
     if (query.isEmpty) {
       setState(() {
         filteredUsers = widget.users;
@@ -380,115 +342,122 @@ class _UserSelectionDialogState extends State<_UserSelectionDialog> {
       });
       return;
     }
-    setState(() {
-      isLoading = true;
-    });
-    // First, filter by name as before
-    List<_UserListItem> nameFilteredUsers = widget.users
-        .where((user) => user.name.toLowerCase().contains(query.toLowerCase()))
-        .toList();
 
-    // If name filtering yields results, use those
-    if (nameFilteredUsers.isNotEmpty) {
-      setState(() {
-        filteredUsers = nameFilteredUsers;
-        isLoading = false;
+    final normalizedQuery = _normalizePhoneNumber(query);
+
+    if (normalizedQuery.replaceAll(RegExp(r'[^\d]'), '').length >= 9) {
+      _debounce = Timer(const Duration(milliseconds: 500), () async {
+        setState(() {
+          isLoading = true;
+        });
+
+        try {
+          final response = await http.get(
+            Uri.parse(
+                'http://145.223.21.62:8090/api/collections/users/records'),
+            headers: {'Content-Type': 'application/json'},
+          );
+
+          if (response.statusCode == 200) {
+            final data = json.decode(response.body);
+            final List<dynamic> userItems = data['items'] as List;
+
+            final phoneFilteredUsers = userItems
+                .where((item) {
+                  if (item['id'] == _currentUserId) return false;
+
+                  String? phoneNumber = item['phonenumber']?.toString();
+
+                  if (phoneNumber != null && phoneNumber.isNotEmpty) {
+                    String normalizedNumber =
+                        _normalizePhoneNumber(phoneNumber);
+                    return normalizedNumber.contains(normalizedQuery) ||
+                        normalizedNumber == normalizedQuery;
+                  }
+                  return false;
+                })
+                .map((item) => _UserListItem(
+                      id: item['id'],
+                      name:
+                          '${item['firstname'] ?? ''} ${item['lastname'] ?? ''}'
+                              .trim(),
+                      avatar: item['avatar'],
+                      bio: item['bio'],
+                      phoneNumber: item['phonenumber']?.toString(),
+                    ))
+                .toList();
+
+            setState(() {
+              filteredUsers = phoneFilteredUsers;
+              isLoading = false;
+            });
+
+            if (phoneFilteredUsers.isEmpty && context.mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('No users found for this phone number'),
+                  backgroundColor: Colors.orange,
+                ),
+              );
+            }
+          } else {
+            setState(() {
+              isLoading = false;
+            });
+            if (context.mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Failed to search users'),
+                  backgroundColor: Colors.red,
+                ),
+              );
+            }
+          }
+        } catch (e) {
+          print('Error searching users by phone number: $e');
+          if (context.mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Error searching users: ${e.toString()}'),
+                backgroundColor: Colors.red,
+              ),
+            );
+          }
+          setState(() {
+            isLoading = false;
+          });
+        }
       });
-      return;
-    }
-
-    // If no name match, try phone number search
-    try {
-      // Fetch users from the database
-      final response = await http.get(
-        Uri.parse('http://145.223.21.62:8090/api/collections/users/records'),
-        headers: {'Content-Type': 'application/json'},
-      );
-
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        final List<dynamic> userItems = data['items'] as List;
-
-        // Normalize the query for phone number search
-        final normalizedQuery = _normalizePhoneNumber(query);
-
-        // Filter users by phone number
-        final phoneFilteredUsers = userItems
-            .where((item) {
-              // Get the phone number from user data
-              String? phoneNumber = item['phonenumber']?.toString();
-
-              if (phoneNumber != null && phoneNumber.isNotEmpty) {
-                // Normalize the phone number for comparison
-                String normalizedNumber = _normalizePhoneNumber(phoneNumber);
-
-                // Check if the normalized phone number contains or matches the query
-                return normalizedNumber.contains(normalizedQuery) ||
-                    normalizedNumber == normalizedQuery;
-              }
-              return false;
-            })
-            .map((item) => _UserListItem(
-                  id: item['id'],
-                  name: '${item['firstname'] ?? ''} ${item['lastname'] ?? ''}'
-                      .trim(),
-                  avatar: item['avatar'],
-                  bio: item['bio'],
-                ))
-            .toList();
-
-        setState(() {
-          filteredUsers = phoneFilteredUsers;
-          isLoading = false;
-        });
-      } else {
-        setState(() {
-          isLoading = false;
-        });
-      }
-    } catch (e) {
-      print('Error searching users by phone number: $e');
-      // Optionally show a snackbar or handle the error
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error searching users: ${e.toString()}'),
-          backgroundColor: Colors.red,
-        ),
-      );
+    } else {
       setState(() {
+        filteredUsers = widget.users;
         isLoading = false;
       });
     }
   }
 
   void _sendChatRequest(_UserListItem user) async {
-    // Prevent multiple requests for the same user
     if (_requestInProgress[user.id] == true) {
       print('Request already in progress for user: ${user.id}');
       return;
     }
 
-    // Check if we have current user data
     if (_currentUserId.isEmpty) {
       await _loadCurrentUserData();
     }
 
-    // Show sending indicator
     setState(() {
       isLoading = true;
       _requestInProgress[user.id] = true;
     });
 
-    // Ensure socket is connected
     if (!_socketService.isConnected) {
-      print('⚠️ Socket not connected, attempting to connect...');
+      print('Socket not connected, attempting to connect...');
       _socketService.connect(_currentUserId);
-
-      // Wait a moment for connection to establish
       await Future.delayed(const Duration(milliseconds: 1000));
 
       if (!_socketService.isConnected) {
-        print('❌ Failed to connect socket');
+        print('Failed to connect socket');
         setState(() {
           isLoading = false;
           _requestInProgress[user.id] = false;
@@ -506,11 +475,9 @@ class _UserSelectionDialogState extends State<_UserSelectionDialog> {
       }
     }
 
-    // Get user avatar URL
     String? currentUserAvatar;
     try {
       final prefs = await SharedPreferences.getInstance();
-
       setState(() {
         _currentUserId = prefs.getString('userId') ?? '';
       });
@@ -534,8 +501,7 @@ class _UserSelectionDialogState extends State<_UserSelectionDialog> {
       print('Error getting avatar: $e');
     }
 
-    // Send the chat request
-    print('📤 Sending chat request to user: ${user.id}');
+    print('Sending chat request to user: ${user.id}');
     _socketService.sendChatRequest(
       _currentUserId,
       user.id,
@@ -543,16 +509,14 @@ class _UserSelectionDialogState extends State<_UserSelectionDialog> {
       currentUserAvatar,
     );
 
-    // Set a timeout to update UI if no response is received
     Future.delayed(const Duration(seconds: 5), () {
       if (mounted && _requestInProgress[user.id] == true) {
-        print('⚠️ Request timeout for user: ${user.id}');
+        print('Request timeout for user: ${user.id}');
         setState(() {
           isLoading = false;
           _requestInProgress[user.id] = false;
         });
 
-        // Show timeout message
         if (context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
@@ -588,7 +552,6 @@ class _UserSelectionDialogState extends State<_UserSelectionDialog> {
   }
 
   void _navigateToChat(_UserListItem user) {
-    // Navigate to chat screen
     HomeScreen.setBottomBarVisibility(false);
 
     Navigator.push(
@@ -602,11 +565,9 @@ class _UserSelectionDialogState extends State<_UserSelectionDialog> {
         ),
       ),
     ).then((_) {
-      // Show bottom bar again when returning
       HomeScreen.setBottomBarVisibility(true);
     });
 
-    // Close dialog
     Navigator.of(context, rootNavigator: true).pop();
   }
 
@@ -635,7 +596,6 @@ class _UserSelectionDialogState extends State<_UserSelectionDialog> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              // Header
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
@@ -655,8 +615,6 @@ class _UserSelectionDialogState extends State<_UserSelectionDialog> {
                 ],
               ),
               const SizedBox(height: 20),
-
-              // Search Bar
               Container(
                 decoration: BoxDecoration(
                   color: Colors.blue[50],
@@ -675,16 +633,28 @@ class _UserSelectionDialogState extends State<_UserSelectionDialog> {
                     hintText: 'Search users...(947XXXXXXX)',
                     hintStyle: TextStyle(color: Colors.blue[200]),
                     prefixIcon: Icon(Icons.search, color: Colors.blue[300]),
+                    suffixIcon: searchController.text.isNotEmpty
+                        ? IconButton(
+                            icon: Icon(Icons.clear, color: Colors.blue[300]),
+                            onPressed: () {
+                              searchController.clear();
+                              _filterUsers('');
+                            },
+                          )
+                        : null,
                     border: InputBorder.none,
                     contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 20, vertical: 15),
+                      horizontal: 20,
+                      vertical: 15,
+                    ),
                   ),
-                  onChanged: _filterUsers,
+                  onChanged: (query) {
+                    setState(() {});
+                    _filterUsers(query);
+                  },
                 ),
               ),
               const SizedBox(height: 20),
-
-              // Users List
               Container(
                 constraints: BoxConstraints(
                   maxHeight: MediaQuery.of(context).size.height * 0.5,
@@ -832,8 +802,6 @@ class _UserSelectionDialogState extends State<_UserSelectionDialog> {
                           ),
               ),
               const SizedBox(height: 20),
-
-              // Cancel Button
               SizedBox(
                 width: double.infinity,
                 child: TextButton(
@@ -864,8 +832,8 @@ class _UserSelectionDialogState extends State<_UserSelectionDialog> {
 
   @override
   void dispose() {
+    _debounce?.cancel();
     searchController.dispose();
-    // Clean up socket listeners to avoid memory leaks
     _socketService.onChatRequestUpdated = null;
     _socketService.onChatRequestReceived = null;
     _socketService.onError = null;
