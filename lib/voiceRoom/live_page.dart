@@ -4720,23 +4720,23 @@ class LivePageState extends State<LivePage>
             ),
             // _buildWelcomeAndAnnouncement(),
 
-            if (_activeEmojis.isNotEmpty)
-              SizedBox(
-                width: double.infinity,
-                height: double.infinity,
-                child: CustomMultiChildLayout(
-                  delegate: EmojiLayoutDelegate(
-                    users: _activeEmojis.keys.toList(),
-                    itemCount: _activeEmojis.length,
-                  ),
-                  children: _activeEmojis.entries.map((entry) {
-                    return LayoutId(
-                      id: entry.key,
-                      child: entry.value,
-                    );
-                  }).toList(),
-                ),
-              ),
+            // if (_activeEmojis.isNotEmpty)
+            //   SizedBox(
+            //     width: double.infinity,
+            //     height: double.infinity,
+            //     child: CustomMultiChildLayout(
+            //       delegate: EmojiLayoutDelegate(
+            //         users: _activeEmojis.keys.toList(),
+            //         itemCount: _activeEmojis.length,
+            //       ),
+            //       children: _activeEmojis.entries.map((entry) {
+            //         return LayoutId(
+            //           id: entry.key,
+            //           child: entry.value,
+            //         );
+            //       }).toList(),
+            //     ),
+            //   ),
 
             // if (isConnecting)
             //   Positioned(
@@ -6642,7 +6642,6 @@ class LivePageState extends State<LivePage>
                 // Group 3: Open with icon
                 //_buildCustomButton(5, customIcons[5]),
                 _buildCustomButton(4, customIcons[4]),
-
               ],
             ),
           ),
@@ -7843,7 +7842,6 @@ class LivePageState extends State<LivePage>
             takenSeats.forEach((index, user) {
               if (user.id == localUserID) {
                 _handleSeatTaken(widget.userId, index);
-
               }
             });
 

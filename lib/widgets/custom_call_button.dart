@@ -58,6 +58,9 @@ class _CallButtonsState extends State<CallButtons> {
 
         if (result.code.isEmpty) {
           print("Setting self info after initialization...");
+
+          print(
+              "Setting self info after initialization... ${widget.name}, ${widget.image}");
           await TUICallKit.instance.setSelfInfo(widget.name, widget.image);
           setState(() {
             isInitialized = true;
@@ -218,6 +221,8 @@ class _CallButtonsState extends State<CallButtons> {
         }
 
         print("Login successful, setting self info...");
+        print(
+            "Setting self info after initialization... ${widget.name}, ${widget.image}");
         await TUICallKit.instance.setSelfInfo(widget.name, widget.image);
         setState(() => isInitialized = true);
       }
