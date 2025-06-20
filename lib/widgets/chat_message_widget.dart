@@ -202,7 +202,6 @@
 //
 // }
 
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:svgaplayer_flutter/svgaplayer_flutter.dart';
 import '../voiceRoom/inroom_message.dart';
@@ -282,9 +281,9 @@ class _InlineMessageListState extends State<InlineMessageList> {
     final visibleMessages = widget.messages.length <= widget.maxVisibleMessages
         ? widget.messages
         : widget.messages.sublist(
-      widget.messages.length - widget.maxVisibleMessages,
-      widget.messages.length,
-    );
+            widget.messages.length - widget.maxVisibleMessages,
+            widget.messages.length,
+          );
 
     return Container(
       constraints: const BoxConstraints(maxHeight: 300),
@@ -308,6 +307,12 @@ class _InlineMessageListState extends State<InlineMessageList> {
 
   Widget _buildMessageItem(
       ChatMessage message, bool isCurrentUser, BuildContext context) {
+    // Special handling for gift messages
+    if (message.type == MessageType.gift) {
+      return _buildGiftMessageItem(message, isCurrentUser, context);
+    }
+
+    // Regular message handling
     return Container(
       alignment: Alignment.centerLeft,
       margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 16),
@@ -342,6 +347,175 @@ class _InlineMessageListState extends State<InlineMessageList> {
                 decoration: TextDecoration.none,
                 fontFamily: 'poppins',
               ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+// **NEW: Special widget for gift messages**
+  Widget _buildGiftMessageItem(
+      ChatMessage message, bool isCurrentUser, BuildContext context) {
+    final giftData = message.giftData;
+    if (giftData == null) return Container();
+
+    return Container(
+      alignment: Alignment.centerLeft,
+      margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 16),
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        width: MediaQuery.of(context).size.width * 0.7,
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [
+              Colors.purple.withOpacity(0.8),
+              Colors.pink.withOpacity(0.8),
+            ],
+          ),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: Colors.white54, width: 2),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.purple.withOpacity(0.3),
+              blurRadius: 8,
+              spreadRadius: 2,
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Gift header
+            Row(
+              children: [
+                const Icon(
+                  Icons.card_giftcard,
+                  color: Colors.white,
+                  size: 20,
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  isCurrentUser ? 'GIFT SENT' : 'GIFT RECEIVED',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 12,
+                    letterSpacing: 1.2,
+                    decoration: TextDecoration.none,
+                    fontFamily: 'poppins',
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+
+            // Gift details
+            Row(
+              children: [
+                // Gift image (if available)
+                if (giftData.giftUrl != null)
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    // child: Image.network(
+                    //   giftData.giftUrl!,
+                    //   width: 40,
+                    //   height: 40,
+                    //   fit: BoxFit.cover,
+                    //   errorBuilder: (context, error, stackTrace) {
+                    //     return Container(
+                    //       width: 40,
+                    //       height: 40,
+                    //       decoration: BoxDecoration(
+                    //         color: Colors.white.withOpacity(0.2),
+                    //         borderRadius: BorderRadius.circular(8),
+                    //       ),
+                    //       child: const Icon(Icons.card_giftcard,
+                    //           color: Colors.white),
+                    //     );
+                    //   },
+                    // ),
+                    child: SizedBox(
+                      width: 40, // Adjust size as needed
+                      height: 40,
+                      child: SVGASimpleImage(resUrl: giftData.giftUrl!),
+                    ),
+                  ),
+                const SizedBox(width: 12),
+
+                // Gift info
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      RichText(
+                        text: TextSpan(
+                          style: const TextStyle(
+                            fontSize: 14,
+                            fontFamily: 'poppins',
+                            decoration: TextDecoration.none,
+                          ),
+                          children: [
+                            TextSpan(
+                              text: isCurrentUser ? 'You' : message.userName,
+                              style: const TextStyle(
+                                color: Colors.yellow,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            const TextSpan(
+                              text: ' sent ',
+                              style: TextStyle(color: Colors.white),
+                            ),
+                            TextSpan(
+                              text:
+                                  '${giftData.giftCount}x ${giftData.giftName}',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            const TextSpan(
+                              text: ' to ',
+                              style: TextStyle(color: Colors.white),
+                            ),
+                            TextSpan(
+                              text: giftData.receiverUserName,
+                              style: const TextStyle(
+                                color: Colors.cyan,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+
+                      // Cost display
+                      Row(
+                        children: [
+                          Image.asset(
+                            'assets/diamond.png',
+                            width: 16,
+                            height: 16,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            '${giftData.totalCost}',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                              decoration: TextDecoration.none,
+                              fontFamily: 'poppins',
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ),
           ],
         ),

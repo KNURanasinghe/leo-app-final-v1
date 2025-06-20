@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:leo_app_01/voiceRoom/inroom_message.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import '../gift_data.dart';
 import '../gift_manager/defines.dart';
 import '../gift_manager/gift_manager.dart';
+import 'package:socket_io_client/socket_io_client.dart' as IO;
 
 class GiftData {
   final String id;
@@ -36,7 +38,8 @@ class GiftData {
       giftPhoto: json['gift_photo'],
       collectionId: json['collectionId'],
       collectionName: json['collectionName'],
-      category: json['catagory'] ?? '', // Added to fromJson, note the API uses 'catagory'
+      category: json['catagory'] ??
+          '', // Added to fromJson, note the API uses 'catagory'
     );
   }
 
@@ -45,7 +48,8 @@ class GiftData {
     final fullGiftUrl = giftFile.startsWith('http')
         ? giftFile
         : '$pocketbaseUrl/api/files/$collectionId/$id/$giftFile';
-    final fullPhotoUrl = '$pocketbaseUrl/api/files/$collectionId/$id/$giftPhoto';
+    final fullPhotoUrl =
+        '$pocketbaseUrl/api/files/$collectionId/$id/$giftPhoto';
 
     final giftType = _determineGiftType(giftFile);
 
@@ -61,7 +65,7 @@ class GiftData {
       name: giftname,
       icon: fullPhotoUrl,
       sourceURL: fullGiftUrl,
-      source: giftSource,  // Always URL
+      source: giftSource, // Always URL
       type: giftType,
       weight: diamondAmount,
     );
@@ -79,6 +83,7 @@ class GiftData {
     }
   }
 }
+
 class User {
   final String id;
   final String username;
@@ -97,11 +102,13 @@ class User {
   });
 
   factory User.fromJson(Map<String, dynamic> json) {
-    final String fullname = '${json['firstname'] ?? ''} ${json['lastname'] ?? ''}'.trim();
+    final String fullname =
+        '${json['firstname'] ?? ''} ${json['lastname'] ?? ''}'.trim();
     return User(
       id: json['id'],
       username: fullname.isEmpty ? 'Unknown' : fullname,
-      avatarUrl: 'http://145.223.21.62:8090/api/files/${json['collectionId']}/${json['id']}/${json['avatar'] ?? ''}',
+      avatarUrl:
+          'http://145.223.21.62:8090/api/files/${json['collectionId']}/${json['id']}/${json['avatar'] ?? ''}',
       walletBalance: json['wallet'] ?? 0,
       firstname: json['firstname'] ?? '',
       lastname: json['lastname'] ?? '',
@@ -109,8 +116,14 @@ class User {
   }
 }
 
-void showGiftListSheet(BuildContext context,String roomId) {
-  //String roomids = roomId;
+void showGiftListSheet(
+  BuildContext context,
+  String roomId, {
+  required IO.Socket socket,
+  required String userId,
+  required String userName,
+  String? userAvatarUrl,
+}) {
   showModalBottomSheet(
     backgroundColor: Colors.black.withOpacity(0.8),
     context: context,
@@ -130,8 +143,17 @@ void showGiftListSheet(BuildContext context,String roomId) {
         child: Container(
           padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 15),
           child: SizedBox(
-            height: MediaQuery.of(context).size.height * 0.45, // Reduced height
-            child:  ZegoGiftSheet(roomId: roomId),
+            height: MediaQuery.of(context).size.height * 0.45,
+            child: ZegoGiftSheet(
+              roomId: roomId,
+              messageService: SocketMessageService(
+                socket: socket,
+                roomId: roomId,
+                userId: userId,
+                userName: userName,
+                userAvatarUrl: userAvatarUrl,
+              ),
+            ),
           ),
         ),
       );
@@ -141,17 +163,19 @@ void showGiftListSheet(BuildContext context,String roomId) {
 
 class ZegoGiftSheet extends StatefulWidget {
   final String roomId;
-
+  final SocketMessageService messageService;
   const ZegoGiftSheet({
-    Key? key,
+    super.key,
     required this.roomId,
-  }) : super(key: key);
+    required this.messageService,
+  });
 
   @override
   State<ZegoGiftSheet> createState() => _ZegoGiftSheetState();
 }
 
-class _ZegoGiftSheetState extends State<ZegoGiftSheet> with SingleTickerProviderStateMixin{
+class _ZegoGiftSheetState extends State<ZegoGiftSheet>
+    with SingleTickerProviderStateMixin {
   bool _showUserList = false;
   final Color selectedColor = const Color(0xFF2196F3);
   final selectedGiftItemNotifier = ValueNotifier<ZegoGiftItem?>(null);
@@ -179,8 +203,7 @@ class _ZegoGiftSheetState extends State<ZegoGiftSheet> with SingleTickerProvider
   Future<void> _initializeData() async {
     setState(() => isLoading = true);
     try {
-      await Future.wait([_loadLoggedUserId(),
-      _loadCategories()]);
+      await Future.wait([_loadLoggedUserId(), _loadCategories()]);
       await Future.wait([
         _loadUsers(),
         _loadGifts(),
@@ -304,7 +327,7 @@ class _ZegoGiftSheetState extends State<ZegoGiftSheet> with SingleTickerProvider
       final onlineUsersResponse = await http.get(
         Uri.parse('$pocketbaseUrl/api/collections/online_users/records')
             .replace(queryParameters: {
-          'filter': 'voiceRoomId="${widget.roomId}"',  // Filter by room ID
+          'filter': 'voiceRoomId="${widget.roomId}"', // Filter by room ID
         }),
       );
 
@@ -357,7 +380,8 @@ class _ZegoGiftSheetState extends State<ZegoGiftSheet> with SingleTickerProvider
             if (userResponse.statusCode == 200) {
               final userData = json.decode(userResponse.body);
               final user = User.fromJson(userData);
-              print('Successfully loaded user: ${user.username} with ID: ${user.id}');
+              print(
+                  'Successfully loaded user: ${user.username} with ID: ${user.id}');
               loadedUsers.add(user);
             } else {
               print('Failed to load user $userId: ${userResponse.statusCode}');
@@ -379,7 +403,8 @@ class _ZegoGiftSheetState extends State<ZegoGiftSheet> with SingleTickerProvider
           });
         }
       } else {
-        print('Failed to fetch online users: ${onlineUsersResponse.statusCode}');
+        print(
+            'Failed to fetch online users: ${onlineUsersResponse.statusCode}');
       }
     } catch (e) {
       print('Error in _loadUsers: $e');
@@ -432,16 +457,16 @@ class _ZegoGiftSheetState extends State<ZegoGiftSheet> with SingleTickerProvider
       }
 
       // Add to playlist
-      ZegoGiftManager().playList.add(PlayData(giftItem: giftItem, count: count));
+      ZegoGiftManager()
+          .playList
+          .add(PlayData(giftItem: giftItem, count: count));
 
       // Send the gift
-      final result = await ZegoGiftManager().service.sendGift(
-          name: giftItem.name,
-          count: count
-      );
+      final result = await ZegoGiftManager()
+          .service
+          .sendGift(name: giftItem.name, count: count);
 
       print('Gift send result: $result');
-
     } catch (e, stackTrace) {
       print('Gift playback error: $e');
       print('Stack trace: $stackTrace');
@@ -468,25 +493,27 @@ class _ZegoGiftSheetState extends State<ZegoGiftSheet> with SingleTickerProvider
       // Don't rethrow - precaching is optional
     }
   }
+
   bool _validateGiftItem(ZegoGiftItem giftItem) {
     if (giftItem.sourceURL.isEmpty) {
       print('Invalid gift: Empty source URL');
       return false;
     }
 
-    if (giftItem.type == ZegoGiftType.svga && !giftItem.sourceURL.toLowerCase().endsWith('.svga')) {
+    if (giftItem.type == ZegoGiftType.svga &&
+        !giftItem.sourceURL.toLowerCase().endsWith('.svga')) {
       print('Invalid SVGA gift: Incorrect file extension');
       return false;
     }
 
-    if (giftItem.type == ZegoGiftType.mp4 && !giftItem.sourceURL.toLowerCase().endsWith('.mp4')) {
+    if (giftItem.type == ZegoGiftType.mp4 &&
+        !giftItem.sourceURL.toLowerCase().endsWith('.mp4')) {
       print('Invalid MP4 gift: Incorrect file extension');
       return false;
     }
 
     return true;
   }
-
 
   Future<void> _preloadSvgaFile(ZegoGiftItem giftItem) async {
     try {
@@ -501,7 +528,6 @@ class _ZegoGiftSheetState extends State<ZegoGiftSheet> with SingleTickerProvider
 
       // Store the bytes in a cache or pass them to your SVGA player
       // Implementation depends on your specific SVGA player setup
-
     } catch (e) {
       print('Error pre-loading SVGA file: $e');
       rethrow;
@@ -587,6 +613,7 @@ class _ZegoGiftSheetState extends State<ZegoGiftSheet> with SingleTickerProvider
       final totalCost = giftItem.weight * count.toDouble();
       final rewardAmount = totalCost * 0.4;
 
+      // Check balance first
       if (!await _checkAndUpdateBalance(totalCost)) {
         if (mounted) {
           _showSnackBar('Insufficient balance!');
@@ -594,23 +621,10 @@ class _ZegoGiftSheetState extends State<ZegoGiftSheet> with SingleTickerProvider
         return;
       }
 
-      if (mounted) {
-        Navigator.of(context).pop();
-      }
-
-      try {
-        await _handleGiftPlayback(giftItem, count);
-      } catch (e) {
-        print('Animation error: $e');
-        if (mounted) {
-          _showSnackBar('Failed to play gift animation');
-        }
-        return;
-      }
-
+      // Prepare the payload
       final payload = {
         'sender_user_id': loggedUserId,
-        'reciever_user_id': receiver.id,  // Using correct spelling to match database
+        'reciever_user_id': receiver.id,
         'gifts_url': giftItem.sourceURL,
         'giftname': giftItem.name,
         'gift_count': count,
@@ -620,33 +634,79 @@ class _ZegoGiftSheetState extends State<ZegoGiftSheet> with SingleTickerProvider
       print('Sending request with payload:');
       print(json.encode(payload));
 
+      // Send to server first
       final response = await http.post(
           Uri.parse('http://145.223.21.62:6003/api/gifts/send'),
           headers: {'Content-Type': 'application/json'},
-          body: json.encode(payload)
-      );
+          body: json.encode(payload));
 
       print('Server response status: ${response.statusCode}');
       print('Server response body: ${response.body}');
 
-      if (!mounted) return;
+      if (response.statusCode != 200) {
+        throw Exception('Failed to send gift to server');
+      }
 
-      if (response.statusCode == 200) {
-        await _updateReceiverWallet(receiver.id, rewardAmount);
+      // Update receiver wallet BEFORE closing dialog
+      print('Updating receiver wallet...');
+      await _updateReceiverWallet(receiver.id, rewardAmount);
+      print('Receiver wallet updated successfully');
+
+      // Emit gift message BEFORE closing dialog
+      print('Emitting gift message...');
+      await _emitGiftMessage(giftItem, count, receiver, totalCost);
+      print('Gift message emitted successfully');
+
+      // Close dialog
+      if (mounted) {
+        Navigator.of(context).pop();
+      }
+
+      // Handle gift playback after dialog is closed
+      try {
+        await _handleGiftPlayback(giftItem, count);
+        print('Gift playback completed successfully');
+      } catch (e) {
+        print('Animation error: $e');
         if (mounted) {
-          Future.delayed(
-              const Duration(milliseconds: 500),
-                  () => _showSnackBar('Gift sent successfully!')
-          );
+          _showSnackBar('Gift sent but animation failed');
         }
-      } else {
-        throw Exception('Failed to send gift');
+        return; // Don't show success message if animation failed
+      }
+
+      // Show success message
+      if (mounted) {
+        Future.delayed(const Duration(milliseconds: 500), () {
+          if (mounted) {
+            _showSnackBar('Gift sent successfully!');
+          }
+        });
       }
     } catch (e) {
       print('Error sending gift: $e');
       if (mounted) {
         _showSnackBar('Error sending gift: ${e.toString()}');
       }
+    }
+  }
+
+// **NEW: Add this method to emit gift message via socket**
+  Future<void> _emitGiftMessage(
+      ZegoGiftItem giftItem, int count, User receiver, double totalCost) async {
+    try {
+      // Use the messageService that was passed to the widget
+      widget.messageService.sendGiftMessage(
+        receiverUserId: receiver.id,
+        receiverUserName: receiver.username,
+        giftName: giftItem.name,
+        giftCount: count,
+        giftUrl: giftItem.sourceURL,
+        totalCost: totalCost.toInt(),
+      );
+
+      print('Gift message sent via socket successfully');
+    } catch (e) {
+      print('Error emitting gift message: $e');
     }
   }
 
@@ -721,21 +781,31 @@ class _ZegoGiftSheetState extends State<ZegoGiftSheet> with SingleTickerProvider
   //   }
   // }
 
-
-  Future<void> _updateReceiverWallet(String receiverId, double rewardAmount) async {
+  Future<void> _updateReceiverWallet(
+      String receiverId, double rewardAmount) async {
     try {
+      print('Starting wallet update for receiver: $receiverId');
+      print('Reward amount: $rewardAmount');
+
       // Fetch current wallet balance
       final fetchResponse = await http.get(
         Uri.parse('$pocketbaseUrl/api/collections/users/records/$receiverId'),
         headers: {'Content-Type': 'application/json'},
       );
 
+      print('Fetch wallet response status: ${fetchResponse.statusCode}');
+      print('Fetch wallet response body: ${fetchResponse.body}');
+
       if (fetchResponse.statusCode == 200) {
         final data = jsonDecode(fetchResponse.body);
         final currentBalance = data['wallet'] ?? 0;
 
+        print('Current balance: $currentBalance');
+
         // Calculate new balance
         final newBalance = currentBalance + rewardAmount;
+
+        print('New balance will be: $newBalance');
 
         // Update wallet balance
         final updateResponse = await http.patch(
@@ -744,11 +814,19 @@ class _ZegoGiftSheetState extends State<ZegoGiftSheet> with SingleTickerProvider
           body: json.encode({'wallet': newBalance}),
         );
 
+        print('Update wallet response status: ${updateResponse.statusCode}');
+        print('Update wallet response body: ${updateResponse.body}');
+
         if (updateResponse.statusCode != 200) {
-          throw Exception('Failed to update wallet balance');
+          throw Exception(
+              'Failed to update wallet balance: ${updateResponse.body}');
         }
+
+        print(
+            'Wallet updated successfully from $currentBalance to $newBalance');
       } else {
-        throw Exception('Failed to fetch receiver wallet details');
+        throw Exception(
+            'Failed to fetch receiver wallet details: ${fetchResponse.body}');
       }
     } catch (e) {
       print('Error updating receiver wallet: $e');
@@ -786,8 +864,10 @@ class _ZegoGiftSheetState extends State<ZegoGiftSheet> with SingleTickerProvider
                   controller: _tabController,
                   isScrollable: true,
                   padding: EdgeInsets.zero, // Remove padding around the TabBar
-                  indicatorPadding: EdgeInsets.zero, // Remove padding around the indicator
-                  labelPadding: const EdgeInsets.symmetric(horizontal: 16), // Adjust tab label padding
+                  indicatorPadding:
+                      EdgeInsets.zero, // Remove padding around the indicator
+                  labelPadding: const EdgeInsets.symmetric(
+                      horizontal: 16), // Adjust tab label padding
                   tabAlignment: TabAlignment.start, // Align tabs to start
                   tabs: categories.map((category) {
                     return Tab(
@@ -891,29 +971,32 @@ class _ZegoGiftSheetState extends State<ZegoGiftSheet> with SingleTickerProvider
                     ClipRRect(
                       borderRadius: BorderRadius.circular(8),
                       child: item.icon.isEmpty
-                          ? Icon(Icons.card_giftcard, color: selectedColor, size: 40)
+                          ? Icon(Icons.card_giftcard,
+                              color: selectedColor, size: 40)
                           : Image.network(
-                        item.icon,
-                        width: 45,
-                        height: 45,
-                        fit: BoxFit.cover,
-                        errorBuilder: (context, error, stackTrace) {
-                          return Icon(Icons.card_giftcard, color: selectedColor, size: 40);
-                        },
-                        loadingBuilder: (context, child, loadingProgress) {
-                          if (loadingProgress == null) return child;
-                          return const SizedBox(
-                            width: 45,
-                            height: 45,
-                            child: Center(
-                              child: CircularProgressIndicator(
-                                color: Colors.white,
-                                strokeWidth: 2,
-                              ),
+                              item.icon,
+                              width: 45,
+                              height: 45,
+                              fit: BoxFit.cover,
+                              errorBuilder: (context, error, stackTrace) {
+                                return Icon(Icons.card_giftcard,
+                                    color: selectedColor, size: 40);
+                              },
+                              loadingBuilder:
+                                  (context, child, loadingProgress) {
+                                if (loadingProgress == null) return child;
+                                return const SizedBox(
+                                  width: 45,
+                                  height: 45,
+                                  child: Center(
+                                    child: CircularProgressIndicator(
+                                      color: Colors.white,
+                                      strokeWidth: 2,
+                                    ),
+                                  ),
+                                );
+                              },
                             ),
-                          );
-                        },
-                      ),
                     ),
                     const SizedBox(height: 4),
                     Text(
@@ -969,11 +1052,11 @@ class _ZegoGiftSheetState extends State<ZegoGiftSheet> with SingleTickerProvider
             }
 
             setState(() {
-              isLoading = true;  // Show loading state
+              isLoading = true; // Show loading state
             });
 
             try {
-              await _loadUsers();  // Reload users
+              await _loadUsers(); // Reload users
             } catch (e) {
               print('Error loading users: $e');
             } finally {
@@ -997,58 +1080,59 @@ class _ZegoGiftSheetState extends State<ZegoGiftSheet> with SingleTickerProvider
             ),
             child: isLoading
                 ? const Center(
-              child: SizedBox(
-                width: 20,
-                height: 20,
-                child: CircularProgressIndicator(
-                  color: Colors.white,
-                  strokeWidth: 2,
-                ),
-              ),
-            )
-                : Row(
-              children: [
-                if (selectedUser != null) ...[
-                  CircleAvatar(
-                    radius: 15,
-                    backgroundColor: Colors.grey,
-                    child: selectedUser.avatarUrl.isEmpty
-                        ? const Icon(Icons.person, color: Colors.white)
-                        : ClipRRect(
-                      borderRadius: BorderRadius.circular(15),
-                      child: Image.network(
-                        selectedUser.avatarUrl,
-                        width: 30,
-                        height: 30,
-                        fit: BoxFit.cover,
-                        errorBuilder: (context, error, stackTrace) {
-                          return const Icon(Icons.person, color: Colors.white);
-                        },
+                    child: SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                        color: Colors.white,
+                        strokeWidth: 2,
                       ),
                     ),
+                  )
+                : Row(
+                    children: [
+                      if (selectedUser != null) ...[
+                        CircleAvatar(
+                          radius: 15,
+                          backgroundColor: Colors.grey,
+                          child: selectedUser.avatarUrl.isEmpty
+                              ? const Icon(Icons.person, color: Colors.white)
+                              : ClipRRect(
+                                  borderRadius: BorderRadius.circular(15),
+                                  child: Image.network(
+                                    selectedUser.avatarUrl,
+                                    width: 30,
+                                    height: 30,
+                                    fit: BoxFit.cover,
+                                    errorBuilder: (context, error, stackTrace) {
+                                      return const Icon(Icons.person,
+                                          color: Colors.white);
+                                    },
+                                  ),
+                                ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            selectedUser.username,
+                            style: const TextStyle(color: Colors.white),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ] else
+                        const Text(
+                          'Select User',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 14,
+                          ),
+                        ),
+                      const Icon(
+                        Icons.arrow_drop_down,
+                        color: Colors.white,
+                      ),
+                    ],
                   ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Text(
-                      selectedUser.username,
-                      style: const TextStyle(color: Colors.white),
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                ] else
-                  const Text(
-                    'Select User',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 14,
-                    ),
-                  ),
-                const Icon(
-                  Icons.arrow_drop_down,
-                  color: Colors.white,
-                ),
-              ],
-            ),
           ),
         );
       },
@@ -1124,24 +1208,29 @@ class _ZegoGiftSheetState extends State<ZegoGiftSheet> with SingleTickerProvider
                                   radius: 20,
                                   backgroundColor: Colors.grey,
                                   child: user.avatarUrl.isEmpty
-                                      ? const Icon(Icons.person, color: Colors.white)
+                                      ? const Icon(Icons.person,
+                                          color: Colors.white)
                                       : ClipRRect(
-                                    borderRadius: BorderRadius.circular(20),
-                                    child: Image.network(
-                                      user.avatarUrl,
-                                      width: 40,
-                                      height: 40,
-                                      fit: BoxFit.cover,
-                                      errorBuilder: (context, error, stackTrace) {
-                                        return const Icon(Icons.person, color: Colors.white);
-                                      },
-                                    ),
-                                  ),
+                                          borderRadius:
+                                              BorderRadius.circular(20),
+                                          child: Image.network(
+                                            user.avatarUrl,
+                                            width: 40,
+                                            height: 40,
+                                            fit: BoxFit.cover,
+                                            errorBuilder:
+                                                (context, error, stackTrace) {
+                                              return const Icon(Icons.person,
+                                                  color: Colors.white);
+                                            },
+                                          ),
+                                        ),
                                 ),
                                 const SizedBox(width: 12),
                                 Expanded(
                                   child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: [
                                       Text(
                                         user.username,
@@ -1151,11 +1240,13 @@ class _ZegoGiftSheetState extends State<ZegoGiftSheet> with SingleTickerProvider
                                           fontWeight: FontWeight.bold,
                                         ),
                                       ),
-                                      if (user.firstname.isNotEmpty || user.lastname.isNotEmpty)
+                                      if (user.firstname.isNotEmpty ||
+                                          user.lastname.isNotEmpty)
                                         Text(
                                           '${user.firstname} ${user.lastname}',
                                           style: TextStyle(
-                                            color: Colors.white.withOpacity(0.7),
+                                            color:
+                                                Colors.white.withOpacity(0.7),
                                             fontSize: 12,
                                           ),
                                         ),
@@ -1165,24 +1256,29 @@ class _ZegoGiftSheetState extends State<ZegoGiftSheet> with SingleTickerProvider
                                 ValueListenableBuilder<User?>(
                                   valueListenable: selectedUserNotifier,
                                   builder: (context, selectedUser, _) {
-                                    final isSelected = selectedUser?.id == user.id;
+                                    final isSelected =
+                                        selectedUser?.id == user.id;
                                     return Container(
                                       width: 24,
                                       height: 24,
                                       decoration: BoxDecoration(
                                         shape: BoxShape.circle,
                                         border: Border.all(
-                                          color: isSelected ? selectedColor : Colors.white.withOpacity(0.3),
+                                          color: isSelected
+                                              ? selectedColor
+                                              : Colors.white.withOpacity(0.3),
                                           width: 2,
                                         ),
-                                        color: isSelected ? selectedColor : Colors.transparent,
+                                        color: isSelected
+                                            ? selectedColor
+                                            : Colors.transparent,
                                       ),
                                       child: isSelected
                                           ? const Icon(
-                                        Icons.check,
-                                        size: 16,
-                                        color: Colors.white,
-                                      )
+                                              Icons.check,
+                                              size: 16,
+                                              color: Colors.white,
+                                            )
                                           : null,
                                     );
                                   },
@@ -1209,7 +1305,8 @@ class _ZegoGiftSheetState extends State<ZegoGiftSheet> with SingleTickerProvider
       child: Row(
         mainAxisAlignment: MainAxisAlignment.end,
         children: [
-          const Icon(Icons.account_balance_wallet, color: Colors.white, size: 16),
+          const Icon(Icons.account_balance_wallet,
+              color: Colors.white, size: 16),
           const SizedBox(width: 4),
           Text(
             'Balance: ${userBalance ?? 0}',
@@ -1250,7 +1347,6 @@ class _ZegoGiftSheetState extends State<ZegoGiftSheet> with SingleTickerProvider
     );
   }
 
-
   Widget _buildSendButton() {
     return SizedBox(
       height: 36,
@@ -1258,12 +1354,14 @@ class _ZegoGiftSheetState extends State<ZegoGiftSheet> with SingleTickerProvider
         valueListenable: selectedGiftItemNotifier,
         builder: (context, selectedGift, _) {
           return ElevatedButton(
-            onPressed: selectedGift == null || selectedUserNotifier.value == null
+            onPressed: selectedGift == null ||
+                    selectedUserNotifier.value == null
                 ? null
                 : () {
-              final giftCount = int.tryParse(countNotifier.value) ?? 1;
-              sendGift(selectedGift, giftCount, selectedUserNotifier.value!);
-            },
+                    final giftCount = int.tryParse(countNotifier.value) ?? 1;
+                    sendGift(
+                        selectedGift, giftCount, selectedUserNotifier.value!);
+                  },
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.blue,
               disabledBackgroundColor: Colors.grey.withOpacity(0.3),
@@ -1275,10 +1373,9 @@ class _ZegoGiftSheetState extends State<ZegoGiftSheet> with SingleTickerProvider
             child: const Text(
               'SEND',
               style: TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.bold,
-                color: Colors.white
-              ),
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white),
             ),
           );
         },
@@ -1299,7 +1396,8 @@ class _ZegoGiftSheetState extends State<ZegoGiftSheet> with SingleTickerProvider
             child: DropdownButton<User>(
               isExpanded: true,
               value: selectedUser,
-              hint: const Text('Select User', style: TextStyle(color: Colors.white)),
+              hint: const Text('Select User',
+                  style: TextStyle(color: Colors.white)),
               style: const TextStyle(color: Colors.white),
               underline: Container(
                 height: 1,
@@ -1316,17 +1414,18 @@ class _ZegoGiftSheetState extends State<ZegoGiftSheet> with SingleTickerProvider
                         child: user.avatarUrl.isEmpty
                             ? const Icon(Icons.person, color: Colors.white)
                             : ClipRRect(
-                          borderRadius: BorderRadius.circular(15),
-                          child: Image.network(
-                            user.avatarUrl,
-                            width: 30,
-                            height: 30,
-                            fit: BoxFit.cover,
-                            errorBuilder: (context, error, stackTrace) {
-                              return const Icon(Icons.person, color: Colors.white);
-                            },
-                          ),
-                        ),
+                                borderRadius: BorderRadius.circular(15),
+                                child: Image.network(
+                                  user.avatarUrl,
+                                  width: 30,
+                                  height: 30,
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (context, error, stackTrace) {
+                                    return const Icon(Icons.person,
+                                        color: Colors.white);
+                                  },
+                                ),
+                              ),
                       ),
                       const SizedBox(width: 10),
                       Expanded(
@@ -1420,29 +1519,32 @@ class _ZegoGiftSheetState extends State<ZegoGiftSheet> with SingleTickerProvider
                     ClipRRect(
                       borderRadius: BorderRadius.circular(8),
                       child: item.icon.isEmpty
-                          ? Icon(Icons.card_giftcard, color: selectedColor, size: 40)
+                          ? Icon(Icons.card_giftcard,
+                              color: selectedColor, size: 40)
                           : Image.network(
-                        item.icon,
-                        width: 45,
-                        height: 45,
-                        fit: BoxFit.cover,
-                        errorBuilder: (context, error, stackTrace) {
-                          return Icon(Icons.card_giftcard, color: selectedColor, size: 40);
-                        },
-                        loadingBuilder: (context, child, loadingProgress) {
-                          if (loadingProgress == null) return child;
-                          return const SizedBox(
-                            width: 45,
-                            height: 45,
-                            child: Center(
-                              child: CircularProgressIndicator(
-                                color: Colors.white,
-                                strokeWidth: 2,
-                              ),
+                              item.icon,
+                              width: 45,
+                              height: 45,
+                              fit: BoxFit.cover,
+                              errorBuilder: (context, error, stackTrace) {
+                                return Icon(Icons.card_giftcard,
+                                    color: selectedColor, size: 40);
+                              },
+                              loadingBuilder:
+                                  (context, child, loadingProgress) {
+                                if (loadingProgress == null) return child;
+                                return const SizedBox(
+                                  width: 45,
+                                  height: 45,
+                                  child: Center(
+                                    child: CircularProgressIndicator(
+                                      color: Colors.white,
+                                      strokeWidth: 2,
+                                    ),
+                                  ),
+                                );
+                              },
                             ),
-                          );
-                        },
-                      ),
                     ),
                     const SizedBox(height: 4),
                     Text(
@@ -1495,8 +1597,6 @@ class _ZegoGiftSheetState extends State<ZegoGiftSheet> with SingleTickerProvider
     super.dispose();
   }
 }
-
-
 
 class GiftCategory {
   final String id;

@@ -344,197 +344,6 @@ class LivePageState extends State<LivePage>
     }
   }
 
-// Helper methods that return specific types
-
-//   Future<String?> _fetchUserAvatarUrl() async {
-//     try {
-//       final uri = Uri.parse('$POCKETBASE_URL/api/collections/users/records')
-//           .replace(queryParameters: {
-//         'filter': 'id="${widget.userId}"',
-//         'fields': 'id,avatar,collectionId',
-//       });
-
-//       final response =
-//           await http.get(uri, headers: {'Content-Type': 'application/json'});
-
-//       if (response.statusCode == 200) {
-//         final data = jsonDecode(response.body);
-//         if (data['items'] != null && data['items'].isNotEmpty) {
-//           final userData = data['items'][0];
-//           if (userData['avatar'] != null) {
-//             return '$POCKETBASE_URL/api/files/${userData['collectionId']}/${userData['id']}/${userData['avatar']}';
-//           }
-//         }
-//       }
-//       return null;
-//     } catch (e) {
-//       print('Error fetching user avatar URL: $e');
-//       return null;
-//     }
-//   }
-
-//   Future<String?> _fetchOwnBorderUrl() async {
-//     try {
-//       final response = await http.get(
-//         Uri.parse('$POCKETBASE_URL/api/collections/myItems/records')
-//             .replace(queryParameters: {
-//           'filter': 'userId="${widget.userId}" && isborder_used=true',
-//         }),
-//         headers: {'Content-Type': 'application/json'},
-//       );
-
-//       if (response.statusCode == 200) {
-//         final data = json.decode(response.body);
-//         final items = List<Map<String, dynamic>>.from(data['items']);
-
-//         if (items.isNotEmpty && items[0]['border'] != null) {
-//           final item = items[0];
-//           return '$POCKETBASE_URL/api/files/myItems/${item['id']}/${item['border']}';
-//         }
-//       }
-//       return null;
-//     } catch (e) {
-//       print('Error fetching own border URL: $e');
-//       return null;
-//     }
-//   }
-
-//   Future<String?> _fetchRoomBackgroundUrl() async {
-//     try {
-//       final response = await http.get(
-//         Uri.parse(
-//             '$POCKETBASE_URL/api/collections/voiceRooms/records/${widget.roomID}'),
-//         headers: {'Content-Type': 'application/json'},
-//       );
-
-//       if (response.statusCode == 200) {
-//         final data = jsonDecode(response.body);
-//         if (data['background_images'] != null) {
-//           return '$POCKETBASE_URL/api/files/voiceRooms/${widget.roomID}/${data['background_images']}';
-//         }
-//       }
-//       return null;
-//     } catch (e) {
-//       print('Error fetching room background URL: $e');
-//       return null;
-//     }
-//   }
-
-//   Future<Map<String, dynamic>?> _fetchVoiceRoomData() async {
-//     try {
-//       final uri = Uri.parse(
-//               '$POCKETBASE_URL/api/collections/voiceRooms/records/${widget.roomID}')
-//           .replace(queryParameters: {
-//         'fields':
-//             'voice_room_name,background_images,group_photo,voiceRoom_id,announcement'
-//       });
-
-//       final response =
-//           await http.get(uri, headers: {'Content-Type': 'application/json'});
-
-//       if (response.statusCode == 200) {
-//         return jsonDecode(response.body);
-//       }
-//       return null;
-//     } catch (e) {
-//       print('Error fetching voice room data: $e');
-//       return null;
-//     }
-//   }
-
-//   Future<Map<String, dynamic>?> _fetchLanguageData(String roomId) async {
-//     try {
-//       final uri = Uri.parse(
-//               '$POCKETBASE_URL/api/collections/voiceRooms/records/$roomId')
-//           .replace(queryParameters: {
-//         'fields': 'language',
-//       });
-
-//       final response =
-//           await http.get(uri, headers: {'Content-Type': 'application/json'});
-
-//       if (response.statusCode == 200) {
-//         return jsonDecode(response.body);
-//       }
-//       return null;
-//     } catch (e) {
-//       print('Error fetching language data: $e');
-//       return null;
-//     }
-//   }
-
-// // Process results methods
-//   void _processStringResults(List<String?> results) {
-//     final avatarUrl = results[0];
-//     final borderUrl = results[1];
-//     final backgroundUrl = results[2];
-
-//     setState(() {
-//       if (avatarUrl != null) _userAvatarUrl = avatarUrl;
-//       if (borderUrl != null) _userBorders[widget.userId] = borderUrl;
-//       if (backgroundUrl != null) _backgroundImageUrl = backgroundUrl;
-//     });
-//   }
-
-//   void _processMapResults(List<Map<String, dynamic>?> results) {
-//     final roomData = results[0];
-//     final languageData = results[1];
-
-//     setState(() {
-//       if (roomData != null) {
-//         _voiceRoomName = roomData['voice_room_name'];
-//         _voiceroomid = roomData['voiceRoom_id'];
-//         if (roomData['announcement'] != null) {
-//           _announcement = roomData['announcement'];
-//         }
-//         if (roomData['group_photo'] != null) {
-//           _groupPhotoUrl =
-//               '$POCKETBASE_URL/api/files/voiceRooms/${widget.roomID}/${roomData['group_photo']}';
-//         }
-//       }
-
-//       if (languageData != null && languageData['language'] != null) {
-//         _language = languageData['language'];
-//       }
-//     });
-//   }
-
-// Most robust approach: Using dynamic types with error handling
-  // Future<void> _initializeParallelRobust() async {
-  //   try {
-  //     setState(() {
-  //       _isLoading = true;
-  //     });
-
-  //     // Create a list of functions that return Future<dynamic>
-  //     final List<Future<dynamic>> futures = [
-  //       _safeExecute(() => _initializeSocket()),
-  //       _safeExecute(() => _fetchInitialUsers()),
-  //       _safeExecute(() => _fetchAndSetUserAvatar()),
-  //       _safeExecute(() => _fetchVoiceRoomDetails()),
-  //       _safeExecute(() => _fetchLanguageDetails(widget.roomID)),
-  //       _safeExecute(() => _createOnlineUserRecord()),
-  //       _safeExecute(() => _checkAdminStatus()),
-  //       _safeExecute(() => _fetchOwnBorder()),
-  //     ];
-
-  //     // Wait for all futures
-  //     final results = await Future.wait<dynamic>(futures);
-
-  //     // Process results if needed
-  //     _processInitializationResults(results);
-
-  //     setState(() {
-  //       _isLoading = false;
-  //     });
-  //   } catch (e) {
-  //     print('Error in robust parallel initialization: $e');
-  //     setState(() {
-  //       _isLoading = false;
-  //     });
-  //   }
-  // }
-
 // Safe execution wrapper
   Future<dynamic> _safeExecute(Future<dynamic> Function() operation) async {
     try {
@@ -544,20 +353,6 @@ class LivePageState extends State<LivePage>
       return null; // Return null on error
     }
   }
-
-// Process initialization results
-  // void _processInitializationResults(List<dynamic> results) {
-  //   // Handle results based on their index/position
-  //   for (int i = 0; i < results.length; i++) {
-  //     final result = results[i];
-  //     if (result != null) {
-  //       // Process successful results
-  //       print('Operation $i completed successfully');
-  //     } else {
-  //       print('Operation $i failed or returned null');
-  //     }
-  //   }
-  // }
 
   // Alternative implementation using time estimation
   void _startPositionTracking() {
@@ -1525,7 +1320,7 @@ class LivePageState extends State<LivePage>
     WidgetsBinding.instance.addPostFrameCallback((timeStamp) {
       _initializePostFrameParallel();
       ZegoGiftManager().service.init(
-            appID: 2069292420,
+            appID: 2021163397,
             liveID: widget.roomID,
             localUserID: localUserID,
             localUserName: widget.username1,
@@ -1722,7 +1517,7 @@ class LivePageState extends State<LivePage>
     try {
       // Initialize ZEGO first (this must be sequential)
       ZegoGiftManager().service.init(
-            appID: 2069292420,
+            appID: 2021163397,
             liveID: widget.roomID,
             localUserID: localUserID,
             localUserName: widget.username1,
@@ -2962,8 +2757,10 @@ class LivePageState extends State<LivePage>
       if (mounted) {
         setState(() {
           onlineUsers = users;
-          userCount = users.length; // Update the count
+          //userCount = users.length; // Update the count
           isLoadingUsers = false;
+          print(
+              'Fetched online users: ${onlineUsers.length} users in room ${widget.roomID}');
         });
       }
     } catch (e) {
@@ -4698,7 +4495,7 @@ class LivePageState extends State<LivePage>
             // Power/Logout button
             Positioned(
               top: MediaQuery.of(context).padding.top + 2,
-              right: 10,
+              right: MediaQuery.of(context).size.width * 0.02,
               child: GestureDetector(
                 onTap: () => _showLogoutDialog(context),
                 child: Container(
@@ -4784,7 +4581,7 @@ class LivePageState extends State<LivePage>
                   padding:
                       const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   decoration: BoxDecoration(
-                    color: Colors.black.withOpacity(0.5),
+                    color: Colors.black.withOpacity(0.8),
                     borderRadius: BorderRadius.circular(15),
                   ),
                   child: Row(
@@ -4945,7 +4742,7 @@ class LivePageState extends State<LivePage>
               Positioned(
                 top: MediaQuery.of(context).padding.top + 2,
                 right: MediaQuery.of(context).size.width *
-                    0.132, // Responsive positioning
+                    0.15, // Responsive positioning
                 child: GestureDetector(
                   onTap: _showSettingsDialog,
                   child: Container(
@@ -5010,7 +4807,7 @@ class LivePageState extends State<LivePage>
                 width: MediaQuery.of(context).size.width * 0.429,
                 // padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 0),
                 decoration: BoxDecoration(
-                  color: Colors.black.withOpacity(0.5),
+                  color: Colors.black.withOpacity(0.8),
                   borderRadius: const BorderRadius.only(
                       bottomRight: Radius.circular(15),
                       topRight: Radius.circular(15)),
@@ -5256,7 +5053,7 @@ class LivePageState extends State<LivePage>
     }
 
     // Return deduplicated count + 1 for current user
-    return uniqueUsers.length + 1;
+    return userCount;
   }
 
   void _showOnlineUsersBottomSheet(BuildContext context) {
@@ -6545,7 +6342,7 @@ class LivePageState extends State<LivePage>
                       height: MediaQuery.of(context).size.width * 0.1,
                       decoration: BoxDecoration(
                         color: Colors.black
-                            .withOpacity(0.7), // Dark background like in image
+                            .withOpacity(0.8), // Dark background like in image
                         border: Border.all(
                           width: 1,
                         ),
@@ -6565,7 +6362,7 @@ class LivePageState extends State<LivePage>
                               child: Text(
                                 'Add a Comment',
                                 style: TextStyle(
-                                  color: Colors.white,
+                                  color: Colors.white70,
                                   fontSize: 11,
                                   fontWeight: FontWeight.w500,
                                 ),
@@ -6594,7 +6391,7 @@ class LivePageState extends State<LivePage>
                 _buildCustomButton(2, customIcons[2]),
 
                 // Space between groups - explicit width
-                const SizedBox(width: 40),
+                const SizedBox(width: 10),
                 _buildCustomSeatLockButton(),
                 // Group 2: Mail icon
                 // _buildCustomButton(1, customIcons[1]),
@@ -6606,7 +6403,11 @@ class LivePageState extends State<LivePage>
                   builder: (context, child) {
                     return InkWell(
                       onTap: () {
-                        showGiftListSheet(context, widget.roomID);
+                        showGiftListSheet(context, widget.roomID,
+                            socket: socket,
+                            userId: widget.userId,
+                            userName: widget.username1,
+                            userAvatarUrl: _userAvatarUrl);
                       },
                       child: Container(
                         width: 48,
@@ -6667,7 +6468,7 @@ class LivePageState extends State<LivePage>
                       height: MediaQuery.of(context).size.width * 0.1,
                       decoration: BoxDecoration(
                         color: Colors.black
-                            .withOpacity(0.7), // Dark background like in image
+                            .withOpacity(0.8), // Dark background like in image
                         border: Border.all(
                           width: 1,
                         ),
@@ -6728,7 +6529,14 @@ class LivePageState extends State<LivePage>
                   builder: (context, child) {
                     return InkWell(
                       onTap: () {
-                        showGiftListSheet(context, widget.roomID);
+                        showGiftListSheet(
+                          context,
+                          widget.roomID,
+                          socket: socket,
+                          userId: widget.userId,
+                          userName: widget.username1,
+                          userAvatarUrl: _userAvatarUrl,
+                        );
                       },
                       child: Container(
                         width: 48,
@@ -6786,7 +6594,7 @@ class LivePageState extends State<LivePage>
                       height: MediaQuery.of(context).size.width * 0.1,
                       decoration: BoxDecoration(
                         color: Colors.black
-                            .withOpacity(0.7), // Dark background like in image
+                            .withOpacity(0.8), // Dark background like in image
                         border: Border.all(
                           width: 1,
                         ),
@@ -6847,7 +6655,11 @@ class LivePageState extends State<LivePage>
                   builder: (context, child) {
                     return InkWell(
                       onTap: () {
-                        showGiftListSheet(context, widget.roomID);
+                        showGiftListSheet(context, widget.roomID,
+                            socket: socket,
+                            userId: widget.userId,
+                            userName: widget.username1,
+                            userAvatarUrl: _userAvatarUrl);
                       },
                       child: Container(
                         width: 48,
@@ -7052,8 +6864,8 @@ class LivePageState extends State<LivePage>
       child: ElevatedButton(
         style: ElevatedButton.styleFrom(
           fixedSize: const Size(40, 40),
-          backgroundColor: const Color(0xff2C2F3E).withOpacity(0.6),
-          iconColor: Colors.white,
+          backgroundColor: Colors.black.withOpacity(0.8),
+          iconColor: Colors.white.withOpacity(0.9),
           shape: const CircleBorder(),
           padding: EdgeInsets.zero, // Remove internal padding
           elevation: 0, // Remove shadow
@@ -7585,8 +7397,8 @@ class LivePageState extends State<LivePage>
           child: ElevatedButton(
             style: ElevatedButton.styleFrom(
               fixedSize: const Size(40, 40),
-              backgroundColor: const Color(0xff2C2F3E).withOpacity(0.6),
-              iconColor: Colors.white,
+              backgroundColor: Colors.black.withOpacity(0.8),
+              iconColor: Colors.white.withOpacity(0.7),
               shape: const CircleBorder(),
               padding: EdgeInsets.zero,
               elevation: 0,
@@ -8046,7 +7858,7 @@ class LivePageState extends State<LivePage>
     return ZegoLiveAudioRoomSeatConfig(
       backgroundBuilder: backgroundBuilder,
       foregroundBuilder: foregroundBuilder,
-      //closeWhenJoining: false,
+      closeWhenJoining: false,
       // avatarBuilder: avatarBuilder,
       openIcon: Image.asset('assets/icons8-mic-24.png'),
     );
