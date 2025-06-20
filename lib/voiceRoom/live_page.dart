@@ -6754,46 +6754,24 @@ class LivePageState extends State<LivePage>
       builder: (BuildContext context) {
         return Padding(
           padding: EdgeInsets.only(
-            bottom: MediaQuery.of(context).viewInsets.bottom + 16,
+            // Add extra padding for high resolution screens
+            bottom: MediaQuery.of(context).viewInsets.bottom +
+                MediaQuery.of(context).padding.bottom +
+                16, // Additional safe area padding
+            left: 16,
+            right: 16,
           ),
           child: Container(
             decoration: BoxDecoration(
               color: Colors.black.withOpacity(0.9),
-              // borderRadius: const BorderRadius.only(
-              //   topLeft: Radius.circular(20),
-              //   topRight: Radius.circular(20),
-              // ),
+              borderRadius: BorderRadius.circular(20), // Add rounded corners
             ),
-            padding: const EdgeInsets.fromLTRB(14, 10, 14, 14),
+            padding: const EdgeInsets.all(14),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Handle bar
-                // Center(
-                //   child: Container(
-                //     width: 40,
-                //     height: 4,
-                //     margin: const EdgeInsets.only(bottom: 16),
-                //     decoration: BoxDecoration(
-                //       color: Colors.white.withOpacity(0.3),
-                //       borderRadius: BorderRadius.circular(2),
-                //     ),
-                //   ),
-                // ),
-
-                // // Title
-                // const Text(
-                //   'Send Message',
-                //   style: TextStyle(
-                //     fontSize: 20,
-                //     fontWeight: FontWeight.bold,
-                //     color: Colors.white,
-                //   ),
-                // ),
-                // const SizedBox(height: 20),
-
-                // Text field
+                // Text field with improved layout
                 Row(
                   children: [
                     Expanded(
