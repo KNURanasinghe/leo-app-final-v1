@@ -17,6 +17,7 @@ class StatusTheme {
   static const Color cardBlue = Color(0xFFBBDEFB);
   static const Color textDark = Color(0xFF1A237E);
   static const Color textLight = Color(0xFF5C6BC0);
+  static const Color kPrimaryColor = Color(0xFF3DB6EB);
 }
 
 class StatusScreen extends StatefulWidget {
@@ -205,7 +206,7 @@ class _StatusScreenState extends State<StatusScreen>
       // backgroundColor: StatusTheme.backgroundBlue,
       appBar: AppBar(
         elevation: 0,
-        backgroundColor: Colors.blue[700],
+        backgroundColor: StatusTheme.kPrimaryColor,
         title: const Text(
           'Status Updates',
           style: TextStyle(
@@ -307,7 +308,7 @@ class _StatusScreenState extends State<StatusScreen>
                                   )
                                 : CircleAvatar(
                                     radius: 25,
-                                    backgroundColor: StatusTheme.lightBlue,
+                                    backgroundColor: StatusTheme.kPrimaryColor,
                                     child: _buildUserAvatar(
                                       widget.currentUserId,
                                       radius: 23,
@@ -321,7 +322,7 @@ class _StatusScreenState extends State<StatusScreen>
                                 child: Container(
                                   padding: const EdgeInsets.all(2),
                                   decoration: BoxDecoration(
-                                    color: StatusTheme.accentBlue,
+                                    color: StatusTheme.kPrimaryColor,
                                     borderRadius: BorderRadius.circular(12),
                                     boxShadow: [
                                       BoxShadow(
@@ -375,11 +376,11 @@ class _StatusScreenState extends State<StatusScreen>
                         trailing: _hasMyStatus()
                             ? const Icon(
                                 Icons.more_vert_outlined,
-                                color: StatusTheme.accentBlue,
+                                color: StatusTheme.kPrimaryColor,
                               )
                             : const Icon(
                                 Icons.add_circle_outline,
-                                color: StatusTheme.accentBlue,
+                                color: StatusTheme.kPrimaryColor,
                               ),
                         onTap: () {
                           if (_hasMyStatus()) {
@@ -449,7 +450,7 @@ class _StatusScreenState extends State<StatusScreen>
                                         borderRadius: BorderRadius.circular(50),
                                         boxShadow: [
                                           BoxShadow(
-                                            color: StatusTheme.accentBlue
+                                            color: StatusTheme.kPrimaryColor
                                                 .withOpacity(0.3),
                                             spreadRadius: _animation.value,
                                             blurRadius: 4,
@@ -488,7 +489,7 @@ class _StatusScreenState extends State<StatusScreen>
                                 ),
                                 trailing: const Icon(
                                   Icons.arrow_forward_ios,
-                                  color: StatusTheme.accentBlue,
+                                  color: StatusTheme.kPrimaryColor,
                                   size: 16,
                                 ),
                                 onTap: () => _viewUserStatus(user.userId),
@@ -562,7 +563,7 @@ class _StatusScreenState extends State<StatusScreen>
               ),
               child: FloatingActionButton(
                 onPressed: _createStatus,
-                backgroundColor: StatusTheme.darkBlue,
+                backgroundColor: StatusTheme.kPrimaryColor,
                 child: const Icon(Icons.camera_alt, color: Colors.white),
               ),
             ),

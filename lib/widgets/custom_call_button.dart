@@ -37,6 +37,8 @@ class _CallButtonsState extends State<CallButtons> {
   bool isInitialized = false;
   bool isInitializing = false;
 
+  final Color kPrimaryColor = const Color(0xFF3DB6EB);
+
   @override
   void initState() {
     super.initState();
@@ -261,7 +263,7 @@ class _CallButtonsState extends State<CallButtons> {
         child: Container(
           padding: const EdgeInsets.all(8),
           decoration: BoxDecoration(
-            color: isInitializing ? Colors.grey : Colors.blue,
+            color: isInitializing ? Colors.grey : kPrimaryColor,
             shape: BoxShape.circle,
           ),
           child: const Icon(
@@ -280,7 +282,7 @@ class _CallButtonsState extends State<CallButtons> {
         child: Container(
           padding: const EdgeInsets.all(8),
           decoration: BoxDecoration(
-            color: isInitializing ? Colors.grey : Colors.blue,
+            color: isInitializing ? Colors.grey : kPrimaryColor,
             shape: BoxShape.circle,
           ),
           child: const Icon(

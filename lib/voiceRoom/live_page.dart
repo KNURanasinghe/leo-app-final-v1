@@ -1314,8 +1314,8 @@ class LivePageState extends State<LivePage>
     //_createOnlineUserRecord().then((_) => _fetchInitialUsers());
     // _checkAdminStatus();
     // _fetchOnlineUsers();
-    // ZegoGiftManager().cache.cacheAllFiles(giftItemList);
-    // ZegoGiftManager().service.recvNotifier.addListener(onGiftReceived);
+    ZegoGiftManager().cache.cacheAllFiles(giftItemList);
+    ZegoGiftManager().service.recvNotifier.addListener(onGiftReceived);
 
     WidgetsBinding.instance.addPostFrameCallback((timeStamp) {
       _initializePostFrameParallel();

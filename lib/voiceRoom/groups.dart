@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:zego_uikit_prebuilt_live_audio_room/zego_uikit_prebuilt_live_audio_room.dart';
+import '../constants/app_constants.dart';
 import 'Ranking/globalranking.dart';
 import 'live_page.dart';
 import 'voiceRoomCreate.dart';
@@ -430,9 +431,9 @@ class _GroupsScreenState extends State<GroupsScreen>
                           tabs: _tabs
                               .map((String name) => Tab(text: name))
                               .toList(),
-                          labelColor: Colors.blue[700],
+                          labelColor: AppConstants.iconColor,
                           unselectedLabelColor: Colors.grey,
-                          indicatorColor: Colors.blue[700],
+                          indicatorColor: AppConstants.iconColor,
                         ),
                       ),
                     ),

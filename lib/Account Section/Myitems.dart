@@ -235,7 +235,9 @@ class _StoreScreenState extends State<StoreScreen>
     if (userId == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-            content: Text('You need to be logged in to purchase items')),
+          content: Text('You need to be logged in to purchase items'),
+          backgroundColor: Colors.red,
+        ),
       );
       return;
     }
@@ -274,60 +276,138 @@ class _StoreScreenState extends State<StoreScreen>
 
       // Create the record first without file references
       final createdRecord = await pb.collection('myItems').create(body: data);
+      print("✅ Item created successfully in database: ${createdRecord.id}");
 
       // Now handle file references separately if they exist
-      List<Future> fileTransfers = [];
+      List<String> successfulTransfers = [];
+      List<String> failedTransfers = [];
 
-      // If there's a rive_file, transfer it
+      // ✅ FIX: Try to transfer files but don't fail if they don't exist
+
+      // If there's a rive_file, try to transfer it
       if (item.data['rive_file'] != null) {
         final sourceUrl =
             '$baseUrl/api/files/${item.collectionId}/${item.id}/${item.data['rive_file']}';
-        fileTransfers.add(
-            _transferFileToRecord(sourceUrl, createdRecord.id, 'rive_file'));
-        print("File transfers: $fileTransfers   and source $sourceUrl");
+
+        try {
+          await _transferFileToRecord(sourceUrl, createdRecord.id, 'rive_file');
+          successfulTransfers.add('rive_file');
+          print("✅ Rive file transferred successfully");
+        } catch (e) {
+          failedTransfers.add('rive_file');
+          print("⚠️ Failed to transfer rive_file: $e");
+        }
       }
 
-      // If there's a border, transfer it
+      // If there's a border, try to transfer it
       if (item.data['border'] != null) {
         final sourceUrl =
             '$baseUrl/api/files/${item.collectionId}/${item.id}/${item.data['border']}';
-        fileTransfers
-            .add(_transferFileToRecord(sourceUrl, createdRecord.id, 'border'));
-        print("File transfers: $fileTransfers   and source $sourceUrl");
+
+        try {
+          await _transferFileToRecord(sourceUrl, createdRecord.id, 'border');
+          successfulTransfers.add('border');
+          print("✅ Border file transferred successfully");
+        } catch (e) {
+          failedTransfers.add('border');
+          print("⚠️ Failed to transfer border: $e");
+        }
       }
 
-      // If there's a theme, transfer it
+      // If there's a theme, try to transfer it
       if (item.data['theme'] != null) {
         final sourceUrl =
             '$baseUrl/api/files/${item.collectionId}/${item.id}/${item.data['theme']}';
-        fileTransfers
-            .add(_transferFileToRecord(sourceUrl, createdRecord.id, 'theme'));
-        print("File transfers: $fileTransfers   and source $sourceUrl");
+
+        try {
+          await _transferFileToRecord(sourceUrl, createdRecord.id, 'theme');
+          successfulTransfers.add('theme');
+          print("✅ Theme file transferred successfully");
+        } catch (e) {
+          failedTransfers.add('theme');
+          print("⚠️ Failed to transfer theme: $e");
+        }
       }
 
-      // Wait for all file transfers to complete
-      if (fileTransfers.isNotEmpty) {
-        await Future.wait(fileTransfers);
-      }
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Item purchased successfully!')),
-      );
-
-      // Switch to My Items tab and reload
+      // ✅ Set loading to false before showing success message
       setState(() {
+        isLoading = false;
         isViewingMyItems = true;
         appBarTitle = "Mine";
-        isLoading = false;
       });
+
+      // ✅ Show success message regardless of file transfer issues
+      if (mounted) {
+        String message = 'Item "${item.data['name']}" purchased successfully!';
+
+        // Add warning if some files failed to transfer
+        // if (failedTransfers.isNotEmpty) {
+        //   message += '\n⚠️ Some files may not display properly.';
+        // }
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                const Icon(Icons.check_circle, color: Colors.white),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    message,
+                    style: const TextStyle(color: Colors.white),
+                  ),
+                ),
+              ],
+            ),
+            backgroundColor: Colors.green,
+            duration: const Duration(seconds: 4),
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10),
+            ),
+          ),
+        );
+      }
+
+      // Reload My Items after successful purchase
       loadMyItems();
     } catch (e) {
+      // ✅ Handle main database errors
       setState(() {
         isLoading = false;
       });
-      // ScaffoldMessenger.of(context).showSnackBar(
-      //   SnackBar(content: Text('Failed to purchase item: $e')),
-      // );
+
+      print('❌ Error purchasing item: $e');
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                const Icon(Icons.error, color: Colors.white),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Failed to purchase item: ${e.toString()}',
+                    style: const TextStyle(color: Colors.white),
+                  ),
+                ),
+              ],
+            ),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 4),
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10),
+            ),
+            action: SnackBarAction(
+              label: 'Retry',
+              textColor: Colors.white,
+              onPressed: () => buyItem(item),
+            ),
+          ),
+        );
+      }
     }
   }
 
@@ -335,12 +415,18 @@ class _StoreScreenState extends State<StoreScreen>
   Future<void> _transferFileToRecord(
       String sourceUrl, String recordId, String fieldName) async {
     try {
+      print("🔄 Attempting to download file from: $sourceUrl");
+
       // Download the file from the source URL
       final response = await http.get(Uri.parse(sourceUrl));
 
       if (response.statusCode != 200) {
-        throw Exception('Failed to download file from $sourceUrl');
+        throw Exception(
+            'HTTP ${response.statusCode}: Failed to download file from $sourceUrl');
       }
+
+      print(
+          "✅ File downloaded successfully, size: ${response.bodyBytes.length} bytes");
 
       // Create a form data request to upload the file
       final request = http.MultipartRequest('PATCH',
@@ -358,16 +444,23 @@ class _StoreScreenState extends State<StoreScreen>
       // Add the file to the request
       request.files.add(multipartFile);
 
+      print("🔄 Uploading file to record: $recordId, field: $fieldName");
+
       // Send the request
       final uploadResponse = await request.send();
 
       if (uploadResponse.statusCode != 200) {
         final responseBody = await uploadResponse.stream.bytesToString();
-        throw Exception('Failed to upload file: $responseBody');
+        throw Exception(
+            'Upload failed (${uploadResponse.statusCode}): $responseBody');
       }
+
+      print("✅ File uploaded successfully to $fieldName");
     } catch (e) {
-      print('Error transferring file: $e');
-      rethrow;
+      print('❌ Error transferring file $sourceUrl: $e');
+
+      // ✅ Don't rethrow - let the calling method handle this gracefully
+      throw Exception('File transfer failed: ${e.toString()}');
     }
   }
 
@@ -745,13 +838,25 @@ class _StoreScreenState extends State<StoreScreen>
                       ),
                       const SizedBox(height: 4),
                       // Price
-                      Text(
-                        "💎 ${item.data['price'] ?? 'N/A'}",
-                        style: const TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.black,
-                        ),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Image.asset(
+                            'assets/images/diamond.png',
+                            width: 15,
+                          ),
+                          const SizedBox(
+                            width: 6,
+                          ),
+                          Text(
+                            "${item.data['price'] ?? 'N/A'}",
+                            style: const TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.black,
+                            ),
+                          ),
+                        ],
                       ),
                       const SizedBox(height: 8),
 

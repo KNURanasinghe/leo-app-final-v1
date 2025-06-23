@@ -35,6 +35,7 @@ class _StatusCreateScreenState extends State<StatusCreateScreen> {
   bool _isUploading = false;
 
   // Blue theme colors
+  final Color kPrimaryColor = const Color(0xFF3DB6EB);
   final Color primaryBlue = const Color(0xFF1E88E5);
   final Color darkBlue = const Color(0xFF0D47A1);
   final Color lightBlue = const Color(0xFFBBDEFB);
@@ -58,7 +59,7 @@ class _StatusCreateScreenState extends State<StatusCreateScreen> {
       backgroundColor: Colors.grey[50],
       appBar: AppBar(
         elevation: 0,
-        backgroundColor: primaryBlue,
+        backgroundColor: kPrimaryColor,
         title: const Text(
           'Create Status',
           style: TextStyle(
@@ -89,7 +90,7 @@ class _StatusCreateScreenState extends State<StatusCreateScreen> {
                 'POST',
                 style: TextStyle(
                   fontWeight: FontWeight.bold,
-                  color: _isUploading ? Colors.grey : primaryBlue,
+                  color: _isUploading ? Colors.grey : kPrimaryColor,
                 ),
               ),
             ),
@@ -250,19 +251,19 @@ class _StatusCreateScreenState extends State<StatusCreateScreen> {
                       _buildMediaButton(
                         icon: Icons.camera_alt,
                         label: 'Camera',
-                        color: accentBlue,
+                        color: kPrimaryColor,
                         onTap: () => _pickImage(ImageSource.camera),
                       ),
                       _buildMediaButton(
                         icon: Icons.photo,
                         label: 'Gallery',
-                        color: primaryBlue,
+                        color: kPrimaryColor,
                         onTap: () => _pickImage(ImageSource.gallery),
                       ),
                       _buildMediaButton(
                         icon: Icons.videocam,
                         label: 'Video',
-                        color: darkBlue,
+                        color: kPrimaryColor,
                         onTap: _pickVideo,
                       ),
                     ],

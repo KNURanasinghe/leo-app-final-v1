@@ -5,6 +5,7 @@ import 'package:leo_app_01/widgets/status_create_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../HomeScreen.dart';
+import '../constants/app_constants.dart';
 import '../widgets/admin_list.dart';
 import '../widgets/status_screen.dart';
 import 'HomePagePopMenu.dart';
@@ -106,10 +107,10 @@ class ChatScreen1State extends State<ChatScreen1>
           appBar: AppBar(
             elevation: 0,
             backgroundColor: Colors.white,
-            title: Text(
+            title: const Text(
               'Messages',
               style: TextStyle(
-                color: Colors.blue[700],
+                color: AppConstants.iconColor,
                 fontWeight: FontWeight.bold,
                 fontSize: 24,
               ),
@@ -117,8 +118,8 @@ class ChatScreen1State extends State<ChatScreen1>
             // actions: const [HomePagePopupMenuButton()],
             bottom: TabBar(
               controller: _tabController,
-              indicatorColor: Colors.blue[700],
-              labelColor: Colors.blue[700],
+              indicatorColor: AppConstants.iconColor,
+              labelColor: AppConstants.iconColor,
               unselectedLabelColor: Colors.grey,
               labelStyle: const TextStyle(
                 fontWeight: FontWeight.bold,

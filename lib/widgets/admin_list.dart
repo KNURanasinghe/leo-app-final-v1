@@ -502,7 +502,7 @@ class _AdminListScreenState extends State<AdminListScreen>
       children: [
         CustomListTile(
           icon: CupertinoIcons.person_add,
-          iconColor: Colors.blue[600],
+          iconColor: AppConstants.iconColor,
           title: 'New Chat',
           ontap: () => showDefaultNewPeerChatDialog(context),
         ),
@@ -511,7 +511,7 @@ class _AdminListScreenState extends State<AdminListScreen>
         ),
         CustomListTile(
           icon: CupertinoIcons.phone_arrow_up_right,
-          iconColor: Colors.blue[600],
+          iconColor: AppConstants.iconColor,
           title: 'Call History',
           ontap: () {
             Future.delayed(Duration.zero, () {
@@ -542,7 +542,7 @@ class _AdminListScreenState extends State<AdminListScreen>
         // ),
         CustomListTile(
           icon: CupertinoIcons.person_add,
-          iconColor: Colors.green[600],
+          iconColor: AppConstants.iconColor,
           title: 'Chat Requests',
           badge: _isLoadingChatRequests
               ? null
@@ -641,7 +641,7 @@ class _AdminListScreenState extends State<AdminListScreen>
       leading: Stack(
         children: [
           CircleAvatar(
-            backgroundColor: Colors.blue,
+            backgroundColor: AppConstants.iconColor,
             child: Icon(Icons.campaign,
                 color: unreadCount > 0
                     ? Colors.white

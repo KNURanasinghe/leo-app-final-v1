@@ -943,7 +943,7 @@ class _DemoChattingPageState extends State<DemoChattingMessageListPage> {
                 icon: const Icon(Icons.send),
                 label: const Text('Send'),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF128C7E),
+                  backgroundColor: AppConstants.iconColor,
                   foregroundColor: Colors.white,
                 ),
               ),
@@ -1268,7 +1268,11 @@ class _DemoChattingPageState extends State<DemoChattingMessageListPage> {
                     if (_isAttachmentMenuOpen && _filePreview == null)
                       Container(
                         color: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 10),
+                        padding: EdgeInsets.only(
+                          bottom: MediaQuery.of(context).viewInsets.bottom +
+                              MediaQuery.of(context).padding.bottom +
+                              16,
+                        ),
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                           children: [
@@ -1377,7 +1381,7 @@ class _DemoChattingPageState extends State<DemoChattingMessageListPage> {
                             IconButton(
                               icon: const Icon(
                                 Icons.send,
-                                color: Color(0xFF128C7E),
+                                color: AppConstants.iconColor,
                               ),
                               onPressed: () {
                                 if (_messageController.text.trim().isNotEmpty) {

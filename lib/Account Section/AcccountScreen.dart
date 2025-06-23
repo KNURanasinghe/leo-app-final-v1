@@ -191,9 +191,9 @@ class _AccountScreen1State extends State<AccountScreen1> {
                       ),
                     ),
                     Text(
-                      'ID:$intId',
+                      'ID:${userData!['id']}',
                       style: TextStyle(
-                        fontSize: 14.sp,
+                        fontSize: 13.sp,
                         color: kAltTextColor,
                       ),
                     ),

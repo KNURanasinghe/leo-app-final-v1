@@ -15,7 +15,7 @@ class AppConstants {
   static const String messageTypeDocument = 'document';
   static const String messageTypeAudio = 'audio';
   static const String messageTypeStatusShare = 'status_share';
-  static const Color iconColor = Color(0xFF128C7E);
+  static const Color iconColor = Color(0xFF3DB6EB);
   // UI Constants
   static const double messageBubbleRadius = 16.0;
   static const double chatInputHeight = 60.0;
