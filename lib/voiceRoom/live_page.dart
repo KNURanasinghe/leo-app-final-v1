@@ -6326,125 +6326,124 @@ class LivePageState extends State<LivePage>
         maxCount: isSmallScreen ? 6 : 7,
         hostExtendButtons: [
           // Use a single container with a custom row to control spacing
-          SizedBox(
-            width: MediaQuery.of(context).size.width, // Adjust width as needed
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                GestureDetector(
-                  onTap: () {
-                    _showMessageBottomSheet(context);
-                  },
-                  child: Padding(
-                    padding: const EdgeInsets.only(left: 10),
-                    child: Container(
-                      width: MediaQuery.of(context).size.width * 0.25,
-                      height: MediaQuery.of(context).size.width * 0.1,
-                      decoration: BoxDecoration(
-                        color: Colors.black
-                            .withOpacity(0.8), // Dark background like in image
-                        border: Border.all(
-                          width: 1,
-                        ),
-                        borderRadius: const BorderRadius.all(
-                          Radius.circular(25),
-                        ),
+          Row(
+            mainAxisAlignment:
+                MainAxisAlignment.spaceBetween, // Changed to spaceEvenly
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              GestureDetector(
+                onTap: () {
+                  _showMessageBottomSheet(context);
+                },
+                child: Padding(
+                  padding: const EdgeInsets.only(left: 10),
+                  child: Container(
+                    width: MediaQuery.of(context).size.width * 0.25,
+                    height: MediaQuery.of(context).size.width * 0.1,
+                    decoration: BoxDecoration(
+                      color: Colors.black
+                          .withOpacity(0.8), // Dark background like in image
+                      border: Border.all(
+                        width: 1,
                       ),
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 6,
-                        ),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            // Text
-                            const Expanded(
-                              child: Text(
-                                'Add a Comment',
-                                style: TextStyle(
-                                  color: Colors.white70,
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                                overflow: TextOverflow.ellipsis,
-                                maxLines: 1,
+                      borderRadius: const BorderRadius.all(
+                        Radius.circular(25),
+                      ),
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 6,
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          // Text
+                          const Expanded(
+                            child: Text(
+                              'Add a Comment',
+                              style: TextStyle(
+                                color: Colors.white70,
+                                fontSize: 11,
+                                fontWeight: FontWeight.w500,
                               ),
+                              overflow: TextOverflow.ellipsis,
+                              maxLines: 1,
                             ),
-                            const SizedBox(width: 2),
-                            // Arrow icon
-                            Icon(
-                              Icons.send_rounded,
-                              color: Colors
-                                  .pink[300], // Pink/purple color like in image
-                              size: 12,
-                            ),
-                          ],
-                        ),
+                          ),
+                          const SizedBox(width: 2),
+                          // Arrow icon
+                          Icon(
+                            Icons.send_rounded,
+                            color: Colors
+                                .pink[300], // Pink/purple color like in image
+                            size: 12,
+                          ),
+                        ],
                       ),
                     ),
                   ),
                 ),
-                // Group 1: First 4 icons without spacing
-                _buildCustomButton(0, customIcons[0]),
-                // _buildCustomButton(3, customIcons[3]),
+              ),
+              // Group 1: First 4 icons without spacing
+              _buildCustomButton(0, customIcons[0]),
+              // _buildCustomButton(3, customIcons[3]),
 
-                _buildCustomButton(2, customIcons[2]),
+              _buildCustomButton(2, customIcons[2]),
 
-                // Space between groups - explicit width
-                const SizedBox(width: 10),
-                _buildCustomSeatLockButton(),
-                // Group 2: Mail icon
-                // _buildCustomButton(1, customIcons[1]),
+              // Space between groups - explicit width
+              const SizedBox(width: 30),
+              _buildCustomSeatLockButton(),
+              // Group 2: Mail icon
+              // _buildCustomButton(1, customIcons[1]),
 
-                // Another space
-
-                AnimatedBuilder(
-                  animation: _glowAnimation,
-                  builder: (context, child) {
-                    return InkWell(
-                      onTap: () {
-                        showGiftListSheet(context, widget.roomID,
-                            socket: socket,
-                            userId: widget.userId,
-                            userName: widget.username1,
-                            userAvatarUrl: _userAvatarUrl);
-                      },
-                      child: Container(
-                        width: 48,
-                        height: 48,
-                        decoration: BoxDecoration(
-                          shape: BoxShape
-                              .circle, // Makes the glow round around the image
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.yellowAccent.withOpacity(
-                                  0.7), // Glow color (you can change it)
-                              spreadRadius: 6 *
-                                  _glowAnimation
-                                      .value, // Animated spread size of the glow
-                              blurRadius: 15 *
-                                  _glowAnimation
-                                      .value, // Animated blur size of the glow
-                              offset: const Offset(0,
-                                  0), // Position of the glow (centered around the image)
-                            ),
-                          ],
-                        ),
-                        child: Image.asset(
-                          'assets/images/gift.png',
-                          width: 28,
-                          height: 28,
-                        ),
+              // Another space
+              const SizedBox(width: 5),
+              AnimatedBuilder(
+                animation: _glowAnimation,
+                builder: (context, child) {
+                  return InkWell(
+                    onTap: () {
+                      showGiftListSheet(context, widget.roomID,
+                          socket: socket,
+                          userId: widget.userId,
+                          userName: widget.username1,
+                          userAvatarUrl: _userAvatarUrl);
+                    },
+                    child: Container(
+                      width: 48,
+                      height: 48,
+                      decoration: BoxDecoration(
+                        shape: BoxShape
+                            .circle, // Makes the glow round around the image
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.yellowAccent.withOpacity(
+                                0.7), // Glow color (you can change it)
+                            spreadRadius: 6 *
+                                _glowAnimation
+                                    .value, // Animated spread size of the glow
+                            blurRadius: 15 *
+                                _glowAnimation
+                                    .value, // Animated blur size of the glow
+                            offset: const Offset(0,
+                                0), // Position of the glow (centered around the image)
+                          ),
+                        ],
                       ),
-                    );
-                  },
-                ),
-                // if (widget.isHost) _buildCustomButton(6, customIcons[6]),
-                // Group 3: Open with icon
-                //_buildCustomButton(5, customIcons[5]),
-                _buildCustomButton(4, customIcons[4]),
-              ],
-            ),
+                      child: Image.asset(
+                        'assets/images/gift.png',
+                        width: 28,
+                        height: 28,
+                      ),
+                    ),
+                  );
+                },
+              ),
+              // if (widget.isHost) _buildCustomButton(6, customIcons[6]),
+              // Group 3: Open with icon
+              //_buildCustomButton(5, customIcons[5]),
+              _buildCustomButton(4, customIcons[4]),
+            ],
           ),
         ],
         hostButtons: [
@@ -6452,251 +6451,248 @@ class LivePageState extends State<LivePage>
         ],
         speakerButtons: [],
         speakerExtendButtons: [
-          SizedBox(
-            width: MediaQuery.of(context).size.width, // Adjust width as needed
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                GestureDetector(
-                  onTap: () {
-                    _showMessageBottomSheet(context);
-                  },
-                  child: Padding(
-                    padding: const EdgeInsets.only(left: 10),
-                    child: Container(
-                      width: MediaQuery.of(context).size.width * 0.25,
-                      height: MediaQuery.of(context).size.width * 0.1,
-                      decoration: BoxDecoration(
-                        color: Colors.black
-                            .withOpacity(0.8), // Dark background like in image
-                        border: Border.all(
-                          width: 1,
-                        ),
-                        borderRadius: const BorderRadius.all(
-                          Radius.circular(25),
-                        ),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              GestureDetector(
+                onTap: () {
+                  _showMessageBottomSheet(context);
+                },
+                child: Padding(
+                  padding: const EdgeInsets.only(left: 10),
+                  child: Container(
+                    width: MediaQuery.of(context).size.width * 0.25,
+                    height: MediaQuery.of(context).size.width * 0.1,
+                    decoration: BoxDecoration(
+                      color: Colors.black
+                          .withOpacity(0.8), // Dark background like in image
+                      border: Border.all(
+                        width: 1,
                       ),
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 6,
-                        ),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            // Text
-                            const Expanded(
-                              child: Text(
-                                'Add a Comment',
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                                overflow: TextOverflow.ellipsis,
-                                maxLines: 1,
+                      borderRadius: const BorderRadius.all(
+                        Radius.circular(25),
+                      ),
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 6,
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          // Text
+                          const Expanded(
+                            child: Text(
+                              'Add a Comment',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 11,
+                                fontWeight: FontWeight.w500,
                               ),
+                              overflow: TextOverflow.ellipsis,
+                              maxLines: 1,
                             ),
-                            const SizedBox(width: 2),
-                            // Arrow icon
-                            Icon(
-                              Icons.send_rounded,
-                              color: Colors
-                                  .pink[300], // Pink/purple color like in image
-                              size: 12,
-                            ),
-                          ],
-                        ),
+                          ),
+                          const SizedBox(width: 2),
+                          // Arrow icon
+                          Icon(
+                            Icons.send_rounded,
+                            color: Colors
+                                .pink[300], // Pink/purple color like in image
+                            size: 12,
+                          ),
+                        ],
                       ),
                     ),
                   ),
                 ),
-                // Group 1: First 4 icons without spacing
-                _buildCustomButton(0, customIcons[0]),
-                // _buildCustomButton(3, customIcons[3]),
+              ),
+              // Group 1: First 4 icons without spacing
+              _buildCustomButton(0, customIcons[0]),
+              // _buildCustomButton(3, customIcons[3]),
 
-                _buildCustomButton(2, customIcons[2]),
+              _buildCustomButton(2, customIcons[2]),
 
-                // Space between groups - explicit width
-                const SizedBox(width: 40),
+              // Space between groups - explicit width
+              const SizedBox(width: 80),
 
-                // Group 2: Mail icon
-                // _buildCustomButton(1, customIcons[1]),
+              // Group 2: Mail icon
+              // _buildCustomButton(1, customIcons[1]),
 
-                // Another space
+              // Another space
 
-                AnimatedBuilder(
-                  animation: _glowAnimation,
-                  builder: (context, child) {
-                    return InkWell(
-                      onTap: () {
-                        showGiftListSheet(
-                          context,
-                          widget.roomID,
-                          socket: socket,
-                          userId: widget.userId,
-                          userName: widget.username1,
-                          userAvatarUrl: _userAvatarUrl,
-                        );
-                      },
-                      child: Container(
-                        width: 48,
-                        height: 48,
-                        decoration: BoxDecoration(
-                          shape: BoxShape
-                              .circle, // Makes the glow round around the image
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.yellowAccent.withOpacity(
-                                  0.7), // Glow color (you can change it)
-                              spreadRadius: 6 *
-                                  _glowAnimation
-                                      .value, // Animated spread size of the glow
-                              blurRadius: 15 *
-                                  _glowAnimation
-                                      .value, // Animated blur size of the glow
-                              offset: const Offset(0,
-                                  0), // Position of the glow (centered around the image)
-                            ),
-                          ],
-                        ),
-                        child: Image.asset(
-                          'assets/images/gift.png',
-                          width: 28,
-                          height: 28,
-                        ),
+              AnimatedBuilder(
+                animation: _glowAnimation,
+                builder: (context, child) {
+                  return InkWell(
+                    onTap: () {
+                      showGiftListSheet(
+                        context,
+                        widget.roomID,
+                        socket: socket,
+                        userId: widget.userId,
+                        userName: widget.username1,
+                        userAvatarUrl: _userAvatarUrl,
+                      );
+                    },
+                    child: Container(
+                      width: 48,
+                      height: 48,
+                      decoration: BoxDecoration(
+                        shape: BoxShape
+                            .circle, // Makes the glow round around the image
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.yellowAccent.withOpacity(
+                                0.7), // Glow color (you can change it)
+                            spreadRadius: 6 *
+                                _glowAnimation
+                                    .value, // Animated spread size of the glow
+                            blurRadius: 15 *
+                                _glowAnimation
+                                    .value, // Animated blur size of the glow
+                            offset: const Offset(0,
+                                0), // Position of the glow (centered around the image)
+                          ),
+                        ],
                       ),
-                    );
-                  },
-                ),
-                // if (widget.isHost) _buildCustomButton(6, customIcons[6]),
-                // Group 3: Open with icon
-                //_buildCustomButton(5, customIcons[5]),
-                _buildCustomButton(4, customIcons[4]),
-              ],
-            ),
+                      child: Image.asset(
+                        'assets/images/gift.png',
+                        width: 28,
+                        height: 28,
+                      ),
+                    ),
+                  );
+                },
+              ),
+              // if (widget.isHost) _buildCustomButton(6, customIcons[6]),
+              // Group 3: Open with icon
+              //_buildCustomButton(5, customIcons[5]),
+              _buildCustomButton(4, customIcons[4]),
+            ],
           ),
         ],
         audienceButtons: [],
         audienceExtendButtons: [
-          SizedBox(
-            width: MediaQuery.of(context).size.width, // Adjust width as needed
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                GestureDetector(
-                  onTap: () {
-                    _showMessageBottomSheet(context);
-                  },
-                  child: Padding(
-                    padding: const EdgeInsets.only(left: 10),
-                    child: Container(
-                      width: MediaQuery.of(context).size.width * 0.25,
-                      height: MediaQuery.of(context).size.width * 0.1,
-                      decoration: BoxDecoration(
-                        color: Colors.black
-                            .withOpacity(0.8), // Dark background like in image
-                        border: Border.all(
-                          width: 1,
-                        ),
-                        borderRadius: const BorderRadius.all(
-                          Radius.circular(25),
-                        ),
+          Row(
+            mainAxisAlignment:
+                MainAxisAlignment.spaceBetween, // Changed to spaceEvenly
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              GestureDetector(
+                onTap: () {
+                  _showMessageBottomSheet(context);
+                },
+                child: Padding(
+                  padding: const EdgeInsets.only(left: 10),
+                  child: Container(
+                    width: MediaQuery.of(context).size.width * 0.25,
+                    height: MediaQuery.of(context).size.width * 0.1,
+                    decoration: BoxDecoration(
+                      color: Colors.black
+                          .withOpacity(0.8), // Dark background like in image
+                      border: Border.all(
+                        width: 1,
                       ),
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 6,
-                        ),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            // Text
-                            const Expanded(
-                              child: Text(
-                                'Add a Comment',
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                                overflow: TextOverflow.ellipsis,
-                                maxLines: 1,
+                      borderRadius: const BorderRadius.all(
+                        Radius.circular(25),
+                      ),
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 6,
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          // Text
+                          const Expanded(
+                            child: Text(
+                              'Add a Comment',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 11,
+                                fontWeight: FontWeight.w500,
                               ),
+                              overflow: TextOverflow.ellipsis,
+                              maxLines: 1,
                             ),
-                            const SizedBox(width: 2),
-                            // Arrow icon
-                            Icon(
-                              Icons.send_rounded,
-                              color: Colors
-                                  .pink[300], // Pink/purple color like in image
-                              size: 12,
-                            ),
-                          ],
-                        ),
+                          ),
+                          const SizedBox(width: 2),
+                          // Arrow icon
+                          Icon(
+                            Icons.send_rounded,
+                            color: Colors
+                                .pink[300], // Pink/purple color like in image
+                            size: 12,
+                          ),
+                        ],
                       ),
                     ),
                   ),
                 ),
-                // Group 1: First 4 icons without spacing
-                _buildCustomButton(0, customIcons[0]),
-                // _buildCustomButton(3, customIcons[3]),
+              ),
+              // Group 1: First 4 icons without spacing
+              _buildCustomButton(0, customIcons[0]),
+              // _buildCustomButton(3, customIcons[3]),
 
-                _buildCustomButton(2, customIcons[2]),
+              _buildCustomButton(2, customIcons[2]),
 
-                // Space between groups - explicit width
-                const SizedBox(width: 40),
+              // Space between groups - explicit width
+              const SizedBox(width: 80),
 
-                // Group 2: Mail icon
-                //  _buildCustomButton(1, customIcons[1]),
+              // Group 2: Mail icon
+              //  _buildCustomButton(1, customIcons[1]),
 
-                // Another space
+              // Another space
 
-                AnimatedBuilder(
-                  animation: _glowAnimation,
-                  builder: (context, child) {
-                    return InkWell(
-                      onTap: () {
-                        showGiftListSheet(context, widget.roomID,
-                            socket: socket,
-                            userId: widget.userId,
-                            userName: widget.username1,
-                            userAvatarUrl: _userAvatarUrl);
-                      },
-                      child: Container(
-                        width: 48,
-                        height: 48,
-                        decoration: BoxDecoration(
-                          shape: BoxShape
-                              .circle, // Makes the glow round around the image
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.yellowAccent.withOpacity(
-                                  0.7), // Glow color (you can change it)
-                              spreadRadius: 6 *
-                                  _glowAnimation
-                                      .value, // Animated spread size of the glow
-                              blurRadius: 15 *
-                                  _glowAnimation
-                                      .value, // Animated blur size of the glow
-                              offset: const Offset(0,
-                                  0), // Position of the glow (centered around the image)
-                            ),
-                          ],
-                        ),
-                        child: Image.asset(
-                          'assets/images/gift.png',
-                          width: 28,
-                          height: 28,
-                        ),
+              AnimatedBuilder(
+                animation: _glowAnimation,
+                builder: (context, child) {
+                  return InkWell(
+                    onTap: () {
+                      showGiftListSheet(context, widget.roomID,
+                          socket: socket,
+                          userId: widget.userId,
+                          userName: widget.username1,
+                          userAvatarUrl: _userAvatarUrl);
+                    },
+                    child: Container(
+                      width: 48,
+                      height: 48,
+                      decoration: BoxDecoration(
+                        shape: BoxShape
+                            .circle, // Makes the glow round around the image
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.yellowAccent.withOpacity(
+                                0.7), // Glow color (you can change it)
+                            spreadRadius: 6 *
+                                _glowAnimation
+                                    .value, // Animated spread size of the glow
+                            blurRadius: 15 *
+                                _glowAnimation
+                                    .value, // Animated blur size of the glow
+                            offset: const Offset(0,
+                                0), // Position of the glow (centered around the image)
+                          ),
+                        ],
                       ),
-                    );
-                  },
-                ),
-                // if (widget.isHost) _buildCustomButton(6, customIcons[6]),
-                // Group 3: Open with icon
-                //_buildCustomButton(5, customIcons[5]),
-                _buildCustomButton(4, customIcons[4]),
-              ],
-            ),
+                      child: Image.asset(
+                        'assets/images/gift.png',
+                        width: 28,
+                        height: 28,
+                      ),
+                    ),
+                  );
+                },
+              ),
+              // if (widget.isHost) _buildCustomButton(6, customIcons[6]),
+              // Group 3: Open with icon
+              //_buildCustomButton(5, customIcons[5]),
+              _buildCustomButton(4, customIcons[4]),
+            ],
           ),
         ],
       );
@@ -6708,7 +6704,7 @@ class LivePageState extends State<LivePage>
       child: ElevatedButton(
         style: ElevatedButton.styleFrom(
           fixedSize: const Size(40, 40),
-          backgroundColor: const Color(0xff2C2F3E).withOpacity(0.6),
+          backgroundColor: Colors.black.withOpacity(0.8),
           iconColor: Colors.white,
           shape: const CircleBorder(),
           padding: EdgeInsets.zero,
