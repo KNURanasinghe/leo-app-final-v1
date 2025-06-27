@@ -30,9 +30,9 @@ class CallButtons extends StatefulWidget {
 
 class _CallButtonsState extends State<CallButtons> {
   // Replace with your SDKAppID and SecretKey from Tencent Cloud console
-  final int sdkAppID = 20024500;
+  final int sdkAppID = 20024985;
   final String secretKey =
-      "15ab4f1530dc1b27e84be46fb297239ceda7739d023674de04aac15ee22cc382";
+      "62ecfe8f93c06365c859dbaf7a0bb80b8e479b97755232137c5feaa32f1b677f";
 
   bool isInitialized = false;
   bool isInitializing = false;

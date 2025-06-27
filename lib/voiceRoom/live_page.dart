@@ -175,6 +175,11 @@ class LivePageState extends State<LivePage>
   // late UnsubscribeFunc? _unsubscribe;
   int userCount = 0; // Add this to track user count
   final Map<String, Timer> _emojiTimers = {};
+
+  // Add these to your existing state variables
+  final Map<String, Timer> _giftTimers = {};
+  final Map<String, Widget> _activeGifts = {};
+  int _giftAnimationCounter = 0; // To create unique keys
   // final Map<String, String> _currentEmojis = {};
   // final Map<String, Offset> _seatPositions = {};
   // final bool _showEmoji = false;
@@ -249,6 +254,149 @@ class LivePageState extends State<LivePage>
   bool get isSmallScreen => screenHeight < 700;
 
 // Convert existing methods to return Future<void> consistently
+
+  void _playGiftAnimation({
+    required String giftUrl,
+    required int giftCount,
+    required String giftName,
+    required String senderName,
+    required String receiverName,
+  }) {
+    // Create unique key for this animation
+    final animationId =
+        'gift_${_giftAnimationCounter++}_${DateTime.now().millisecondsSinceEpoch}';
+
+    // Cancel any existing gift timer
+    _giftTimers.forEach((key, timer) => timer.cancel());
+    _giftTimers.clear();
+    _activeGifts.clear();
+
+    setState(() {
+      // Add new gift animation
+      _activeGifts[animationId] = _buildGiftAnimation(
+        giftUrl: giftUrl,
+        giftCount: giftCount,
+        giftName: giftName,
+        senderName: senderName,
+        receiverName: receiverName,
+      );
+    });
+
+    // Remove animation after duration (adjust as needed)
+    _giftTimers[animationId] = Timer(const Duration(seconds: 8), () {
+      if (mounted) {
+        setState(() {
+          _activeGifts.remove(animationId);
+        });
+        _giftTimers.remove(animationId);
+      }
+    });
+
+    print(
+        '🎬 Playing gift animation: $giftName (${giftCount}x) from $senderName to $receiverName');
+  }
+
+  Widget _buildGiftAnimation({
+    required String giftUrl,
+    required int giftCount,
+    required String giftName,
+    required String senderName,
+    required String receiverName,
+  }) {
+    return Container(
+      width: double.infinity,
+      height: double.infinity,
+      color: Colors.black.withOpacity(0.3), // Semi-transparent overlay
+      child: Stack(
+        children: [
+          // Full-screen SVGA animation
+          Positioned.fill(
+            child: Center(
+              child: SVGASimpleImage(
+                resUrl: giftUrl,
+                // Cover the full screen
+              ),
+            ),
+          ),
+
+          // Gift information overlay at the bottom
+          Positioned(
+            bottom: MediaQuery.of(context).size.height * 0.15,
+            left: 20,
+            right: 20,
+            child: Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.black.withOpacity(0.7),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: Colors.white.withOpacity(0.3)),
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Gift count and name
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        '${giftCount}x ',
+                        style: const TextStyle(
+                          color: Colors.yellow,
+                          fontSize: 24,
+                          fontWeight: FontWeight.bold,
+                          decoration: TextDecoration.none,
+                        ),
+                      ),
+                      Text(
+                        giftName,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                          decoration: TextDecoration.none,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  // Sender and receiver info
+                  RichText(
+                    textAlign: TextAlign.center,
+                    text: TextSpan(
+                      style: const TextStyle(
+                        fontSize: 16,
+                        decoration: TextDecoration.none,
+                      ),
+                      children: [
+                        TextSpan(
+                          text: senderName,
+                          style: const TextStyle(
+                            color: Colors.blue,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const TextSpan(
+                          text: ' sent ',
+                          style: TextStyle(color: Colors.white),
+                        ),
+                        TextSpan(
+                          text: receiverName,
+                          style: const TextStyle(
+                            color: Colors.pink,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 
 // Load current user's active item for entry animations
   Future<void> _fetchAndSetUserActiveItemAsync() async {
@@ -1320,7 +1468,7 @@ class LivePageState extends State<LivePage>
     WidgetsBinding.instance.addPostFrameCallback((timeStamp) {
       _initializePostFrameParallel();
       ZegoGiftManager().service.init(
-            appID: 2021163397,
+            appID: 118815176,
             liveID: widget.roomID,
             localUserID: localUserID,
             localUserName: widget.username1,
@@ -1517,7 +1665,7 @@ class LivePageState extends State<LivePage>
     try {
       // Initialize ZEGO first (this must be sequential)
       ZegoGiftManager().service.init(
-            appID: 2021163397,
+            appID: 118815176,
             liveID: widget.roomID,
             localUserID: localUserID,
             localUserName: widget.username1,
@@ -1584,6 +1732,30 @@ class LivePageState extends State<LivePage>
 
 // ✅ ADD socket listeners setup as separate method:
   void _setupSocketListeners() {
+    // Add this in your _setupSocketListeners() method
+    socket.on('giftMessage', (data) {
+      print('🎁 Received gift message: $data');
+
+      if (mounted && data != null) {
+        final String giftUrl = data['giftUrl'] ?? '';
+        final int giftCount = data['giftCount'] ?? 0;
+        final String giftName = data['giftName'] ?? '';
+        final String senderName = data['senderUserName'] ?? '';
+        final String receiverName = data['receiverUserName'] ?? '';
+
+        if (giftUrl.isNotEmpty) {
+          // Play gift animation for all users
+          _playGiftAnimation(
+            giftUrl: giftUrl,
+            giftCount: giftCount,
+            giftName: giftName,
+            senderName: senderName,
+            receiverName: receiverName,
+          );
+        }
+      }
+    });
+
     socket.on('announcementUpdated', (data) {
       if (mounted && data['updatedBy'] != widget.userId) {
         setState(() {
@@ -3224,6 +3396,10 @@ class LivePageState extends State<LivePage>
     _messageService.dispose();
     _stopPositionTracking();
 
+    _giftTimers.forEach((key, timer) => timer.cancel());
+    _giftTimers.clear();
+    _activeGifts.clear();
+
     socket.emit('leaveRoom', {
       'roomId': widget.roomID,
       'userId': widget.userId,
@@ -4433,9 +4609,9 @@ class LivePageState extends State<LivePage>
           children: [
             // Main Zego UIKit widget
             ZegoUIKitPrebuiltLiveAudioRoom(
-              appID: 2021163397,
+              appID: 118815176,
               appSign:
-                  '493c643bc39f9809a908d013c015d2e78408ec436abcf514aed64c29fdfc78f8',
+                  '281551d36b1f77d9e7b8642b39e8bbbedd1fababf2f1783681f05498aa64e577',
               userID: localUserID,
               userName: widget.username1,
               roomID: widget.roomID,
@@ -4483,6 +4659,13 @@ class LivePageState extends State<LivePage>
                 ],
               ),
             ),
+
+            if (_activeGifts.isNotEmpty)
+              ...(_activeGifts.entries.map((entry) {
+                return Positioned.fill(
+                  child: entry.value,
+                );
+              }).toList()),
             // In your build method, replace the current music player position with this
             Positioned(
               left: 0,
@@ -4494,7 +4677,7 @@ class LivePageState extends State<LivePage>
 
             // Power/Logout button
             Positioned(
-              top: MediaQuery.of(context).padding.top + 2,
+              top: MediaQuery.of(context).size.height * 0.02,
               right: MediaQuery.of(context).size.width * 0.02,
               child: GestureDetector(
                 onTap: () => _showLogoutDialog(context),
@@ -4740,9 +4923,9 @@ class LivePageState extends State<LivePage>
 
             if (isAdmin)
               Positioned(
-                top: MediaQuery.of(context).padding.top + 2,
+                top: MediaQuery.of(context).size.height * 0.02,
                 right: MediaQuery.of(context).size.width *
-                    0.15, // Responsive positioning
+                    0.13, // Responsive positioning
                 child: GestureDetector(
                   onTap: _showSettingsDialog,
                   child: Container(
@@ -4775,7 +4958,7 @@ class LivePageState extends State<LivePage>
 
             // Share button
             Positioned(
-              top: MediaQuery.of(context).padding.top + 2,
+              top: MediaQuery.of(context).size.height * 0.02,
               right: isAdmin ? 100 : 55, // Adjust based on admin status
               child: GestureDetector(
                 onTap: () => _showShareOptions(context),
@@ -6363,7 +6546,7 @@ class LivePageState extends State<LivePage>
                               'Add a Comment',
                               style: TextStyle(
                                 color: Colors.white70,
-                                fontSize: 11,
+                                fontSize: 14,
                                 fontWeight: FontWeight.w500,
                               ),
                               overflow: TextOverflow.ellipsis,
@@ -6376,7 +6559,7 @@ class LivePageState extends State<LivePage>
                             Icons.send_rounded,
                             color: Colors
                                 .pink[300], // Pink/purple color like in image
-                            size: 12,
+                            size: 16,
                           ),
                         ],
                       ),
@@ -6716,7 +6899,7 @@ class LivePageState extends State<LivePage>
         child: Center(
           child: Icon(
             _areSeatsLocked ? Icons.lock : Icons.lock_open,
-            size: 20,
+            size: 29,
           ),
         ),
       ),
@@ -6852,7 +7035,7 @@ class LivePageState extends State<LivePage>
               'Button clicked with icon: $icon at index $index'); // Debug print
           _handleCustomButtonTap(index);
         },
-        child: Center(child: Icon(icon, size: 20)),
+        child: Center(child: Icon(icon, size: 29)),
       ),
     );
   }
@@ -7384,7 +7567,7 @@ class LivePageState extends State<LivePage>
               child: Icon(
                 isMicOn ? Icons.mic : Icons.mic_off,
                 color: isMicOn ? Colors.white : Colors.white,
-                size: 20,
+                size: 29,
               ),
             ),
           ),

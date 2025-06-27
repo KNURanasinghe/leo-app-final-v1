@@ -10,18 +10,29 @@ class GiftProtocolImpll {
   late String _liveID;
   late String _localUserID;
   late String _localUserName;
+  SocketService? _socketService;
 
   final List<StreamSubscription<dynamic>?> _subscriptions = [];
 
   final recvNotifier = ValueNotifier<ZegoGiftProtocolItem?>(null);
 
-  void init({required int appID, required String liveID, required String localUserID, required String localUserName}) {
+  void init({
+    required int appID,
+    required String liveID,
+    required String localUserID,
+    required String localUserName,
+    SocketService? socketService,
+  }) {
     _appID = appID;
     _liveID = liveID;
     _localUserID = localUserID;
     _localUserName = localUserName;
+    _socketService = socketService;
 
-    _subscriptions.add(ZegoUIKit().getSignalingPlugin().getInRoomCommandMessageReceivedEventStream().listen((event) {
+    _subscriptions.add(ZegoUIKit()
+        .getSignalingPlugin()
+        .getInRoomCommandMessageReceivedEventStream()
+        .listen((event) {
       onInRoomCommandMessageReceived(event);
     }));
   }
@@ -55,10 +66,12 @@ class GiftProtocolImpll {
     ///!
     ///! https://docs.zegocloud.com/article/16201
     debugPrint('! ${'*' * 80}');
-    debugPrint('! ** Warning: This is just a demo for synchronous display effects.');
+    debugPrint(
+        '! ** Warning: This is just a demo for synchronous display effects.');
     debugPrint('! ** ');
     debugPrint('! ** If it involves billing or your business logic,');
-    debugPrint('! ** please use the SERVER API to send a Message of type ZIMCommandMessage.');
+    debugPrint(
+        '! ** please use the SERVER API to send a Message of type ZIMCommandMessage.');
     debugPrint('! ${'*' * 80}');
 
     debugPrint('try send gift, name:$name, count:$count, data:$data');
@@ -81,7 +94,8 @@ class GiftProtocolImpll {
     return uint8List;
   }
 
-  void onInRoomCommandMessageReceived(ZegoSignalingPluginInRoomCommandMessageReceivedEvent event) {
+  void onInRoomCommandMessageReceived(
+      ZegoSignalingPluginInRoomCommandMessageReceivedEvent event) {
     final messages = event.messages;
 
     // You can display different animations according to gift-type
