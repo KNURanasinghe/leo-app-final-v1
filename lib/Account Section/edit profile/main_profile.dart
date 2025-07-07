@@ -33,12 +33,9 @@ class MainProfile extends StatelessWidget {
         themeMode: darkModeEnabled ? ThemeMode.dark : ThemeMode.light,
         darkTheme: darkTheme,
         routes: {
-          'profile': (context) => ProfileScreen(
-              ),
+          'profile': (context) => const ProfileScreen(),
           'gifts': (context) => const GiftsScreen(),
-          'badges': (context) => BadgesScreen(
-
-              ),
+          'badges': (context) => const BadgesScreen(),
           'rooms': (context) => const VoiceRoomsScreen(),
           'edit-profile': (context) =>
               EditProfileScreen(firstname: name, userId: userId),

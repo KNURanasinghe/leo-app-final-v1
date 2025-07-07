@@ -216,52 +216,6 @@ class _InlineMessageListState extends State<InlineMessageList> {
                 ),
               ),
             ),
-
-          // **ENHANCED: Message count indicator**
-          // if (widget.messages.isNotEmpty)
-          //   Positioned(
-          //     top: 8,
-          //     right: 16,
-          //     child: Container(
-          //       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-          //       decoration: BoxDecoration(
-          //         color: Colors.black.withOpacity(0.7),
-          //         borderRadius: BorderRadius.circular(12),
-          //         border: Border.all(color: Colors.white24),
-          //       ),
-          //       child: Text(
-          //         '${widget.messages.length} messages',
-          //         style: const TextStyle(
-          //           color: Colors.white70,
-          //           fontSize: 10,
-          //           fontFamily: 'poppins',
-          //         ),
-          //       ),
-          //     ),
-          //   ),
-
-          // **NEW: Scroll indicator to show position**
-          // if (widget.messages.length > 10)
-          //   Positioned(
-          //     top: 8,
-          //     left: 16,
-          //     child: Container(
-          //       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-          //       decoration: BoxDecoration(
-          //         color: Colors.black.withOpacity(0.7),
-          //         borderRadius: BorderRadius.circular(12),
-          //         border: Border.all(color: Colors.white24),
-          //       ),
-          //       child: Text(
-          //         _isUserScrolling ? '📜 Viewing History' : '💬 Live Chat',
-          //         style: const TextStyle(
-          //           color: Colors.white70,
-          //           fontSize: 10,
-          //           fontFamily: 'poppins',
-          //         ),
-          //       ),
-          //     ),
-          //   ),
         ],
       ),
     );
@@ -306,17 +260,17 @@ class _InlineMessageListState extends State<InlineMessageList> {
 
   Widget _buildMessageItem(
       ChatMessage message, bool isCurrentUser, BuildContext context) {
-    // Handle system messages
+    // Handle system messages - now using normal message background
     if (message.type == MessageType.system) {
       return _buildSystemMessage(message, context);
     }
 
-    // Handle entry messages
+    // Handle entry messages - now using normal message background
     if (message.type == MessageType.entry) {
       return _buildEntryMessage(message, isCurrentUser, context);
     }
 
-    // Special handling for gift messages
+    // Special handling for gift messages - now using normal message background
     if (message.type == MessageType.gift) {
       return _buildGiftMessageItem(message, isCurrentUser, context);
     }
@@ -363,113 +317,104 @@ class _InlineMessageListState extends State<InlineMessageList> {
     );
   }
 
-  // System message widget
+  // System message widget - now using normal message background
   Widget _buildSystemMessage(ChatMessage message, BuildContext context) {
     return Container(
-      margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
-      child: Center(
-        child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 12),
-          decoration: BoxDecoration(
-            color: Colors.red.withOpacity(0.2),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: Colors.red.withOpacity(0.3)),
-          ),
-          child: Text(
-            message.message,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 12,
-              fontStyle: FontStyle.italic,
-              decoration: TextDecoration.none,
-              fontFamily: 'poppins',
-            ),
-            textAlign: TextAlign.center,
+      alignment: Alignment.centerLeft,
+      margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 16),
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+        width: MediaQuery.of(context).size.width * 0.6,
+        decoration: BoxDecoration(
+          color: Colors.black.withOpacity(0.6),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: Colors.white24, width: 1),
+        ),
+        child: Text(
+          message.message,
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 14,
+            fontStyle: FontStyle.italic,
+            decoration: TextDecoration.none,
+            fontFamily: 'poppins',
           ),
         ),
       ),
     );
   }
 
-  // Entry message widget
+  // Entry message widget - now using normal message background
   Widget _buildEntryMessage(
       ChatMessage message, bool isCurrentUser, BuildContext context) {
     return Container(
-      margin: const EdgeInsets.symmetric(vertical: 6, horizontal: 16),
-      child: Column(
-        children: [
-          // Entry animation if itemUrl is provided
-          // Uncomment if you want to show entry animations
-          // if (message.itemUrl != null && message.itemUrl!.isNotEmpty)
-          //   Container(
-          //     height: 80,
-          //     alignment: Alignment.center,
-          //     margin: const EdgeInsets.only(bottom: 8),
-          //     child: SVGASimpleImage(resUrl: message.itemUrl!),
-          //   ),
-
-          // Entry message
-          Container(
-            padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
-            decoration: BoxDecoration(
-              color: Colors.purple.withOpacity(0.3),
-              borderRadius: BorderRadius.circular(16),
-              border:
-                  Border.all(color: Colors.purple.withOpacity(0.5), width: 1),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                if (message.avatarUrl != null && message.avatarUrl!.isNotEmpty)
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(12),
-                    child: Image.network(
-                      message.avatarUrl!,
-                      width: 24,
-                      height: 24,
-                      fit: BoxFit.cover,
-                      errorBuilder: (context, error, stackTrace) => Container(
-                        width: 24,
-                        height: 24,
-                        decoration: BoxDecoration(
-                          color: Colors.grey.withOpacity(0.3),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: const Icon(Icons.person,
-                            size: 14, color: Colors.white),
-                      ),
+      alignment: Alignment.centerLeft,
+      margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 16),
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+        width: MediaQuery.of(context).size.width * 0.6,
+        decoration: BoxDecoration(
+          color: Colors.black.withOpacity(0.6),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: Colors.white24, width: 1),
+        ),
+        child: Row(
+          children: [
+            if (message.avatarUrl != null && message.avatarUrl!.isNotEmpty)
+              ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: Image.network(
+                  message.avatarUrl!,
+                  width: 24,
+                  height: 24,
+                  fit: BoxFit.cover,
+                  errorBuilder: (context, error, stackTrace) => Container(
+                    width: 24,
+                    height: 24,
+                    decoration: BoxDecoration(
+                      color: Colors.grey.withOpacity(0.3),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child:
+                        const Icon(Icons.person, size: 14, color: Colors.white),
+                  ),
+                ),
+              ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    isCurrentUser ? "You" : message.userName,
+                    style: TextStyle(
+                      color: isCurrentUser ? Colors.white : Colors.yellow,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 12,
+                      decoration: TextDecoration.none,
+                      fontFamily: 'poppins',
                     ),
                   ),
-                const SizedBox(width: 8),
-                Text(
-                  isCurrentUser ? "You" : message.userName,
-                  style: const TextStyle(
-                    color: Colors.yellow,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 13,
-                    decoration: TextDecoration.none,
-                    fontFamily: 'poppins',
+                  const SizedBox(height: 2),
+                  Text(
+                    message.message,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 14,
+                      decoration: TextDecoration.none,
+                      fontFamily: 'poppins',
+                    ),
                   ),
-                ),
-                const SizedBox(width: 4),
-                Text(
-                  message.message,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 13,
-                    decoration: TextDecoration.none,
-                    fontFamily: 'poppins',
-                  ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
 
-  // Gift message widget
+  // Gift message widget - now using normal message background
   Widget _buildGiftMessageItem(
       ChatMessage message, bool isCurrentUser, BuildContext context) {
     final giftData = message.giftData;
@@ -477,31 +422,19 @@ class _InlineMessageListState extends State<InlineMessageList> {
 
     return Container(
       alignment: Alignment.centerLeft,
-      margin: const EdgeInsets.symmetric(vertical: 6, horizontal: 16),
+      margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 16),
       child: Container(
-        padding: const EdgeInsets.all(12),
-        width: MediaQuery.of(context).size.width * 0.75,
+        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+        width: MediaQuery.of(context).size.width * 0.6,
         decoration: BoxDecoration(
-          gradient: LinearGradient(
-            colors: [
-              Colors.purple.withOpacity(0.8),
-              Colors.pink.withOpacity(0.8),
-            ],
-          ),
+          color: Colors.black.withOpacity(0.6),
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: Colors.white54, width: 2),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.purple.withOpacity(0.3),
-              blurRadius: 8,
-              spreadRadius: 2,
-            ),
-          ],
+          border: Border.all(color: Colors.white24, width: 1),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Gift header with icon
+            // Gift header
             Row(
               children: [
                 Container(
@@ -513,24 +446,23 @@ class _InlineMessageListState extends State<InlineMessageList> {
                   child: const Icon(
                     Icons.card_giftcard,
                     color: Colors.white,
-                    size: 18,
+                    size: 16,
                   ),
                 ),
                 const SizedBox(width: 8),
                 Text(
-                  isCurrentUser ? 'GIFT SENT' : 'GIFT RECEIVED',
-                  style: const TextStyle(
-                    color: Colors.white,
+                  isCurrentUser ? "You" : message.userName,
+                  style: TextStyle(
+                    color: isCurrentUser ? Colors.white : Colors.yellow,
                     fontWeight: FontWeight.bold,
-                    fontSize: 11,
-                    letterSpacing: 1.2,
+                    fontSize: 12,
                     decoration: TextDecoration.none,
                     fontFamily: 'poppins',
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 10),
+            const SizedBox(height: 8),
 
             // Gift details
             Row(
@@ -540,60 +472,28 @@ class _InlineMessageListState extends State<InlineMessageList> {
                   ClipRRect(
                     borderRadius: BorderRadius.circular(8),
                     child: SizedBox(
-                      width: 40,
-                      height: 40,
+                      width: 30,
+                      height: 30,
                       child: SVGASimpleImage(resUrl: giftData.giftUrl!),
                     ),
                   ),
-                const SizedBox(width: 12),
+                const SizedBox(width: 8),
 
                 // Gift info
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      RichText(
-                        text: TextSpan(
-                          style: const TextStyle(
-                            fontSize: 14,
-                            fontFamily: 'poppins',
-                            decoration: TextDecoration.none,
-                          ),
-                          children: [
-                            TextSpan(
-                              text: isCurrentUser ? 'You' : message.userName,
-                              style: const TextStyle(
-                                color: Colors.yellow,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                            const TextSpan(
-                              text: ' sent ',
-                              style: TextStyle(color: Colors.white),
-                            ),
-                            TextSpan(
-                              text:
-                                  '${giftData.giftCount}x ${giftData.giftName}',
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                            const TextSpan(
-                              text: ' to ',
-                              style: TextStyle(color: Colors.white),
-                            ),
-                            TextSpan(
-                              text: giftData.receiverUserName,
-                              style: const TextStyle(
-                                color: Colors.cyan,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ],
+                      Text(
+                        'Sent ${giftData.giftCount}x ${giftData.giftName} to ${giftData.receiverUserName}',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 14,
+                          decoration: TextDecoration.none,
+                          fontFamily: 'poppins',
                         ),
                       ),
-                      const SizedBox(height: 6),
+                      const SizedBox(height: 4),
 
                       // Cost display with diamond icon
                       Row(

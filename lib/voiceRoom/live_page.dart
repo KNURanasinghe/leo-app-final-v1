@@ -253,6 +253,8 @@ class LivePageState extends State<LivePage>
   double get screenHeight => MediaQuery.of(context).size.height;
   bool get isSmallScreen => screenHeight < 700;
 
+  bool ismute = false;
+
 // Convert existing methods to return Future<void> consistently
 
   void _playGiftAnimation({
@@ -2268,6 +2270,8 @@ class LivePageState extends State<LivePage>
         final roomData = json.decode(response.body);
         setState(() {
           isAdmin = roomData['ownerId'] == widget.userId;
+          print(
+              'Admin status for user ${widget.userId} in room ${widget.roomID}: $isAdmin');
         });
       }
     } catch (e) {
@@ -2653,16 +2657,16 @@ class LivePageState extends State<LivePage>
 
 // ✅ ADD this method for welcome message:
   void _addWelcomeMessage() {
-    final welcomeMessage = ChatMessage(
-      userId: 'system',
-      userName: 'Welcome',
-      message: '${widget.username1} has entered the room',
-      timestamp: DateTime.now().millisecondsSinceEpoch,
-    );
+    // final welcomeMessage = ChatMessage(
+    //   userId: 'system',
+    //   userName: 'Welcome',
+    //   message: '${widget.username1} has entered the room',
+    //   timestamp: DateTime.now().millisecondsSinceEpoch,
+    // );
 
-    setState(() {
-      _messages.add(welcomeMessage);
-    });
+    // setState(() {
+    //   _messages.add(welcomeMessage);
+    // });
   }
 
 // // ✅ OPTIMIZE room update handling:
@@ -3481,6 +3485,15 @@ class LivePageState extends State<LivePage>
       const double nameLabelHeight = 20;
       final double avatarSize =
           size.width * 0.66; // Make avatar 60% of seat width
+      final bool isUserAdmin = seatData['userId'] == widget.userId && isAdmin;
+
+      String? currentUserId;
+      if (user != null) {
+        currentUserId = user.id;
+      }
+
+      final bool isThisUserMuted =
+          !ZegoUIKit().getMicrophoneStateNotifier(currentUserId ?? '').value;
 
       return Column(
         children: [
@@ -3566,11 +3579,12 @@ class LivePageState extends State<LivePage>
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  if (isAdmin)
+                  if (isUserAdmin) ...[
                     const Icon(Icons.person, size: 16, color: Colors.yellow),
-                  const SizedBox(
-                    width: 3,
-                  ),
+                    const SizedBox(
+                      width: 3,
+                    ),
+                  ],
                   Text(
                     "${seatData['userName']}",
                     overflow: TextOverflow.ellipsis,
@@ -3583,6 +3597,20 @@ class LivePageState extends State<LivePage>
                       decoration: TextDecoration.none,
                     ),
                   ),
+                  if (isThisUserMuted && currentUserId != null) ...[
+                    const SizedBox(
+                      width: 3,
+                    ),
+                    const CircleAvatar(
+                      radius: 5,
+                      backgroundColor: Colors.white,
+                      child: Icon(
+                        Icons.mic_off,
+                        size: 10,
+                        color: Colors.red,
+                      ),
+                    ),
+                  ],
                 ],
               ),
             ),
@@ -6935,15 +6963,16 @@ class LivePageState extends State<LivePage>
           padding: EdgeInsets.only(
             // Add extra padding for high resolution screens
             bottom: MediaQuery.of(context).viewInsets.bottom +
-                MediaQuery.of(context).padding.bottom +
-                16, // Additional safe area padding
-            left: 16,
-            right: 16,
+                MediaQuery.of(context)
+                    .padding
+                    .bottom, // Additional safe area padding
+            // left: 16,
+            // right: 16,
           ),
           child: Container(
             decoration: BoxDecoration(
               color: Colors.black.withOpacity(0.9),
-              borderRadius: BorderRadius.circular(20), // Add rounded corners
+              //borderRadius: BorderRadius.circular(20), // Add rounded corners
             ),
             padding: const EdgeInsets.all(14),
             child: Column(
@@ -7532,7 +7561,9 @@ class LivePageState extends State<LivePage>
     final currentMicState =
         ZegoUIKit().getMicrophoneStateNotifier(localUserID).value;
     ZegoUIKit().turnMicrophoneOn(!currentMicState);
-
+    setState(() {
+      ismute = currentMicState ? false : true;
+    });
     // // Optional: Show a notification
     // ScaffoldMessenger.of(context).showSnackBar(
     //   SnackBar(

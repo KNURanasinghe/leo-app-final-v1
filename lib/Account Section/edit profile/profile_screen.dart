@@ -53,7 +53,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Future<void> _fetchUserProfile() async {
     try {
       final response = await http.get(
-        Uri.parse('http://145.223.21.62:8090/api/collections/users/records/$userId'),
+        Uri.parse(
+            'http://145.223.21.62:8090/api/collections/users/records/$userId'),
       );
       if (response.statusCode == 200) {
         setState(() {
@@ -68,7 +69,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Future<void> _fetchProfileViews() async {
     try {
       final response = await http.get(
-        Uri.parse('$baseUrl/api/collections/profileView/records?filter=(viewed_users_id="$userId")'),
+        Uri.parse(
+            '$baseUrl/api/collections/profileView/records?filter=(viewed_users_id="$userId")'),
       );
 
       if (response.statusCode == 200) {
@@ -89,7 +91,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Future<void> _fetchProfileViewers() async {
     try {
       final viewsResponse = await http.get(
-        Uri.parse('$baseUrl/api/collections/profileView/records?filter=(viewed_users_id="$userId")'),
+        Uri.parse(
+            '$baseUrl/api/collections/profileView/records?filter=(viewed_users_id="$userId")'),
       );
 
       if (viewsResponse.statusCode == 200) {
@@ -99,7 +102,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
         for (var view in viewsList) {
           final userResponse = await http.get(
-            Uri.parse('$baseUrl/api/collections/users/records/${view['viewer_user_id']}'),
+            Uri.parse(
+                '$baseUrl/api/collections/users/records/${view['viewer_user_id']}'),
           );
 
           if (userResponse.statusCode == 200) {
@@ -121,9 +125,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
       debugPrint('Error fetching profile viewers: $e');
     }
   }
-
-
-
 
   Future<void> _fetchReceivedGifts() async {
     try {
@@ -152,7 +153,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
       // Fetch received gifts
       final receivedResponse = await http.get(
-        Uri.parse('$baseUrl/api/collections/sending_recieving_gifts/records?filter=(reciever_user_id="$userId")'),
+        Uri.parse(
+            '$baseUrl/api/collections/sending_recieving_gifts/records?filter=(reciever_user_id="$userId")'),
       );
 
       if (receivedResponse.statusCode != 200) {
@@ -167,7 +169,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
         final count = received['gift_count'] as int;
 
         if (giftsMap.containsKey(giftName)) {
-          giftsMap[giftName]!['count'] = (giftsMap[giftName]!['count'] as int) + count;
+          giftsMap[giftName]!['count'] =
+              (giftsMap[giftName]!['count'] as int) + count;
         }
       }
 
@@ -175,17 +178,22 @@ class _ProfileScreenState extends State<ProfileScreen> {
       List<Map<String, dynamic>> giftsList = giftsMap.values
           .where((gift) => gift['count'] > 0)
           .map((gift) => {
-        'id': gift['id'],
-        'collectionId': gift['collectionId'],
-        // Try all possible field names for gift photo
-        'gifphoto': gift['gift_photo'] ?? gift['giftphoto'] ?? gift['gifPhoto'] ?? gift['photo'] ?? '',
-        'giftCount': gift['count'],
-        'giftName': gift['giftname'],
-      })
+                'id': gift['id'],
+                'collectionId': gift['collectionId'],
+                // Try all possible field names for gift photo
+                'gifphoto': gift['gift_photo'] ??
+                    gift['giftphoto'] ??
+                    gift['gifPhoto'] ??
+                    gift['photo'] ??
+                    '',
+                'giftCount': gift['count'],
+                'giftName': gift['giftname'],
+              })
           .toList();
 
       // Sort by count
-      giftsList.sort((a, b) => (b['giftCount'] as int).compareTo(a['giftCount'] as int));
+      giftsList.sort(
+          (a, b) => (b['giftCount'] as int).compareTo(a['giftCount'] as int));
 
       if (mounted) {
         setState(() {
@@ -200,22 +208,25 @@ class _ProfileScreenState extends State<ProfileScreen> {
         print('ID: ${gift['id']}');
         print('CollectionId: ${gift['collectionId']}');
         print('Photo field: ${gift['gifphoto']}');
-        print('Full URL: $baseUrl/api/files/${gift['collectionId']}/${gift['id']}/${gift['gifphoto']}');
+        print(
+            'Full URL: $baseUrl/api/files/${gift['collectionId']}/${gift['id']}/${gift['gifphoto']}');
       }
-
     } catch (e) {
       debugPrint('Error fetching gifts: $e');
     }
   }
+
   Future<void> _fetchUserBadges() async {
     try {
       // First fetch received badges for the specific user
       final receivedBadgesResponse = await http.get(
-        Uri.parse('$baseUrl/api/collections/recieved_badges/records?filter=(userId="$userId")'),
+        Uri.parse(
+            '$baseUrl/api/collections/recieved_badges/records?filter=(userId="$userId")'),
       );
 
       if (receivedBadgesResponse.statusCode == 200) {
-        final receivedBadges = json.decode(receivedBadgesResponse.body)['items'] as List;
+        final receivedBadges =
+            json.decode(receivedBadgesResponse.body)['items'] as List;
         List<Map<String, dynamic>> badgesList = [];
 
         // Create a Set to track unique badge names
@@ -230,7 +241,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
           // Fetch badge details
           final badgeResponse = await http.get(
-            Uri.parse('$baseUrl/api/collections/badges/records?filter=(badgeName="$badgeName")'),
+            Uri.parse(
+                '$baseUrl/api/collections/badges/records?filter=(badgeName="$badgeName")'),
           );
 
           if (badgeResponse.statusCode == 200) {
@@ -238,7 +250,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
             if (badgeItems.isNotEmpty) {
               final badgeData = badgeItems[0];
               // Make sure badgePhoto exists and is not empty
-              if (badgeData['badgePhoto'] != null && badgeData['badgePhoto'].toString().isNotEmpty) {
+              if (badgeData['badgePhoto'] != null &&
+                  badgeData['badgePhoto'].toString().isNotEmpty) {
                 badgesList.add({
                   'id': badgeData['id'],
                   'collectionId': badgeData['collectionId'],
@@ -263,6 +276,30 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
+    int? intId;
+    String displayId = 'N/A';
+
+    try {
+      if (userProfile != null && userProfile!['id'] != null) {
+        String userId = userProfile!['id'].toString();
+        intId = int.parse(userId, radix: 36);
+        displayId = intId.toString();
+        print('Converted ID: $intId');
+      }
+    } catch (e) {
+      print('Error converting ID to integer: $e');
+      // Fallback: use hash code or show original ID
+      if (userProfile != null && userProfile!['id'] != null) {
+        try {
+          intId = userProfile!['id'].toString().hashCode.abs();
+          displayId = intId.toString();
+        } catch (e2) {
+          displayId =
+              userProfile!['id'].toString(); // Show original ID as fallback
+        }
+      }
+    }
+
     if (userProfile == null) {
       return const Scaffold(
         body: Center(child: CircularProgressIndicator()),
@@ -270,7 +307,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
 
     // Fetch the cover photo URL
-    String coverPhotoUrl = userProfile!['coverphoto'] != null && userProfile!['coverphoto'].isNotEmpty
+    String coverPhotoUrl = userProfile!['coverphoto'] != null &&
+            userProfile!['coverphoto'].isNotEmpty
         ? '$baseUrl/api/files/${userProfile!['collectionId']}/${userProfile!['id']}/${userProfile!['coverphoto']}'
         : 'assets/images/default_cover.png'; // Default cover image if not available
 
@@ -306,7 +344,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               fit: BoxFit.cover,
               errorBuilder: (context, error, stackTrace) {
                 return Image.asset(
-                  'assets/images/default_cover.png', // Fallback image in case of error
+                  'assets/images/voice-room-background.jpg', // Fallback image in case of error
                   width: double.infinity,
                   height: 150,
                   fit: BoxFit.cover,
@@ -319,8 +357,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   ProfileInfo(
-                    name: '${userProfile!['firstname']} ${userProfile!['lastname']}',
-                    userId: userProfile!['id'],
+                    name:
+                        '${userProfile!['firstname']} ${userProfile!['lastname']}',
+                    userId: displayId,
                     profileImgUrl: userProfile!['avatar'].isNotEmpty
                         ? '$baseUrl/api/files/${userProfile!['collectionId']}/${userProfile!['id']}/${userProfile!['avatar']}'
                         : 'default_avatar_url',
@@ -347,13 +386,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-
   void _showViewersBottomSheet() {
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
       builder: (context) => Container(
-        decoration: BoxDecoration(
+        decoration: const BoxDecoration(
           color: darkModeEnabled ? kDarkBoxColor : Colors.white,
           borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
         ),
@@ -361,7 +399,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           mainAxisSize: MainAxisSize.min,
           children: [
             Container(
-              margin: EdgeInsets.symmetric(vertical: 10),
+              margin: const EdgeInsets.symmetric(vertical: 10),
               width: 40,
               height: 4,
               decoration: BoxDecoration(
@@ -369,9 +407,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
-
             Padding(
-              padding: EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
               child: Text(
                 'Profile Viewers',
                 style: TextStyle(
@@ -381,73 +418,74 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ),
               ),
             ),
-
-            Divider(),
-
+            const Divider(),
             Container(
               constraints: BoxConstraints(
                 maxHeight: MediaQuery.of(context).size.height * 0.5,
               ),
               child: profileViewers.isEmpty
                   ? Padding(
-                padding: EdgeInsets.all(20),
-                child: Text(
-                  'No profile viewers yet',
-                  style: TextStyle(
-                    color: Colors.grey,
-                    fontSize: 16.sp,
-                  ),
-                ),
-              )
+                      padding: const EdgeInsets.all(20),
+                      child: Text(
+                        'No profile viewers yet',
+                        style: TextStyle(
+                          color: Colors.grey,
+                          fontSize: 16.sp,
+                        ),
+                      ),
+                    )
                   : ListView.builder(
-                shrinkWrap: true,
-                padding: EdgeInsets.symmetric(horizontal: 16),
-                itemCount: profileViewers.length,
-                itemBuilder: (context, index) {
-                  final viewer = profileViewers[index];
-                  return Container(
-                    padding: EdgeInsets.symmetric(vertical: 8),
-                    child: Row(
-                      children: [
-                        Container(
-                          width: 50.w,
-                          height: 50.w,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            border: Border.all(
-                              color: Colors.grey[200]!,
-                              width: 1,
-                            ),
-                          ),
-                          child: ClipRRect(
-                            borderRadius: BorderRadius.circular(25.w),
-                            child: Image.network(
-                              '$baseUrl/api/files/${viewer['collectionId']}/${viewer['id']}/${viewer['avatar']}',
-                              fit: BoxFit.cover,
-                              errorBuilder: (context, error, stackTrace) => Icon(
-                                Icons.person,
-                                color: Colors.grey[400],
-                                size: 30.w,
+                      shrinkWrap: true,
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      itemCount: profileViewers.length,
+                      itemBuilder: (context, index) {
+                        final viewer = profileViewers[index];
+                        return Container(
+                          padding: const EdgeInsets.symmetric(vertical: 8),
+                          child: Row(
+                            children: [
+                              Container(
+                                width: 50.w,
+                                height: 50.w,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  border: Border.all(
+                                    color: Colors.grey[200]!,
+                                    width: 1,
+                                  ),
+                                ),
+                                child: ClipRRect(
+                                  borderRadius: BorderRadius.circular(25.w),
+                                  child: Image.network(
+                                    '$baseUrl/api/files/${viewer['collectionId']}/${viewer['id']}/${viewer['avatar']}',
+                                    fit: BoxFit.cover,
+                                    errorBuilder:
+                                        (context, error, stackTrace) => Icon(
+                                      Icons.person,
+                                      color: Colors.grey[400],
+                                      size: 30.w,
+                                    ),
+                                  ),
+                                ),
                               ),
-                            ),
+                              SizedBox(width: 12.w),
+                              Text(
+                                viewer['name'],
+                                style: TextStyle(
+                                  fontSize: 16.sp,
+                                  fontWeight: FontWeight.w500,
+                                  color: darkModeEnabled
+                                      ? kDarkTextColor
+                                      : kAltTextColor,
+                                ),
+                              ),
+                            ],
                           ),
-                        ),
-                        SizedBox(width: 12.w),
-                        Text(
-                          viewer['name'],
-                          style: TextStyle(
-                            fontSize: 16.sp,
-                            fontWeight: FontWeight.w500,
-                            color: darkModeEnabled ? kDarkTextColor : kAltTextColor,
-                          ),
-                        ),
-                      ],
+                        );
+                      },
                     ),
-                  );
-                },
-              ),
             ),
-            SizedBox(height: 20),
+            const SizedBox(height: 20),
           ],
         ),
       ),
@@ -465,30 +503,31 @@ class _ProfileScreenState extends State<ProfileScreen> {
           child: gifts == null
               ? const Center(child: CircularProgressIndicator())
               : gifts!.isEmpty
-              ? const Center(child: Text('No gifts'))
-              : ListView.separated(
-            scrollDirection: Axis.horizontal,
-            itemCount: gifts!.length,
-            separatorBuilder: (_, __) => SizedBox(width: 20.w),
-            itemBuilder: (context, index) {
-              final gift = gifts![index];
-              final imageUrl = '$baseUrl/api/files/${gift['collectionId']}/${gift['id']}/${gift['gifphoto']}';
-              return Column(
-                children: [
-                  Image.network(
-                    imageUrl,
-                    width: 50.w,
-                    height: 50.w,
-                    fit: BoxFit.cover,
-                    errorBuilder: (context, error, stackTrace) {
-                      return Icon(Icons.error, size: 50.w);
-                    },
-                  ),
-                  Text('x${gift['giftCount']}')
-                ],
-              );
-            },
-          ),
+                  ? const Center(child: Text('No gifts'))
+                  : ListView.separated(
+                      scrollDirection: Axis.horizontal,
+                      itemCount: gifts!.length,
+                      separatorBuilder: (_, __) => SizedBox(width: 20.w),
+                      itemBuilder: (context, index) {
+                        final gift = gifts![index];
+                        final imageUrl =
+                            '$baseUrl/api/files/${gift['collectionId']}/${gift['id']}/${gift['gifphoto']}';
+                        return Column(
+                          children: [
+                            Image.network(
+                              imageUrl,
+                              width: 50.w,
+                              height: 50.w,
+                              fit: BoxFit.cover,
+                              errorBuilder: (context, error, stackTrace) {
+                                return Icon(Icons.error, size: 50.w);
+                              },
+                            ),
+                            Text('x${gift['giftCount']}')
+                          ],
+                        );
+                      },
+                    ),
         ),
       ],
     );
@@ -525,7 +564,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   'Total number of profile visits',
                   style: TextStyle(
                     fontSize: 12.sp,
-                    color: darkModeEnabled ? Colors.grey[400] : Colors.grey[600],
+                    color:
+                        darkModeEnabled ? Colors.grey[400] : Colors.grey[600],
                   ),
                 ),
               ],
@@ -572,44 +612,47 @@ class _ProfileScreenState extends State<ProfileScreen> {
           child: badges == null
               ? const Center(child: CircularProgressIndicator())
               : badges!.isEmpty
-              ? const Center(child: Text('No badges'))
-              : ListView.separated(
-            scrollDirection: Axis.horizontal,
-            itemCount: badges!.length,
-            separatorBuilder: (_, __) => SizedBox(width: 20.w),
-            itemBuilder: (context, index) {
-              final badge = badges![index];
-              final imageUrl = '$baseUrl/api/files/${badge['collectionId']}/${badge['id']}/${badge['badgePhoto']}';
-              return Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Container(
-                    width: 50.w,
-                    height: 50.w,
-                    decoration: BoxDecoration(
-                      color: Colors.grey[200],
-                      borderRadius: BorderRadius.circular(8),
+                  ? const Center(child: Text('No badges'))
+                  : ListView.separated(
+                      scrollDirection: Axis.horizontal,
+                      itemCount: badges!.length,
+                      separatorBuilder: (_, __) => SizedBox(width: 20.w),
+                      itemBuilder: (context, index) {
+                        final badge = badges![index];
+                        final imageUrl =
+                            '$baseUrl/api/files/${badge['collectionId']}/${badge['id']}/${badge['badgePhoto']}';
+                        return Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Container(
+                              width: 50.w,
+                              height: 50.w,
+                              decoration: BoxDecoration(
+                                color: Colors.grey[200],
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: _buildBadgeImage(imageUrl),
+                            ),
+                            SizedBox(height: 5.w),
+                            SizedBox(
+                              width: 60.w,
+                              child: Text(
+                                badge['badgeName'] ?? '',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  fontSize: 10.sp,
+                                  color: darkModeEnabled
+                                      ? kDarkTextColor
+                                      : kAltTextColor,
+                                ),
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
+                        );
+                      },
                     ),
-                    child: _buildBadgeImage(imageUrl),
-                  ),
-                  SizedBox(height: 5.w),
-                  Container(
-                    width: 60.w,
-                    child: Text(
-                      badge['badgeName'] ?? '',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        fontSize: 10.sp,
-                        color: darkModeEnabled ? kDarkTextColor : kAltTextColor,
-                      ),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                ],
-              );
-            },
-          ),
         ),
       ],
     );
@@ -622,7 +665,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       return SvgPicture.network(
         imageUrl,
         fit: BoxFit.cover,
-        placeholderBuilder: (context) => Center(
+        placeholderBuilder: (context) => const Center(
           child: CircularProgressIndicator(),
         ),
       );
@@ -644,7 +687,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             child: CircularProgressIndicator(
               value: loadingProgress.expectedTotalBytes != null
                   ? loadingProgress.cumulativeBytesLoaded /
-                  loadingProgress.expectedTotalBytes!
+                      loadingProgress.expectedTotalBytes!
                   : null,
             ),
           );
