@@ -1470,7 +1470,7 @@ class LivePageState extends State<LivePage>
     WidgetsBinding.instance.addPostFrameCallback((timeStamp) {
       _initializePostFrameParallel();
       ZegoGiftManager().service.init(
-            appID: 118815176,
+            appID: 970649463,
             liveID: widget.roomID,
             localUserID: localUserID,
             localUserName: widget.username1,
@@ -1667,7 +1667,7 @@ class LivePageState extends State<LivePage>
     try {
       // Initialize ZEGO first (this must be sequential)
       ZegoGiftManager().service.init(
-            appID: 118815176,
+            appID: 970649463,
             liveID: widget.roomID,
             localUserID: localUserID,
             localUserName: widget.username1,
@@ -4637,9 +4637,9 @@ class LivePageState extends State<LivePage>
           children: [
             // Main Zego UIKit widget
             ZegoUIKitPrebuiltLiveAudioRoom(
-              appID: 118815176,
+              appID: 970649463,
               appSign:
-                  '281551d36b1f77d9e7b8642b39e8bbbedd1fababf2f1783681f05498aa64e577',
+                  '208a410cd46ba9cc218ebfbf27e366c1247991300164ae66512cce6eab7ec74c',
               userID: localUserID,
               userName: widget.username1,
               roomID: widget.roomID,
