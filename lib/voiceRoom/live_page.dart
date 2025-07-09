@@ -5281,8 +5281,9 @@ class LivePageState extends State<LivePage>
       context: context,
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
+      useSafeArea: true,
       builder: (context) => Container(
-        height: MediaQuery.of(context).size.height * 0.8,
+        height: MediaQuery.of(context).size.height,
         decoration: BoxDecoration(
           color: Colors.black.withOpacity(0.9),
           borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
@@ -5535,6 +5536,37 @@ class LivePageState extends State<LivePage>
     );
   }
 
+  // Future<void> _handleUserTap(OnlineUser user, bool isCurrentUser) async {
+  //   if (!isCurrentUser) {
+  //     try {
+  //       final canView = await checkAndRecordProfileView(widget.userId, user.id);
+
+  //       if (canView && mounted) {
+  //         Navigator.pop(context); // Close bottom sheet
+
+  //         showDialog(
+  //           context: context,
+  //           barrierDismissible: true,
+  //           barrierColor: Colors.black.withOpacity(0.85),
+  //           builder: (BuildContext context) {
+  //             return ProfileScreenView(
+  //               viewedUserId: user.id,
+  //               viewerUserId: widget.userId,
+  //             );
+  //           },
+  //         );
+  //       }
+  //     } catch (e) {
+  //       print('Error showing profile: $e');
+  //       if (mounted) {
+  //         ScaffoldMessenger.of(context).showSnackBar(
+  //           const SnackBar(content: Text('Unable to load profile')),
+  //         );
+  //       }
+  //     }
+  //   }
+  // }
+
   Future<void> _handleUserTap(OnlineUser user, bool isCurrentUser) async {
     if (!isCurrentUser) {
       try {
@@ -5543,16 +5575,17 @@ class LivePageState extends State<LivePage>
         if (canView && mounted) {
           Navigator.pop(context); // Close bottom sheet
 
-          showDialog(
-            context: context,
-            barrierDismissible: true,
-            barrierColor: Colors.black.withOpacity(0.85),
-            builder: (BuildContext context) {
-              return ProfileScreenView(
-                viewedUserId: user.id,
-                viewerUserId: widget.userId,
-              );
-            },
+          // Navigate to full-screen profile instead of dialog
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (BuildContext context) {
+                return ProfileScreenView(
+                  viewedUserId: user.id,
+                  viewerUserId: widget.userId,
+                );
+              },
+            ),
           );
         }
       } catch (e) {

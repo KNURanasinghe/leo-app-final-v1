@@ -20,10 +20,10 @@ class ProfileScreenView extends StatefulWidget {
   final String viewerUserId;
 
   const ProfileScreenView({
-    Key? key,
+    super.key,
     required this.viewedUserId,
     required this.viewerUserId,
-  }): super(key: key);
+  });
 
   @override
   _ProfileScreenState createState() => _ProfileScreenState();
@@ -58,18 +58,18 @@ class _ProfileScreenState extends State<ProfileScreenView> {
       } finally {
         if (mounted) {
           setState(() {
-            isLoading = false; // Ensure state updates when API calls complete
+            isLoading = false;
           });
         }
       }
     }
   }
 
-
   Future<void> _fetchUserProfile() async {
     try {
       final response = await http.get(
-        Uri.parse('http://145.223.21.62:8090/api/collections/users/records/${widget.viewedUserId}'),
+        Uri.parse(
+            'http://145.223.21.62:8090/api/collections/users/records/${widget.viewedUserId}'),
       );
       if (response.statusCode == 200) {
         setState(() {
@@ -108,7 +108,8 @@ class _ProfileScreenState extends State<ProfileScreenView> {
 
       // Fetch received gifts
       final receivedResponse = await http.get(
-        Uri.parse('$baseUrl/api/collections/sending_recieving_gifts/records?filter=(reciever_user_id="${widget.viewedUserId}")'),
+        Uri.parse(
+            '$baseUrl/api/collections/sending_recieving_gifts/records?filter=(reciever_user_id="${widget.viewedUserId}")'),
       );
 
       if (receivedResponse.statusCode != 200) {
@@ -123,7 +124,8 @@ class _ProfileScreenState extends State<ProfileScreenView> {
         final count = received['gift_count'] as int;
 
         if (giftsMap.containsKey(giftName)) {
-          giftsMap[giftName]!['count'] = (giftsMap[giftName]!['count'] as int) + count;
+          giftsMap[giftName]!['count'] =
+              (giftsMap[giftName]!['count'] as int) + count;
         }
       }
 
@@ -131,17 +133,22 @@ class _ProfileScreenState extends State<ProfileScreenView> {
       List<Map<String, dynamic>> giftsList = giftsMap.values
           .where((gift) => gift['count'] > 0)
           .map((gift) => {
-        'id': gift['id'],
-        'collectionId': gift['collectionId'],
-        // Try all possible field names for gift photo
-        'gifphoto': gift['gift_photo'] ?? gift['giftphoto'] ?? gift['gifPhoto'] ?? gift['photo'] ?? '',
-        'giftCount': gift['count'],
-        'giftName': gift['giftname'],
-      })
+                'id': gift['id'],
+                'collectionId': gift['collectionId'],
+                // Try all possible field names for gift photo
+                'gifphoto': gift['gift_photo'] ??
+                    gift['giftphoto'] ??
+                    gift['gifPhoto'] ??
+                    gift['photo'] ??
+                    '',
+                'giftCount': gift['count'],
+                'giftName': gift['giftname'],
+              })
           .toList();
 
       // Sort by count
-      giftsList.sort((a, b) => (b['giftCount'] as int).compareTo(a['giftCount'] as int));
+      giftsList.sort(
+          (a, b) => (b['giftCount'] as int).compareTo(a['giftCount'] as int));
 
       if (mounted) {
         setState(() {
@@ -156,22 +163,25 @@ class _ProfileScreenState extends State<ProfileScreenView> {
         print('ID: ${gift['id']}');
         print('CollectionId: ${gift['collectionId']}');
         print('Photo field: ${gift['gifphoto']}');
-        print('Full URL: $baseUrl/api/files/${gift['collectionId']}/${gift['id']}/${gift['gifphoto']}');
+        print(
+            'Full URL: $baseUrl/api/files/${gift['collectionId']}/${gift['id']}/${gift['gifphoto']}');
       }
-
     } catch (e) {
       debugPrint('Error fetching gifts: $e');
     }
   }
+
   Future<void> _fetchUserBadges() async {
     try {
       // First fetch received badges for the specific user
       final receivedBadgesResponse = await http.get(
-        Uri.parse('$baseUrl/api/collections/recieved_badges/records?filter=(userId="${widget.viewedUserId}")'),
+        Uri.parse(
+            '$baseUrl/api/collections/recieved_badges/records?filter=(userId="${widget.viewedUserId}")'),
       );
 
       if (receivedBadgesResponse.statusCode == 200) {
-        final receivedBadges = json.decode(receivedBadgesResponse.body)['items'] as List;
+        final receivedBadges =
+            json.decode(receivedBadgesResponse.body)['items'] as List;
         List<Map<String, dynamic>> badgesList = [];
 
         // Create a Set to track unique badge names
@@ -186,7 +196,8 @@ class _ProfileScreenState extends State<ProfileScreenView> {
 
           // Fetch badge details
           final badgeResponse = await http.get(
-            Uri.parse('$baseUrl/api/collections/badges/records?filter=(badgeName="$badgeName")'),
+            Uri.parse(
+                '$baseUrl/api/collections/badges/records?filter=(badgeName="$badgeName")'),
           );
 
           if (badgeResponse.statusCode == 200) {
@@ -194,7 +205,8 @@ class _ProfileScreenState extends State<ProfileScreenView> {
             if (badgeItems.isNotEmpty) {
               final badgeData = badgeItems[0];
               // Make sure badgePhoto exists and is not empty
-              if (badgeData['badgePhoto'] != null && badgeData['badgePhoto'].toString().isNotEmpty) {
+              if (badgeData['badgePhoto'] != null &&
+                  badgeData['badgePhoto'].toString().isNotEmpty) {
                 badgesList.add({
                   'id': badgeData['id'],
                   'collectionId': badgeData['collectionId'],
@@ -221,41 +233,40 @@ class _ProfileScreenState extends State<ProfileScreenView> {
   Widget build(BuildContext context) {
     // Loading state
     if (isLoading || userProfile == null) {
-      return Dialog(
-        backgroundColor: Colors.black87,
-        child: Container(
-          width: MediaQuery.of(context).size.width * 0.9,
-          height: MediaQuery.of(context).size.height * 0.8,
-          padding: EdgeInsets.all(20),
-          child: Center(
-            child: CircularProgressIndicator(
-              color: Colors.white,
-            ),
+      return Scaffold(
+        backgroundColor: Colors.black,
+        body: SafeArea(
+          child: Column(
+            children: [
+              _buildHeader(),
+              const Expanded(
+                child: Center(
+                  child: CircularProgressIndicator(
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+            ],
           ),
         ),
       );
     }
 
     // Get cover photo URL with fallback
-    final String coverPhotoUrl = userProfile!['coverphoto'] != null && userProfile!['coverphoto'].isNotEmpty
+    final String coverPhotoUrl = userProfile!['coverphoto'] != null &&
+            userProfile!['coverphoto'].isNotEmpty
         ? '$baseUrl/api/files/${userProfile!['collectionId']}/${userProfile!['id']}/${userProfile!['coverphoto']}'
         : 'assets/images/default_cover.png';
 
     // Get avatar URL with fallback
-    final String avatarUrl = userProfile!['avatar'] != null && userProfile!['avatar'].isNotEmpty
+    final String avatarUrl = userProfile!['avatar'] != null &&
+            userProfile!['avatar'].isNotEmpty
         ? '$baseUrl/api/files/${userProfile!['collectionId']}/${userProfile!['id']}/${userProfile!['avatar']}'
         : 'assets/images/default_avatar.png';
 
-    return Dialog(
-      backgroundColor: Colors.transparent,
-      insetPadding: EdgeInsets.symmetric(horizontal: 16),
-      child: Container(
-        width: MediaQuery.of(context).size.width * 0.9,
-        height: MediaQuery.of(context).size.height * 0.8,
-        decoration: BoxDecoration(
-          color: Colors.black.withOpacity(0.95),
-          borderRadius: BorderRadius.circular(20),
-        ),
+    return Scaffold(
+      backgroundColor: Colors.black,
+      body: SafeArea(
         child: Column(
           children: [
             // Header
@@ -264,7 +275,7 @@ class _ProfileScreenState extends State<ProfileScreenView> {
             // Scrollable Content
             Expanded(
               child: SingleChildScrollView(
-                physics: BouncingScrollPhysics(),
+                physics: const BouncingScrollPhysics(),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -279,6 +290,9 @@ class _ProfileScreenState extends State<ProfileScreenView> {
 
                     // Badges Section
                     _buildBadgesSection(),
+
+                    // Add bottom padding for better scrolling
+                    const SizedBox(height: 20),
                   ],
                 ),
               ),
@@ -290,12 +304,12 @@ class _ProfileScreenState extends State<ProfileScreenView> {
   }
 
   Widget _buildHeader() {
-    return Padding(
-      padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(
+          const Text(
             'Profile',
             style: TextStyle(
               color: Colors.white,
@@ -304,7 +318,7 @@ class _ProfileScreenState extends State<ProfileScreenView> {
             ),
           ),
           IconButton(
-            icon: Icon(Icons.close, color: Colors.white),
+            icon: const Icon(Icons.close, color: Colors.white),
             onPressed: () => Navigator.of(context).pop(),
             splashRadius: 24,
           ),
@@ -317,22 +331,16 @@ class _ProfileScreenState extends State<ProfileScreenView> {
     return Stack(
       clipBehavior: Clip.none,
       children: [
-        // Cover Photo
-        Container(
+        // Cover Photo - Made taller for better full-screen experience
+        SizedBox(
           width: double.infinity,
-          height: 150,
-          child: ClipRRect(
-            borderRadius: BorderRadius.only(
-              topLeft: Radius.circular(20),
-              topRight: Radius.circular(20),
-            ),
-            child: Image.network(
-              coverPhotoUrl,
-              fit: BoxFit.cover,
-              errorBuilder: (_, __, ___) => Container(
-                color: Colors.grey[900],
-                child: Icon(Icons.image, color: Colors.white24, size: 40),
-              ),
+          height: 200, // Increased height
+          child: Image.network(
+            coverPhotoUrl,
+            fit: BoxFit.cover,
+            errorBuilder: (_, __, ___) => Container(
+              color: Colors.grey[900],
+              child: const Icon(Icons.image, color: Colors.white24, size: 40),
             ),
           ),
         ),
@@ -347,7 +355,7 @@ class _ProfileScreenState extends State<ProfileScreenView> {
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               border: Border.all(color: Colors.white, width: 3),
-              boxShadow: [
+              boxShadow: const [
                 BoxShadow(
                   color: Colors.black26,
                   blurRadius: 10,
@@ -362,7 +370,8 @@ class _ProfileScreenState extends State<ProfileScreenView> {
                 fit: BoxFit.cover,
                 errorBuilder: (_, __, ___) => Container(
                   color: Colors.grey[800],
-                  child: Icon(Icons.person, color: Colors.white70, size: 50),
+                  child:
+                      const Icon(Icons.person, color: Colors.white70, size: 50),
                 ),
               ),
             ),
@@ -374,30 +383,31 @@ class _ProfileScreenState extends State<ProfileScreenView> {
 
   Widget _buildProfileInfo() {
     return Padding(
-      padding: EdgeInsets.fromLTRB(20, 60, 20, 20),
+      padding: const EdgeInsets.fromLTRB(20, 60, 20, 20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
             '${userProfile!['firstname']} ${userProfile!['lastname']}',
-            style: TextStyle(
+            style: const TextStyle(
               color: Colors.white,
               fontSize: 24,
               fontWeight: FontWeight.bold,
             ),
           ),
-          if (userProfile!['moto'] != null && userProfile!['moto'].isNotEmpty) ...[
-            SizedBox(height: 8),
+          if (userProfile!['moto'] != null &&
+              userProfile!['moto'].isNotEmpty) ...[
+            const SizedBox(height: 8),
             Text(
               userProfile!['moto'],
-              style: TextStyle(
+              style: const TextStyle(
                 color: Colors.white70,
                 fontSize: 14,
               ),
             ),
           ],
-          SizedBox(height: 20),
-          Divider(color: Colors.white24),
+          const SizedBox(height: 20),
+          const Divider(color: Colors.white24),
         ],
       ),
     );
@@ -405,11 +415,11 @@ class _ProfileScreenState extends State<ProfileScreenView> {
 
   Widget _buildGiftsSection() {
     return Padding(
-      padding: EdgeInsets.symmetric(horizontal: 20),
+      padding: const EdgeInsets.symmetric(horizontal: 20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
+          const Text(
             'Gifts',
             style: TextStyle(
               color: Colors.white,
@@ -417,29 +427,34 @@ class _ProfileScreenState extends State<ProfileScreenView> {
               fontWeight: FontWeight.bold,
             ),
           ),
-          SizedBox(height: 12),
+          const SizedBox(height: 12),
           SizedBox(
             height: 75.w,
             child: gifts == null
-                ? Center(child: CircularProgressIndicator(color: Colors.white))
+                ? const Center(
+                    child: CircularProgressIndicator(color: Colors.white))
                 : gifts!.isEmpty
-                ? Center(child: Text('No gifts', style: TextStyle(color: Colors.white70)))
-                : ListView.separated(
-              scrollDirection: Axis.horizontal,
-              itemCount: gifts!.length,
-              separatorBuilder: (_, __) => SizedBox(width: 16.w),
-              itemBuilder: (context, index) => _buildGiftItem(gifts![index]),
-            ),
+                    ? const Center(
+                        child: Text('No gifts',
+                            style: TextStyle(color: Colors.white70)))
+                    : ListView.separated(
+                        scrollDirection: Axis.horizontal,
+                        itemCount: gifts!.length,
+                        separatorBuilder: (_, __) => SizedBox(width: 16.w),
+                        itemBuilder: (context, index) =>
+                            _buildGiftItem(gifts![index]),
+                      ),
           ),
-          SizedBox(height: 20),
-          Divider(color: Colors.white24),
+          const SizedBox(height: 20),
+          const Divider(color: Colors.white24),
         ],
       ),
     );
   }
 
   Widget _buildGiftItem(Map<String, dynamic> gift) {
-    final imageUrl = '$baseUrl/api/files/${gift['collectionId']}/${gift['id']}/${gift['gifphoto']}';
+    final imageUrl =
+        '$baseUrl/api/files/${gift['collectionId']}/${gift['id']}/${gift['gifphoto']}';
     return Column(
       children: [
         Container(
@@ -454,7 +469,7 @@ class _ProfileScreenState extends State<ProfileScreenView> {
             child: Image.network(
               imageUrl,
               fit: BoxFit.cover,
-              errorBuilder: (_, __, ___) => Icon(
+              errorBuilder: (_, __, ___) => const Icon(
                 Icons.card_giftcard,
                 color: Colors.white70,
               ),
@@ -475,11 +490,11 @@ class _ProfileScreenState extends State<ProfileScreenView> {
 
   Widget _buildBadgesSection() {
     return Padding(
-      padding: EdgeInsets.symmetric(horizontal: 20),
+      padding: const EdgeInsets.symmetric(horizontal: 20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
+          const Text(
             'Badges',
             style: TextStyle(
               color: Colors.white,
@@ -487,19 +502,23 @@ class _ProfileScreenState extends State<ProfileScreenView> {
               fontWeight: FontWeight.bold,
             ),
           ),
-          SizedBox(height: 12),
+          const SizedBox(height: 12),
           SizedBox(
             height: 100.w,
             child: badges == null
-                ? Center(child: CircularProgressIndicator(color: Colors.white))
+                ? const Center(
+                    child: CircularProgressIndicator(color: Colors.white))
                 : badges!.isEmpty
-                ? Center(child: Text('No badges', style: TextStyle(color: Colors.white70)))
-                : ListView.separated(
-              scrollDirection: Axis.horizontal,
-              itemCount: badges!.length,
-              separatorBuilder: (_, __) => SizedBox(width: 16.w),
-              itemBuilder: (context, index) => _buildBadgeItem(badges![index]),
-            ),
+                    ? const Center(
+                        child: Text('No badges',
+                            style: TextStyle(color: Colors.white70)))
+                    : ListView.separated(
+                        scrollDirection: Axis.horizontal,
+                        itemCount: badges!.length,
+                        separatorBuilder: (_, __) => SizedBox(width: 16.w),
+                        itemBuilder: (context, index) =>
+                            _buildBadgeItem(badges![index]),
+                      ),
           ),
         ],
       ),
@@ -507,7 +526,8 @@ class _ProfileScreenState extends State<ProfileScreenView> {
   }
 
   Widget _buildBadgeItem(Map<String, dynamic> badge) {
-    final imageUrl = '$baseUrl/api/files/${badge['collectionId']}/${badge['id']}/${badge['badgePhoto']}';
+    final imageUrl =
+        '$baseUrl/api/files/${badge['collectionId']}/${badge['id']}/${badge['badgePhoto']}';
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -524,7 +544,7 @@ class _ProfileScreenState extends State<ProfileScreenView> {
           ),
         ),
         SizedBox(height: 5.h),
-        Container(
+        SizedBox(
           width: 60.w,
           child: Text(
             badge['badgeName'] ?? '',
@@ -548,7 +568,7 @@ class _ProfileScreenState extends State<ProfileScreenView> {
       return SvgPicture.network(
         imageUrl,
         fit: BoxFit.cover,
-        placeholderBuilder: (context) => Center(
+        placeholderBuilder: (context) => const Center(
           child: CircularProgressIndicator(),
         ),
       );
@@ -570,7 +590,7 @@ class _ProfileScreenState extends State<ProfileScreenView> {
             child: CircularProgressIndicator(
               value: loadingProgress.expectedTotalBytes != null
                   ? loadingProgress.cumulativeBytesLoaded /
-                  loadingProgress.expectedTotalBytes!
+                      loadingProgress.expectedTotalBytes!
                   : null,
             ),
           );
