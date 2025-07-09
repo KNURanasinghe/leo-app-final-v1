@@ -1270,8 +1270,7 @@ class _DemoChattingPageState extends State<DemoChattingMessageListPage> {
                         color: Colors.white,
                         padding: EdgeInsets.only(
                           bottom: MediaQuery.of(context).viewInsets.bottom +
-                              MediaQuery.of(context).padding.bottom +
-                              16,
+                              MediaQuery.of(context).padding.bottom,
                         ),
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.spaceEvenly,

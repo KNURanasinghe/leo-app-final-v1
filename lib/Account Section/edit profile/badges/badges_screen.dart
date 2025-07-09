@@ -43,6 +43,30 @@ class _BadgesScreenState extends State<BadgesScreen> {
     }
   }
 
+  String _formatIdToInteger(String userId) {
+    int? intId;
+    String displayId = 'N/A';
+
+    try {
+      if (userId.isNotEmpty) {
+        intId = int.parse(userId, radix: 36);
+        displayId = intId.toString();
+        print('Converted ID: $intId');
+      }
+    } catch (e) {
+      print('Error converting ID to integer: $e');
+      // Fallback: use hash code or show original ID
+      try {
+        intId = userId.hashCode.abs();
+        displayId = intId.toString();
+      } catch (e2) {
+        displayId = userId; // Show original ID as fallback
+      }
+    }
+
+    return displayId;
+  }
+
   Future<void> fetchUserAvatar() async {
     try {
       final response = await http.get(
@@ -65,11 +89,13 @@ class _BadgesScreenState extends State<BadgesScreen> {
     try {
       // First fetch received badges for the specific user
       final receivedBadgesResponse = await http.get(
-        Uri.parse('$baseUrl/api/collections/recieved_badges/records?filter=(userId="$userId")'),
+        Uri.parse(
+            '$baseUrl/api/collections/recieved_badges/records?filter=(userId="$userId")'),
       );
 
       if (receivedBadgesResponse.statusCode == 200) {
-        final receivedBadges = json.decode(receivedBadgesResponse.body)['items'] as List;
+        final receivedBadges =
+            json.decode(receivedBadgesResponse.body)['items'] as List;
         List<Map<String, dynamic>> badgesList = [];
 
         // Create a Set to track unique badge names
@@ -84,7 +110,8 @@ class _BadgesScreenState extends State<BadgesScreen> {
 
           // Fetch badge details
           final badgeResponse = await http.get(
-            Uri.parse('$baseUrl/api/collections/badges/records?filter=(badgeName="$badgeName")'),
+            Uri.parse(
+                '$baseUrl/api/collections/badges/records?filter=(badgeName="$badgeName")'),
           );
 
           if (badgeResponse.statusCode == 200) {
@@ -92,7 +119,8 @@ class _BadgesScreenState extends State<BadgesScreen> {
             if (badgeItems.isNotEmpty) {
               final badgeData = badgeItems[0];
               // Make sure badgePhoto exists and is not empty
-              if (badgeData['badgePhoto'] != null && badgeData['badgePhoto'].toString().isNotEmpty) {
+              if (badgeData['badgePhoto'] != null &&
+                  badgeData['badgePhoto'].toString().isNotEmpty) {
                 badgesList.add({
                   'id': badgeData['id'],
                   'collectionId': badgeData['collectionId'],
@@ -137,7 +165,7 @@ class _BadgesScreenState extends State<BadgesScreen> {
             if (userId != null && name != null)
               ProfileInfo(
                 name: name!,
-                userId: userId!,
+                userId: _formatIdToInteger(userId!),
                 profileImgUrl: profileImgUrl ?? 'assets/images/avatar.png',
               ),
             SizedBox(height: 30.w),
@@ -163,7 +191,8 @@ class _BadgesScreenState extends State<BadgesScreen> {
                 itemBuilder: (context, index) {
                   final badge = badges[index];
                   return BadgeGridItem(
-                    icon: '$baseUrl/api/files/${badge['collectionId']}/${badge['id']}/${badge['badgePhoto']}',
+                    icon:
+                        '$baseUrl/api/files/${badge['collectionId']}/${badge['id']}/${badge['badgePhoto']}',
                     text: badge['badgeName'],
                   );
                 },

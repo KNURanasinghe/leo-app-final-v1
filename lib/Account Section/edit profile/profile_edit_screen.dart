@@ -18,11 +18,8 @@ import 'widgets/text_with_arrow.dart';
 class EditProfileScreen extends StatefulWidget {
   final String userId;
   final String firstname;
-  const EditProfileScreen({
-    super.key,
-    required this.firstname,
-    required this.userId
-  });
+  const EditProfileScreen(
+      {super.key, required this.firstname, required this.userId});
 
   @override
   State<EditProfileScreen> createState() => _EditProfileScreenState();
@@ -43,9 +40,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
   Future<void> fetchUserData() async {
     try {
-      final response = await http.get(
-          Uri.parse('http://145.223.21.62:8090/api/collections/users/records/${widget.userId}')
-      );
+      final response = await http.get(Uri.parse(
+          'http://145.223.21.62:8090/api/collections/users/records/${widget.userId}'));
 
       if (response.statusCode == 200) {
         setState(() {
@@ -88,7 +84,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   Future<void> updateBirthday(DateTime birthday) async {
     try {
       final response = await http.patch(
-        Uri.parse('http://145.223.21.62:8090/api/collections/users/records/${widget.userId}'),
+        Uri.parse(
+            'http://145.223.21.62:8090/api/collections/users/records/${widget.userId}'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({'birthday': birthday.toUtc().toIso8601String()}),
       );
@@ -109,11 +106,14 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         final ext = extension(pickedFile.path);
         var request = http.MultipartRequest(
           'PATCH',
-          Uri.parse('http://145.223.21.62:8090/api/collections/users/records/${widget.userId}'),
+          Uri.parse(
+              'http://145.223.21.62:8090/api/collections/users/records/${widget.userId}'),
         );
 
         request.files.add(http.MultipartFile.fromBytes(
-          isCoverPhoto ? 'coverphoto' : 'avatar', // Determine field name based on type
+          isCoverPhoto
+              ? 'coverphoto'
+              : 'avatar', // Determine field name based on type
           bytes,
           filename: 'coverphoto$ext',
         ));
@@ -206,7 +206,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   Future<void> _saveCountryToDatabase(Country country) async {
     try {
       final response = await http.patch(
-        Uri.parse('http://145.223.21.62:8090/api/collections/users/records/${widget.userId}'),
+        Uri.parse(
+            'http://145.223.21.62:8090/api/collections/users/records/${widget.userId}'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
           'country': country.name,
@@ -222,8 +223,33 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       print('Error updating country: $e');
     }
   }
+
   Future<String> getuserId() async {
-   return "";
+    return "";
+  }
+
+  String _formatIdToInteger(String userId) {
+    int? intId;
+    String displayId = 'N/A';
+
+    try {
+      if (userId.isNotEmpty) {
+        intId = int.parse(userId, radix: 36);
+        displayId = intId.toString();
+        print('Converted ID: $intId');
+      }
+    } catch (e) {
+      print('Error converting ID to integer: $e');
+      // Fallback: use hash code or show original ID
+      try {
+        intId = userId.hashCode.abs();
+        displayId = intId.toString();
+      } catch (e2) {
+        displayId = userId; // Show original ID as fallback
+      }
+    }
+
+    return displayId;
   }
 
   @override
@@ -242,200 +268,217 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       ),
       body: BodyContainer(
         padding: const EdgeInsets.all(20.0),
-        child: Column(
-          children: [
-            Material(
-              color: darkModeEnabled ? kDarkBoxColor : kLightBlueColor,
-              borderRadius: BorderRadius.circular(10.w),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(vertical: 20.0, horizontal: 10.0),
-                child: Column(
-                  children: [
-                    ProfileEditTile(
-                      icon: 'assets/icons/ic-user.svg',
-                      text: 'Avatar',
-                      onTap: () => pickAndUploadImage(), // Call the method to pick and upload image
-                      endWidget: ClipRRect(
-                        borderRadius: BorderRadius.circular(10.w),
-                        child: userData?.containsKey('avatar') ?? false && userData!['avatar'] != null
-                            ? Image.network(
-                          'http://145.223.21.62:8090/api/files/${userData!['collectionId']}/${userData!['id']}/${userData!['avatar']}',
-                          width: 35.w, // Set a fixed width
-                          height: 35.w, // Set a fixed height
-                          fit: BoxFit.cover,
-                          errorBuilder: (context, error, stackTrace) {
-                            // Handle image loading error
-                            return Container(
-                              width: 35.w,
-                              height: 35.w,
-                              decoration: BoxDecoration(
-                                color: Colors.grey[300], // Placeholder color
-                                borderRadius: BorderRadius.circular(10.w),
-                              ),
-                              child: Icon(Icons.error, color: Colors.red), // Optional error icon
-                            );
-                          },
-                        )
-                            : Container(
-                          width: 35.w, // Set a fixed width
-                          height: 35.w, // Set a fixed height
-                          decoration: BoxDecoration(
-                            color: Colors.grey[300], // Placeholder color
-                            borderRadius: BorderRadius.circular(10.w),
-                          ),
-                          child: Icon(Icons.image, color: Colors.grey), // Placeholder icon
+        child: SingleChildScrollView(
+          child: Column(
+            children: [
+              Material(
+                color: darkModeEnabled ? kDarkBoxColor : kLightBlueColor,
+                borderRadius: BorderRadius.circular(10.w),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                      vertical: 20.0, horizontal: 10.0),
+                  child: Column(
+                    children: [
+                      ProfileEditTile(
+                        icon: 'assets/icons/ic-user.svg',
+                        text: 'Avatar',
+                        onTap: () =>
+                            pickAndUploadImage(), // Call the method to pick and upload image
+                        endWidget: ClipRRect(
+                          borderRadius: BorderRadius.circular(10.w),
+                          child: userData?.containsKey('avatar') ??
+                                  false && userData!['avatar'] != null
+                              ? Image.network(
+                                  'http://145.223.21.62:8090/api/files/${userData!['collectionId']}/${userData!['id']}/${userData!['avatar']}',
+                                  width: 35.w, // Set a fixed width
+                                  height: 35.w, // Set a fixed height
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (context, error, stackTrace) {
+                                    // Handle image loading error
+                                    return Container(
+                                      width: 35.w,
+                                      height: 35.w,
+                                      decoration: BoxDecoration(
+                                        color: Colors
+                                            .grey[300], // Placeholder color
+                                        borderRadius:
+                                            BorderRadius.circular(10.w),
+                                      ),
+                                      child: const Icon(Icons.error,
+                                          color: Colors
+                                              .red), // Optional error icon
+                                    );
+                                  },
+                                )
+                              : Container(
+                                  width: 35.w, // Set a fixed width
+                                  height: 35.w, // Set a fixed height
+                                  decoration: BoxDecoration(
+                                    color:
+                                        Colors.grey[300], // Placeholder color
+                                    borderRadius: BorderRadius.circular(10.w),
+                                  ),
+                                  child: const Icon(Icons.image,
+                                      color: Colors.grey), // Placeholder icon
+                                ),
                         ),
                       ),
-                    ),
-                    const Divider(
-                      color: kSeperatorColor,
-                      indent: 20.0,
-                      endIndent: 20.0,
-                    ),
-
-                    ProfileEditTile(
-                      icon: 'assets/icons/ic-image.svg', // Use appropriate icon
-                      text: 'Cover Photo',
-                      onTap: () => pickAndUploadImage(isCoverPhoto: true),
-                      endWidget: ClipRRect(
-                        borderRadius: BorderRadius.circular(10.w),
-                        child: userData?.containsKey('coverphoto') ?? false && userData!['coverphoto'] != null
-                            ? Image.network(
-                          'http://145.223.21.62:8090/api/files/${userData!['collectionId']}/${userData!['id']}/${userData!['coverphoto']}',
-                          width: 35.w, // Set a fixed width
-                          height: 35.w, // Set a fixed height
-                          fit: BoxFit.cover,
-                          errorBuilder: (context, error, stackTrace) {
-                            // Handle image loading error
-                            return Text("Not Set");
-                          },
-                        )
-                            : Container(
-                          width: 100.w, // Set a fixed width
-                          height: 100.w, // Set a fixed height
-                          decoration: BoxDecoration(
-                            color: Colors.grey[300], // Placeholder color
-                            borderRadius: BorderRadius.circular(10.w),
-                          ),
-                          child: Icon(Icons.image, color: Colors.grey), // Placeholder icon
+                      const Divider(
+                        color: kSeperatorColor,
+                        indent: 20.0,
+                        endIndent: 20.0,
+                      ),
+                      ProfileEditTile(
+                        icon:
+                            'assets/icons/ic-image.svg', // Use appropriate icon
+                        text: 'Cover Photo',
+                        onTap: () => pickAndUploadImage(isCoverPhoto: true),
+                        endWidget: ClipRRect(
+                          borderRadius: BorderRadius.circular(10.w),
+                          child: userData?.containsKey('coverphoto') ??
+                                  false && userData!['coverphoto'] != null
+                              ? Image.network(
+                                  'http://145.223.21.62:8090/api/files/${userData!['collectionId']}/${userData!['id']}/${userData!['coverphoto']}',
+                                  width: 35.w, // Set a fixed width
+                                  height: 35.w, // Set a fixed height
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (context, error, stackTrace) {
+                                    // Handle image loading error
+                                    return const Text("Not Set");
+                                  },
+                                )
+                              : Container(
+                                  width: 100.w, // Set a fixed width
+                                  height: 100.w, // Set a fixed height
+                                  decoration: BoxDecoration(
+                                    color:
+                                        Colors.grey[300], // Placeholder color
+                                    borderRadius: BorderRadius.circular(10.w),
+                                  ),
+                                  child: const Icon(Icons.image,
+                                      color: Colors.grey), // Placeholder icon
+                                ),
                         ),
                       ),
-                    ),
-
-                  ],
+                    ],
+                  ),
                 ),
               ),
-            ),
-            SizedBox(height: 20.w),
-            Material(
-              color: darkModeEnabled ? kDarkBoxColor : kLightBlueColor,
-              borderRadius: BorderRadius.circular(10.w),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(vertical: 20.0, horizontal: 10.0),
-                child: Column(
-                  children: [
-                    ProfileEditTile(
-                      icon: 'assets/icons/ic-user.svg',
-                      text: 'Name',
-                      onTap: () => Navigator.pushNamed(context, 'edit-name'),
-                      endWidget: TextWithArrow(
-                        text: userData?['firstname'] ?? '',
+              SizedBox(height: 20.w),
+              Material(
+                color: darkModeEnabled ? kDarkBoxColor : kLightBlueColor,
+                borderRadius: BorderRadius.circular(10.w),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                      vertical: 20.0, horizontal: 10.0),
+                  child: Column(
+                    children: [
+                      ProfileEditTile(
+                        icon: 'assets/icons/ic-user.svg',
+                        text: 'Name',
+                        onTap: () => Navigator.pushNamed(context, 'edit-name'),
+                        endWidget: TextWithArrow(
+                          text: userData?['firstname'] ?? '',
+                        ),
                       ),
-                    ),
-                    _buildDivider(),
-                    ProfileEditTile(
-                      icon: 'assets/icons/ic-info.svg',
-                      text: 'ID',
-                      onTap: () {},
-                      endWidget: TextWithArrow(
-                        text: widget.userId,
-                        showArrow: false,
+                      _buildDivider(),
+                      ProfileEditTile(
+                        icon: 'assets/icons/ic-info.svg',
+                        text: 'ID',
+                        onTap: () {},
+                        endWidget: TextWithArrow(
+                          text: _formatIdToInteger(widget.userId),
+                          showArrow: false,
+                        ),
                       ),
-                    ),
-                    _buildDivider(),
-                    ProfileEditTile(
-                      icon: 'assets/icons/ic-users.svg',
-                      text: 'Gender',
-                      onTap: () {
+                      _buildDivider(),
+                      ProfileEditTile(
+                        icon: 'assets/icons/ic-users.svg',
+                        text: 'Gender',
+                        onTap: () {
+                          showDialog(
+                            context: context,
+                            useSafeArea: true,
+                            builder: (BuildContext context) {
+                              return const AlertDialog(
+                                surfaceTintColor: Colors.transparent,
+                                content: GenderSelectorDialog(),
+                              );
+                            },
+                          );
+                        },
+                        endWidget: TextWithArrow(
+                          text: userData?['gender'] ?? 'Not set',
+                        ),
+                      ),
+                      _buildDivider(),
+                      ProfileEditTile(
+                        icon: 'assets/icons/ic-flag.svg',
+                        text: 'Country',
+                        onTap: () {
+                          showCountryPicker(
+                            context: context,
+                            showPhoneCode: false,
+                            onSelect: _saveCountryToDatabase,
+                          );
+                        },
+                        endWidget: TextWithArrow(
+                          text: userData?['country'] ?? 'Not set',
+                        ),
+                      ),
+                      _buildDivider(),
+                      // ProfileEditTile(
+                      //   icon: 'assets/icons/ic_calendar.svg',
+                      //   text: 'Birthday',
+                      //   onTap: () => selectDate(context),
+                      //   endWidget: TextWithArrow(
+                      //     text: userData?['birthday'] != null
+                      //         ? DateTime.parse(userData!['birthday'])
+                      //         .toLocal()
+                      //         .toString()
+                      //         .split(' ')[0]
+                      //         : 'Not set',
+                      //   ),
+                      // ),
+                      ProfileEditTile(
+                        icon: 'assets/icons/ic_calendar.svg',
+                        text: 'Birthday',
+                        onTap: () => selectDate(context),
+                        endWidget: TextWithArrow(
+                          text: userData?['birthday'] != null &&
+                                  userData!['birthday'].isNotEmpty
+                              ? DateTime.parse(userData!['birthday'])
+                                  .toLocal()
+                                  .toString()
+                                  .split(' ')[0]
+                              : 'Not set', // Display 'Not set' if birthday is not available
+                        ),
+                      ),
 
-                        showDialog(
-                          context: context,
-                          useSafeArea: true,
-                          builder: (BuildContext context) {
-                            return const AlertDialog(
-                              surfaceTintColor: Colors.transparent,
-                              content: GenderSelectorDialog(),
-                            );
-                          },
-                        );
-                      },
-                      endWidget: TextWithArrow(
-                        text: userData?['gender'] ?? 'Not set',
+                      _buildDivider(),
+                      ProfileEditTile(
+                        icon: 'assets/icons/ic-list.svg',
+                        text: 'Bio',
+                        onTap: () => Navigator.pushNamed(context, 'edit-bio'),
+                        endWidget: TextWithArrow(
+                          text: userData?['bio'] ?? '',
+                        ),
                       ),
-                    ),
-                    _buildDivider(),
-                    ProfileEditTile(
-                      icon: 'assets/icons/ic-flag.svg',
-                      text: 'Country',
-                      onTap: () {
-                        showCountryPicker(
-                          context: context,
-                          showPhoneCode: false,
-                          onSelect: _saveCountryToDatabase,
-                        );
-                      },
-                      endWidget: TextWithArrow(
-                        text: userData?['country'] ?? 'Not set',
+                      _buildDivider(),
+                      ProfileEditTile(
+                        icon: 'assets/icons/ic-motto.svg',
+                        text: 'Motto',
+                        onTap: () => Navigator.pushNamed(context, 'edit-motto'),
+                        endWidget: TextWithArrow(
+                          text: userData?['moto'] ?? '',
+                        ),
                       ),
-                    ),
-                    _buildDivider(),
-                    // ProfileEditTile(
-                    //   icon: 'assets/icons/ic_calendar.svg',
-                    //   text: 'Birthday',
-                    //   onTap: () => selectDate(context),
-                    //   endWidget: TextWithArrow(
-                    //     text: userData?['birthday'] != null
-                    //         ? DateTime.parse(userData!['birthday'])
-                    //         .toLocal()
-                    //         .toString()
-                    //         .split(' ')[0]
-                    //         : 'Not set',
-                    //   ),
-                    // ),
-                    ProfileEditTile(
-                      icon: 'assets/icons/ic_calendar.svg',
-                      text: 'Birthday',
-                      onTap: () => selectDate(context),
-                      endWidget: TextWithArrow(
-                        text: userData?['birthday'] != null && userData!['birthday'].isNotEmpty
-                            ? DateTime.parse(userData!['birthday']).toLocal().toString().split(' ')[0]
-                            : 'Not set', // Display 'Not set' if birthday is not available
-                      ),
-                    ),
-
-                    _buildDivider(),
-                    ProfileEditTile(
-                      icon: 'assets/icons/ic-list.svg',
-                      text: 'Bio',
-                      onTap: () => Navigator.pushNamed(context, 'edit-bio'),
-                      endWidget: TextWithArrow(
-                        text: userData?['bio'] ?? '',
-                      ),
-                    ),
-                    _buildDivider(),
-                    ProfileEditTile(
-                      icon: 'assets/icons/ic-motto.svg',
-                      text: 'Motto',
-                      onTap: () => Navigator.pushNamed(context, 'edit-motto'),
-                      endWidget: TextWithArrow(
-                        text: userData?['moto'] ?? '',
-                      ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

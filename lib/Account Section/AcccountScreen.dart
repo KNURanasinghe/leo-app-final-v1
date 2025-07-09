@@ -176,7 +176,7 @@ class _AccountScreen1State extends State<AccountScreen1> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      userData?['firstname'] ?? 'User',
+                      "${userData?['firstname']} ${userData?['lastname'] ?? ''}",
                       style: TextStyle(
                         fontSize: 16.sp,
                         color: kTextColor,

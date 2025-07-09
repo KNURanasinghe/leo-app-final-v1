@@ -313,21 +313,27 @@ class _ProfileScreenState extends State<ProfileScreen> {
         : 'assets/images/default_cover.png'; // Default cover image if not available
 
     return Scaffold(
-      bottomNavigationBar: Container(
-        width: double.infinity,
-        color: darkModeEnabled ? kDarkBoxColor : kLightBlueColor,
-        padding: const EdgeInsets.all(20.0),
-        child: Row(
-          children: [
-            Expanded(child: OutlineButton(onTap: () {}, text: 'Share')),
-            SizedBox(width: 10.w),
-            Expanded(
-              child: PrimaryButton(
-                onTap: () => Navigator.pushNamed(context, 'edit-profile'),
-                text: 'Edit',
-              ),
-            )
-          ],
+      bottomNavigationBar: Padding(
+        padding: EdgeInsets.only(
+          bottom: MediaQuery.of(context).viewInsets.bottom +
+              MediaQuery.of(context).padding.bottom,
+        ),
+        child: Container(
+          width: double.infinity,
+          color: darkModeEnabled ? kDarkBoxColor : kLightBlueColor,
+          padding: const EdgeInsets.all(20.0),
+          child: Row(
+            children: [
+              Expanded(child: OutlineButton(onTap: () {}, text: 'Share')),
+              SizedBox(width: 10.w),
+              Expanded(
+                child: PrimaryButton(
+                  onTap: () => Navigator.pushNamed(context, 'edit-profile'),
+                  text: 'Edit',
+                ),
+              )
+            ],
+          ),
         ),
       ),
       body: BodyContainer(
