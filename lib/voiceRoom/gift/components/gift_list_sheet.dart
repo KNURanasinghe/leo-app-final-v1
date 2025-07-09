@@ -260,31 +260,64 @@ class _ZegoGiftSheetState extends State<ZegoGiftSheet>
 
   Future<void> _loadGifts() async {
     try {
-      final response = await http.get(
-        Uri.parse('$pocketbaseUrl/api/collections/gifts/records'),
-      );
+      List<GiftData> allGifts = [];
+      int page = 1;
+      int perPage = 50;
+      bool hasMore = true;
 
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        final List<GiftData> gifts = (data['items'] as List)
-            .map((item) => GiftData.fromJson(item))
-            .toList();
+      while (hasMore) {
+        final response = await http.get(
+          Uri.parse(
+              '$pocketbaseUrl/api/collections/gifts/records?page=$page&perPage=$perPage'),
+        );
 
-        // Organize gifts by category
-        categorizedGifts.clear();
-        for (var category in categories) {
-          categorizedGifts[category.id] = gifts
-              .where((gift) => gift.category == category.categoryName)
-              .map((gift) => gift.toZegoGiftItem(pocketbaseUrl))
+        if (response.statusCode == 200) {
+          final data = json.decode(response.body);
+          final List<GiftData> pageGifts = (data['items'] as List)
+              .map((item) => GiftData.fromJson(item))
               .toList();
-        }
 
-        if (mounted) {
-          setState(() {});
+          allGifts.addAll(pageGifts);
+
+          // Check if there are more pages
+          hasMore = data['items'].length == perPage;
+          page++;
+
+          print(
+              'Loaded page $page: ${pageGifts.length} gifts (Total so far: ${allGifts.length})');
+        } else {
+          throw Exception('Failed to load gifts: ${response.statusCode}');
         }
       }
+
+      print('Total gifts loaded: ${allGifts.length}');
+
+      // Debug: Print all gifts and their categories
+      print('\n=== ALL GIFTS ===');
+      for (var gift in allGifts) {
+        print('Gift: "${gift.giftname}" -> Category: "${gift.category}"');
+      }
+
+      // Organize gifts by category
+      categorizedGifts.clear();
+      for (var category in categories) {
+        var matchingGifts = allGifts
+            .where((gift) => gift.category == category.categoryName)
+            .toList();
+
+        categorizedGifts[category.id] = matchingGifts
+            .map((gift) => gift.toZegoGiftItem(pocketbaseUrl))
+            .toList();
+
+        print(
+            'Category "${category.categoryName}" has ${categorizedGifts[category.id]?.length ?? 0} gifts');
+      }
+
+      if (mounted) {
+        setState(() {});
+      }
     } catch (e) {
-      print('Error loading gifts: $e');
+      print('Error loading all gifts: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Error loading gifts: ${e.toString()}')),
