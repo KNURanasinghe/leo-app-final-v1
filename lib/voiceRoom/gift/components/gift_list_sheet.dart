@@ -322,12 +322,14 @@ class _ZegoGiftSheetState extends State<ZegoGiftSheet>
       }
 
       print('Loading users with logged user ID: $loggedUserId');
+      print('Room ID: ${widget.roomId}');
 
-      // Get all online users from this room
+      // Get all online users from this specific room
       final onlineUsersResponse = await http.get(
         Uri.parse('$pocketbaseUrl/api/collections/online_users/records')
             .replace(queryParameters: {
-          'filter': 'voiceRoomId="${widget.roomId}"', // Filter by room ID
+          'filter': 'voiceRoomId="${widget.roomId}"',
+          'expand': '', // Don't expand relations to keep response clean
         }),
       );
 
@@ -336,63 +338,86 @@ class _ZegoGiftSheetState extends State<ZegoGiftSheet>
 
       if (onlineUsersResponse.statusCode == 200) {
         final onlineUsersData = json.decode(onlineUsersResponse.body);
-        print('Online users data: ${onlineUsersData['items']}');
+        final onlineUsersList = onlineUsersData['items'] as List;
 
-        if (onlineUsersData['items'].isEmpty) {
-          print('No online users found in room');
-          setState(() {
-            users = [];
-          });
+        print('Found ${onlineUsersList.length} total online users in room');
+
+        if (onlineUsersList.isEmpty) {
+          print('No online users found in room ${widget.roomId}');
+          if (mounted) {
+            setState(() {
+              users = [];
+            });
+          }
           return;
         }
 
-        // Get all online user IDs except current user
+        // Extract user IDs excluding current user
         List<String> onlineUserIds = [];
-        for (var item in onlineUsersData['items']) {
+        for (var item in onlineUsersList) {
           final userId = item['userId'] as String;
+          print('Processing online user: $userId');
+
+          // Skip current user
           if (userId != loggedUserId) {
             onlineUserIds.add(userId);
+          } else {
+            print('Skipping current user: $userId');
           }
         }
 
-        print('Found online user IDs in room: $onlineUserIds');
+        print(
+            'Found ${onlineUserIds.length} other users in room: $onlineUserIds');
 
         if (onlineUserIds.isEmpty) {
-          print('No other online users found in room');
-          setState(() {
-            users = [];
-          });
+          print('No other users found in room besides current user');
+          if (mounted) {
+            setState(() {
+              users = [];
+            });
+          }
           return;
         }
 
         // Load details for each online user
         List<User> loadedUsers = [];
-        for (String userId in onlineUserIds) {
+
+        // Use Future.wait for better performance when loading multiple users
+        final userFutures = onlineUserIds.map((userId) async {
           try {
             print('Fetching details for user: $userId');
             final userResponse = await http.get(
               Uri.parse('$pocketbaseUrl/api/collections/users/records/$userId'),
             );
 
-            print('User response status: ${userResponse.statusCode}');
-            print('User response body: ${userResponse.body}');
+            print('User $userId response status: ${userResponse.statusCode}');
 
             if (userResponse.statusCode == 200) {
               final userData = json.decode(userResponse.body);
               final user = User.fromJson(userData);
               print(
                   'Successfully loaded user: ${user.username} with ID: ${user.id}');
-              loadedUsers.add(user);
+              return user;
             } else {
               print('Failed to load user $userId: ${userResponse.statusCode}');
+              print('Error response: ${userResponse.body}');
+              return null;
             }
           } catch (e) {
             print('Error loading user $userId: $e');
+            return null;
           }
-        }
+        }).toList();
 
-        print('Total users loaded from room: ${loadedUsers.length}');
-        print('Loaded users details:');
+        // Wait for all user details to be fetched
+        final userResults = await Future.wait(userFutures);
+
+        // Filter out null results
+        loadedUsers =
+            userResults.where((user) => user != null).cast<User>().toList();
+
+        print(
+            'Successfully loaded ${loadedUsers.length} users from room ${widget.roomId}:');
         for (var user in loadedUsers) {
           print('- User: ${user.username}, ID: ${user.id}');
         }
@@ -405,12 +430,27 @@ class _ZegoGiftSheetState extends State<ZegoGiftSheet>
       } else {
         print(
             'Failed to fetch online users: ${onlineUsersResponse.statusCode}');
+        print('Error response: ${onlineUsersResponse.body}');
+
+        if (mounted) {
+          setState(() {
+            users = [];
+          });
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+                content: Text(
+                    'Failed to load users: ${onlineUsersResponse.statusCode}')),
+          );
+        }
       }
     } catch (e) {
       print('Error in _loadUsers: $e');
       if (mounted) {
+        setState(() {
+          users = [];
+        });
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Error loading users')),
+          const SnackBar(content: Text('Error loading users from room')),
         );
       }
     }
@@ -842,97 +882,102 @@ class _ZegoGiftSheetState extends State<ZegoGiftSheet>
       );
     }
 
-    return Stack(
-      children: [
-        Column(
-          children: [
-            Container(
-              width: 40,
-              height: 4,
-              margin: const EdgeInsets.only(bottom: 10),
-              decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.3),
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-            _buildSelectedUserDisplay(),
-            if (!isLoadingCategories && categories.isNotEmpty) ...[
+    return SafeArea(
+      child: Stack(
+        children: [
+          Column(
+            children: [
               Container(
-                margin: EdgeInsets.zero, // Remove any margin
-                padding: EdgeInsets.zero, // Remove any padding
-                child: TabBar(
-                  controller: _tabController,
-                  isScrollable: true,
-                  padding: EdgeInsets.zero, // Remove padding around the TabBar
-                  indicatorPadding:
-                      EdgeInsets.zero, // Remove padding around the indicator
-                  labelPadding: const EdgeInsets.symmetric(
-                      horizontal: 16), // Adjust tab label padding
-                  tabAlignment: TabAlignment.start, // Align tabs to start
-                  tabs: categories.map((category) {
-                    return Tab(
-                      text: category.categoryName,
-                    );
-                  }).toList(),
-                  labelColor: Colors.white,
-                  unselectedLabelColor: Colors.white.withOpacity(0.5),
-                  indicatorColor: selectedColor,
+                width: 40,
+                height: 4,
+                margin: const EdgeInsets.only(bottom: 10),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.3),
+                  borderRadius: BorderRadius.circular(2),
                 ),
               ),
-              Expanded(
-                child: TabBarView(
-                  controller: _tabController,
-                  children: categories.map((category) {
-                    return _buildGiftGridForCategory(category.id);
-                  }).toList(),
+              _buildSelectedUserDisplay(),
+              if (!isLoadingCategories && categories.isNotEmpty) ...[
+                Container(
+                  margin: EdgeInsets.zero, // Remove any margin
+                  padding: EdgeInsets.zero, // Remove any padding
+                  child: TabBar(
+                    controller: _tabController,
+                    isScrollable: true,
+                    padding:
+                        EdgeInsets.zero, // Remove padding around the TabBar
+                    indicatorPadding:
+                        EdgeInsets.zero, // Remove padding around the indicator
+                    labelPadding: const EdgeInsets.symmetric(
+                        horizontal: 16), // Adjust tab label padding
+                    tabAlignment: TabAlignment.start, // Align tabs to start
+                    tabs: categories.map((category) {
+                      return Tab(
+                        text: category.categoryName,
+                      );
+                    }).toList(),
+                    labelColor: Colors.white,
+                    unselectedLabelColor: Colors.white.withOpacity(0.5),
+                    indicatorColor: selectedColor,
+                  ),
+                ),
+                Expanded(
+                  child: TabBarView(
+                    controller: _tabController,
+                    children: categories.map((category) {
+                      return _buildGiftGridForCategory(category.id);
+                    }).toList(),
+                  ),
+                ),
+              ],
+              Container(
+                padding: EdgeInsets.only(
+                    top: 10,
+                    bottom: MediaQuery.of(context).padding.bottom + 10),
+                decoration: BoxDecoration(
+                  border: Border(
+                    top: BorderSide(
+                      color: Colors.white.withOpacity(0.1),
+                      width: 1,
+                    ),
+                  ),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Row(
+                      children: [
+                        Image.asset(
+                          'assets/diamond.png',
+                          width: 20,
+                          height: 20,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          '${userBalance ?? 0}',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
+                    Row(
+                      children: [
+                        countDropList(),
+                        const SizedBox(width: 10),
+                        _buildSendButton(),
+                      ],
+                    ),
+                  ],
                 ),
               ),
             ],
-            Container(
-              padding: const EdgeInsets.only(top: 10),
-              decoration: BoxDecoration(
-                border: Border(
-                  top: BorderSide(
-                    color: Colors.white.withOpacity(0.1),
-                    width: 1,
-                  ),
-                ),
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Row(
-                    children: [
-                      Image.asset(
-                        'assets/diamond.png',
-                        width: 20,
-                        height: 20,
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        '${userBalance ?? 0}',
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ],
-                  ),
-                  Row(
-                    children: [
-                      countDropList(),
-                      const SizedBox(width: 10),
-                      _buildSendButton(),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-        if (_showUserList) _buildUserListOverlay(),
-      ],
+          ),
+          if (_showUserList) _buildUserListOverlay(),
+        ],
+      ),
     );
   }
 
@@ -1056,9 +1101,12 @@ class _ZegoGiftSheetState extends State<ZegoGiftSheet>
             });
 
             try {
-              await _loadUsers(); // Reload users
+              // Refresh users from current room
+              await _loadUsers();
+              print(
+                  'Users refreshed. Found ${users.length} users in room ${widget.roomId}');
             } catch (e) {
-              print('Error loading users: $e');
+              print('Error refreshing users: $e');
             } finally {
               if (mounted) {
                 setState(() {
@@ -1120,11 +1168,15 @@ class _ZegoGiftSheetState extends State<ZegoGiftSheet>
                           ),
                         ),
                       ] else
-                        const Text(
-                          'Select User',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 14,
+                        Expanded(
+                          child: Text(
+                            users.isEmpty
+                                ? 'No users in room'
+                                : 'Select User (${users.length} available)',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 14,
+                            ),
                           ),
                         ),
                       const Icon(

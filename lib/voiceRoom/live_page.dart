@@ -273,16 +273,16 @@ class LivePageState extends State<LivePage>
     _giftTimers.clear();
     _activeGifts.clear();
 
-    setState(() {
-      // Add new gift animation
-      _activeGifts[animationId] = _buildGiftAnimation(
-        giftUrl: giftUrl,
-        giftCount: giftCount,
-        giftName: giftName,
-        senderName: senderName,
-        receiverName: receiverName,
-      );
-    });
+    // setState(() {
+    //   // Add new gift animation
+    //   _activeGifts[animationId] = _buildGiftAnimation(
+    //     giftUrl: giftUrl,
+    //     giftCount: giftCount,
+    //     giftName: giftName,
+    //     senderName: senderName,
+    //     receiverName: receiverName,
+    //   );
+    // });
 
     // Remove animation after duration (adjust as needed)
     _giftTimers[animationId] = Timer(const Duration(seconds: 8), () {
@@ -298,107 +298,107 @@ class LivePageState extends State<LivePage>
         '🎬 Playing gift animation: $giftName (${giftCount}x) from $senderName to $receiverName');
   }
 
-  Widget _buildGiftAnimation({
-    required String giftUrl,
-    required int giftCount,
-    required String giftName,
-    required String senderName,
-    required String receiverName,
-  }) {
-    return Container(
-      width: double.infinity,
-      height: double.infinity,
-      color: Colors.black.withOpacity(0.3), // Semi-transparent overlay
-      child: Stack(
-        children: [
-          // Full-screen SVGA animation
-          Positioned.fill(
-            child: Center(
-              child: SVGASimpleImage(
-                resUrl: giftUrl,
-                // Cover the full screen
-              ),
-            ),
-          ),
+  // Widget _buildGiftAnimation({
+  //   required String giftUrl,
+  //   required int giftCount,
+  //   required String giftName,
+  //   required String senderName,
+  //   required String receiverName,
+  // }) {
+  //   return Container(
+  //     width: double.infinity,
+  //     height: double.infinity,
+  //     color: Colors.black.withOpacity(0.3), // Semi-transparent overlay
+  //     child: Stack(
+  //       children: [
+  //         // Full-screen SVGA animation
+  //         Positioned.fill(
+  //           child: Center(
+  //             child: SVGASimpleImage(
+  //               resUrl: giftUrl,
+  //               // Cover the full screen
+  //             ),
+  //           ),
+  //         ),
 
-          // Gift information overlay at the bottom
-          Positioned(
-            bottom: MediaQuery.of(context).size.height * 0.15,
-            left: 20,
-            right: 20,
-            child: Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.black.withOpacity(0.7),
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: Colors.white.withOpacity(0.3)),
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  // Gift count and name
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text(
-                        '${giftCount}x ',
-                        style: const TextStyle(
-                          color: Colors.yellow,
-                          fontSize: 24,
-                          fontWeight: FontWeight.bold,
-                          decoration: TextDecoration.none,
-                        ),
-                      ),
-                      Text(
-                        giftName,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                          decoration: TextDecoration.none,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  // Sender and receiver info
-                  RichText(
-                    textAlign: TextAlign.center,
-                    text: TextSpan(
-                      style: const TextStyle(
-                        fontSize: 16,
-                        decoration: TextDecoration.none,
-                      ),
-                      children: [
-                        TextSpan(
-                          text: senderName,
-                          style: const TextStyle(
-                            color: Colors.blue,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        const TextSpan(
-                          text: ' sent ',
-                          style: TextStyle(color: Colors.white),
-                        ),
-                        TextSpan(
-                          text: receiverName,
-                          style: const TextStyle(
-                            color: Colors.pink,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+  //         // Gift information overlay at the bottom
+  //         Positioned(
+  //           bottom: MediaQuery.of(context).size.height * 0.15,
+  //           left: 20,
+  //           right: 20,
+  //           child: Container(
+  //             padding: const EdgeInsets.all(16),
+  //             decoration: BoxDecoration(
+  //               color: Colors.black.withOpacity(0.7),
+  //               borderRadius: BorderRadius.circular(16),
+  //               border: Border.all(color: Colors.white.withOpacity(0.3)),
+  //             ),
+  //             child: Column(
+  //               mainAxisSize: MainAxisSize.min,
+  //               children: [
+  //                 // Gift count and name
+  //                 Row(
+  //                   mainAxisAlignment: MainAxisAlignment.center,
+  //                   children: [
+  //                     Text(
+  //                       '${giftCount}x ',
+  //                       style: const TextStyle(
+  //                         color: Colors.yellow,
+  //                         fontSize: 24,
+  //                         fontWeight: FontWeight.bold,
+  //                         decoration: TextDecoration.none,
+  //                       ),
+  //                     ),
+  //                     Text(
+  //                       giftName,
+  //                       style: const TextStyle(
+  //                         color: Colors.white,
+  //                         fontSize: 20,
+  //                         fontWeight: FontWeight.bold,
+  //                         decoration: TextDecoration.none,
+  //                       ),
+  //                     ),
+  //                   ],
+  //                 ),
+  //                 const SizedBox(height: 8),
+  //                 // Sender and receiver info
+  //                 RichText(
+  //                   textAlign: TextAlign.center,
+  //                   text: TextSpan(
+  //                     style: const TextStyle(
+  //                       fontSize: 16,
+  //                       decoration: TextDecoration.none,
+  //                     ),
+  //                     children: [
+  //                       TextSpan(
+  //                         text: senderName,
+  //                         style: const TextStyle(
+  //                           color: Colors.blue,
+  //                           fontWeight: FontWeight.bold,
+  //                         ),
+  //                       ),
+  //                       const TextSpan(
+  //                         text: ' sent ',
+  //                         style: TextStyle(color: Colors.white),
+  //                       ),
+  //                       TextSpan(
+  //                         text: receiverName,
+  //                         style: const TextStyle(
+  //                           color: Colors.pink,
+  //                           fontWeight: FontWeight.bold,
+  //                         ),
+  //                       ),
+  //                     ],
+  //                   ),
+  //                 ),
+  //               ],
+  //             ),
+  //           ),
+  //         ),
+  //       ],
+  //     ),
+  //   );
+  // }
 
 // Load current user's active item for entry animations
   Future<void> _fetchAndSetUserActiveItemAsync() async {
@@ -3472,6 +3472,8 @@ class LivePageState extends State<LivePage>
     print('Seat index: $seatIndex, User: ${user?.name}');
     final isFlashing = seatIndex != null && seatIndex == _flashingSeat;
 
+    print('hostrole ${ZegoLiveAudioRoomRole.host.index.toString()} ');
+
     // If no seat index is provided, return empty container
     if (seatIndex == null) return Container();
 
@@ -3579,7 +3581,7 @@ class LivePageState extends State<LivePage>
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  if (isUserAdmin) ...[
+                  if (isAttributeHost(user?.inRoomAttributes.value)) ...[
                     const Icon(Icons.person, size: 16, color: Colors.yellow),
                     const SizedBox(
                       width: 3,
