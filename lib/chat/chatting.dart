@@ -1327,8 +1327,13 @@ class _DemoChattingPageState extends State<DemoChattingMessageListPage> {
                     // Input field
                     if (!_isShowingRecorder && _filePreview == null)
                       Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 8, vertical: 4),
+                        padding: EdgeInsets.only(
+                          left: 8,
+                          right: 8,
+                          top: 4,
+                          // Add bottom padding that accounts for safe area and keyboard
+                          bottom: MediaQuery.of(context).padding.bottom + 4,
+                        ),
                         decoration: BoxDecoration(
                           color: Colors.white,
                           boxShadow: [
