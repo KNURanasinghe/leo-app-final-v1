@@ -80,6 +80,7 @@ class GiftData {
   final String giftName;
   final int giftCount;
   final String? giftUrl;
+  final String? photoUrl;
   final int totalCost;
 
   GiftData({
@@ -88,6 +89,7 @@ class GiftData {
     required this.giftName,
     required this.giftCount,
     this.giftUrl,
+    this.photoUrl,
     required this.totalCost,
   });
 
@@ -98,6 +100,7 @@ class GiftData {
       giftName: json['giftName'] ?? '',
       giftCount: json['giftCount'] ?? 0,
       giftUrl: json['giftUrl'],
+      photoUrl: json['photoUrl'],
       totalCost: json['totalCost'] ?? 0,
     );
   }
@@ -237,9 +240,11 @@ class SocketMessageService {
             giftName: data['giftName'],
             giftCount: data['giftCount'],
             giftUrl: data['giftUrl'],
+            photoUrl: data['photoUrl'],
             totalCost: data['totalCost'],
           ),
         );
+        print('photo url from socket ${data['photoUrl']}');
         _addMessageToHistory(giftMessage);
       } catch (e) {
         print('Error processing gift message: $e');
@@ -300,25 +305,66 @@ class SocketMessageService {
 
   // **ENHANCED: Helper method to add messages to history with deduplication**
   void _addMessageToHistory(ChatMessage message) {
-    // Simple deduplication based on userId, timestamp, and message content
-    final isDuplicate = _messageHistory.any((existing) =>
-        existing.userId == message.userId &&
-        existing.timestamp == message.timestamp &&
-        existing.message == message.message &&
-        existing.type == message.type);
-
-    if (!isDuplicate) {
-      _messageHistory.add(message);
-      _messageController.add(message);
-
-      // Limit local history size to prevent memory issues
-      if (_messageHistory.length > 500) {
-        _messageHistory.removeAt(0);
-      }
-
-      // Notify history listeners
-      _messageHistoryController.add(List.unmodifiable(_messageHistory));
+    // Only print photoUrl for gift messages
+    if (message.type == MessageType.gift &&
+        message.giftData?.photoUrl != null) {
+      print(
+          '🎁 Gift message - photo url from chat history: ${message.giftData!.photoUrl}');
     }
+
+    // **ENHANCED: Better deduplication for gift messages**
+    if (message.type == MessageType.gift) {
+      // Remove any existing gift message with same sender, receiver, gift, and similar timestamp
+      _messageHistory.removeWhere((existing) {
+        if (existing.type != MessageType.gift) return false;
+
+        final timeDiff = (existing.timestamp - message.timestamp).abs();
+        final isSimilarTime = timeDiff < 5000; // Within 5 seconds
+
+        final isSameGift = existing.userId == message.userId &&
+            existing.giftData?.receiverUserId ==
+                message.giftData?.receiverUserId &&
+            existing.giftData?.giftName == message.giftData?.giftName &&
+            existing.giftData?.giftCount == message.giftData?.giftCount;
+
+        if (isSameGift && isSimilarTime) {
+          print(
+              '🗑️ Removing duplicate/old gift message from ${existing.userName}');
+          return true;
+        }
+        return false;
+      });
+    } else {
+      // Regular deduplication for non-gift messages
+      final isDuplicate = _messageHistory.any((existing) =>
+          existing.userId == message.userId &&
+          existing.timestamp == message.timestamp &&
+          existing.message == message.message &&
+          existing.type == message.type);
+
+      if (isDuplicate) {
+        print('🔄 Duplicate non-gift message detected and skipped');
+        return;
+      }
+    }
+
+    // Add the new message
+    _messageHistory.add(message);
+    _messageController.add(message);
+
+    print(
+        '✅ Added ${message.type.toString().split('.').last} message to history from ${message.userName}');
+
+    // Limit local history size to prevent memory issues
+    if (_messageHistory.length > 500) {
+      _messageHistory.removeAt(0);
+    }
+
+    // Sort messages by timestamp to ensure correct order
+    _messageHistory.sort((a, b) => a.timestamp.compareTo(b.timestamp));
+
+    // Notify history listeners
+    _messageHistoryController.add(List.unmodifiable(_messageHistory));
   }
 
   // **ENHANCED: Request message history with pagination support**
@@ -418,6 +464,7 @@ class SocketMessageService {
     required int giftCount,
     required String giftUrl,
     required int totalCost,
+    required String photourl,
   }) {
     final data = {
       'roomId': roomId,
@@ -428,6 +475,7 @@ class SocketMessageService {
       'giftName': giftName,
       'giftCount': giftCount,
       'giftUrl': giftUrl,
+      'photoUrl': photourl,
       'totalCost': totalCost,
       'timestamp': DateTime.now().millisecondsSinceEpoch,
     };

@@ -16,11 +16,11 @@ class MemberListScreen extends StatefulWidget {
   final bool isJoined;
 
   const MemberListScreen({
-    Key? key,
+    super.key,
     required this.voiceRoomId,
     required this.currentUserId,
     required this.isJoined,
-  }) : super(key: key);
+  });
 
   @override
   _MemberListScreenState createState() => _MemberListScreenState();
@@ -49,8 +49,10 @@ class _MemberListScreenState extends State<MemberListScreen> {
 
       // Fetch room data and joined users data in parallel
       final futures = await Future.wait([
-        http.get(Uri.parse('$baseUrl/api/collections/voiceRooms/records/${widget.voiceRoomId}')),
-        http.get(Uri.parse('$baseUrl/api/collections/joined_users/records?filter=(voice_room_id="${widget.voiceRoomId}")')),
+        http.get(Uri.parse(
+            '$baseUrl/api/collections/voiceRooms/records/${widget.voiceRoomId}')),
+        http.get(Uri.parse(
+            '$baseUrl/api/collections/joined_users/records?filter=(voice_room_id="${widget.voiceRoomId}")')),
       ]);
 
       final roomResponse = futures[0];
@@ -92,9 +94,10 @@ class _MemberListScreenState extends State<MemberListScreen> {
 
         // Fetch all user details in parallel
         if (userIds.isNotEmpty) {
-          final userFutures = userIds.map((userId) =>
-              http.get(Uri.parse('$baseUrl/api/collections/users/records/$userId'))
-          ).toList();
+          final userFutures = userIds
+              .map((userId) => http.get(
+                  Uri.parse('$baseUrl/api/collections/users/records/$userId')))
+              .toList();
 
           final userResponses = await Future.wait(userFutures);
 
@@ -104,7 +107,7 @@ class _MemberListScreenState extends State<MemberListScreen> {
             if (userResponses[i].statusCode == 200) {
               final userData = json.decode(userResponses[i].body);
               final joinedUser = joinedUsers.firstWhere(
-                    (user) => user['userid'] == userIds[i],
+                (user) => user['userid'] == userIds[i],
                 orElse: () => null,
               );
 
@@ -142,12 +145,15 @@ class _MemberListScreenState extends State<MemberListScreen> {
     }
   }
 
-  Future<void> _deleteDuplicateOnlineUserRecords(String userId, String roomId) async {
-    const String baseUrl = 'http://145.223.21.62:8090/api/collections/online_users/records';
+  Future<void> _deleteDuplicateOnlineUserRecords(
+      String userId, String roomId) async {
+    const String baseUrl =
+        'http://145.223.21.62:8090/api/collections/online_users/records';
 
     try {
       // Step 1: Fetch all records for this user and room
-      final filter = Uri.encodeComponent('userId="$userId" && voiceRoomId="$roomId"');
+      final filter =
+          Uri.encodeComponent('userId="$userId" && voiceRoomId="$roomId"');
       final response = await http.get(
         Uri.parse('$baseUrl?filter=$filter'),
         headers: {'Content-Type': 'application/json'},
@@ -172,10 +178,12 @@ class _MemberListScreenState extends State<MemberListScreen> {
             headers: {'Content-Type': 'application/json'},
           );
 
-          if (deleteResponse.statusCode == 204 || deleteResponse.statusCode == 200) {
+          if (deleteResponse.statusCode == 204 ||
+              deleteResponse.statusCode == 200) {
             print('Successfully deleted record: $recordId');
           } else {
-            print('Failed to delete record $recordId: ${deleteResponse.statusCode}');
+            print(
+                'Failed to delete record $recordId: ${deleteResponse.statusCode}');
           }
         }
       } else {
@@ -192,30 +200,30 @@ class _MemberListScreenState extends State<MemberListScreen> {
     try {
       // Delete from joined_users
       final response = await http.delete(
-        Uri.parse('$baseUrl/api/collections/joined_users/records/$joinedUserId'),
+        Uri.parse(
+            '$baseUrl/api/collections/joined_users/records/$joinedUserId'),
       );
 
       if (response.statusCode == 200) {
         Navigator.pop(context); // Close the bottom sheet
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Successfully left the room')),
+          const SnackBar(content: Text('Successfully left the room')),
         );
       }
     } catch (e) {
       print('Error leaving room: $e');
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to leave room')),
+        const SnackBar(content: Text('Failed to leave room')),
       );
     }
   }
-
 
   Future<void> _leaving() async {
     try {
       Map<String, dynamic>? currentUser;
       try {
         currentUser = usersList.firstWhere(
-              (user) => user['id'] == widget.currentUserId,
+          (user) => user['id'] == widget.currentUserId,
         );
       } catch (e) {
         currentUser = null;
@@ -223,12 +231,13 @@ class _MemberListScreenState extends State<MemberListScreen> {
 
       if (currentUser != null) {
         final response = await http.delete(
-          Uri.parse('$baseUrl/api/collections/joined_users/records/${currentUser['joinedUserId']}'),
+          Uri.parse(
+              '$baseUrl/api/collections/joined_users/records/${currentUser['joinedUserId']}'),
         );
 
         if (response.statusCode == 200) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
+            const SnackBar(
               content: Text('Successfully left the room'),
               backgroundColor: Colors.red,
               duration: Duration(seconds: 2),
@@ -239,7 +248,7 @@ class _MemberListScreenState extends State<MemberListScreen> {
     } catch (e) {
       print('Error leaving room: $e');
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
+        const SnackBar(
           content: Text('Failed to leave room'),
           backgroundColor: Colors.red,
           duration: Duration(seconds: 2),
@@ -248,25 +257,27 @@ class _MemberListScreenState extends State<MemberListScreen> {
     }
   }
 
-
   Future<void> updateEndTime(String userId, String voiceRoomId) async {
     try {
-      final filter = Uri.encodeComponent('UserID="$userId" && voiceRoom_id="$voiceRoomId"');
+      final filter = Uri.encodeComponent(
+          'UserID="$userId" && voiceRoom_id="$voiceRoomId"');
       final response = await http.get(
-        Uri.parse('$baseUrl/api/collections/level_Timer/records?filter=$filter'),
+        Uri.parse(
+            '$baseUrl/api/collections/level_Timer/records?filter=$filter'),
       );
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         final records = data['items'] ?? [];
         final record = records.firstWhere(
-              (r) => r['End_Time'] == null || r['End_Time'] == "",
+          (r) => r['End_Time'] == null || r['End_Time'] == "",
           orElse: () => null,
         );
 
         if (record != null) {
           await http.patch(
-            Uri.parse('$baseUrl/api/collections/level_Timer/records/${record['id']}'),
+            Uri.parse(
+                '$baseUrl/api/collections/level_Timer/records/${record['id']}'),
             headers: {'Content-Type': 'application/json'},
             body: json.encode({
               'End_Time': DateTime.now().toIso8601String(),
@@ -282,7 +293,8 @@ class _MemberListScreenState extends State<MemberListScreen> {
   Future<void> _joinRoom(String roomId, String userId) async {
     try {
       final response = await http.post(
-        Uri.parse('http://145.223.21.62:8090/api/collections/joined_users/records'),
+        Uri.parse(
+            'http://145.223.21.62:8090/api/collections/joined_users/records'),
         headers: {'Content-Type': 'application/json'},
         body: json.encode({
           'voice_room_id': roomId,
@@ -294,13 +306,13 @@ class _MemberListScreenState extends State<MemberListScreen> {
       if (response.statusCode == 200) {
         Navigator.pop(context);
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Successfully joined the room')),
+          const SnackBar(content: Text('Successfully joined the room')),
         );
       }
     } catch (e) {
       print('Error joining room: $e');
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to join room')),
+        const SnackBar(content: Text('Failed to join room')),
       );
     }
   }
@@ -311,7 +323,8 @@ class _MemberListScreenState extends State<MemberListScreen> {
         !adminIds.contains(widget.currentUserId)) return;
 
     if (userId == ownerId) return; // Can't remove owner
-    if (adminIds.contains(userId) && widget.currentUserId != ownerId) return; // Admins can't remove other admins
+    if (adminIds.contains(userId) && widget.currentUserId != ownerId)
+      return; // Admins can't remove other admins
 
     try {
       // Add to removed_users
@@ -327,28 +340,29 @@ class _MemberListScreenState extends State<MemberListScreen> {
       if (removeResponse.statusCode == 200) {
         // Delete from joined_users
         await http.delete(
-          Uri.parse('$baseUrl/api/collections/joined_users/records/$joinedUserId'),
+          Uri.parse(
+              '$baseUrl/api/collections/joined_users/records/$joinedUserId'),
         );
 
         loadData(); // Refresh the list
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('User removed successfully')),
+          const SnackBar(content: Text('User removed successfully')),
         );
       }
     } catch (e) {
       print('Error removing user: $e');
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to remove user')),
+        const SnackBar(content: Text('Failed to remove user')),
       );
     }
   }
 
   Widget _buildOwnerProfile() {
-    if (ownerData == null) return SizedBox.shrink();
+    if (ownerData == null) return const SizedBox.shrink();
 
     return Container(
-      padding: EdgeInsets.all(16),
-      margin: EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.all(16),
+      margin: const EdgeInsets.only(bottom: 16),
       decoration: BoxDecoration(
         color: Colors.blue.withOpacity(0.1),
         borderRadius: BorderRadius.circular(12),
@@ -358,31 +372,40 @@ class _MemberListScreenState extends State<MemberListScreen> {
         leading: ClipRRect(
           borderRadius: BorderRadius.circular(25),
           child: CachedNetworkImage(
-            imageUrl: "$baseUrl/api/files/${ownerData!['collectionId']}/${ownerData!['id']}/${ownerData!['avatar']}",
+            imageUrl:
+                "$baseUrl/api/files/${ownerData!['collectionId']}/${ownerData!['id']}/${ownerData!['avatar']}",
             width: 50,
             height: 50,
             fit: BoxFit.cover,
             placeholder: (context, url) => Container(
               color: Colors.grey[200],
-              child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
+              child: const Center(
+                  child: CircularProgressIndicator(strokeWidth: 2)),
             ),
             errorWidget: (context, url, error) => Container(
               color: Colors.grey[300],
-              child: Icon(Icons.person, color: Colors.grey[400],),
+              child: Icon(
+                Icons.person,
+                color: Colors.grey[400],
+              ),
             ),
           ),
         ),
         title: Text(
           ownerData!['firstname'] ?? "Unknown",
-          style: TextStyle(fontWeight: FontWeight.bold),
+          style: const TextStyle(fontWeight: FontWeight.bold),
         ),
         subtitle: Text(
           ownerData!['bio'] ?? "No bio available",
-          style: TextStyle(fontSize: 12),
+          style: const TextStyle(fontSize: 12),
           maxLines: 2,
           overflow: TextOverflow.ellipsis,
         ),
-        trailing: Icon(Icons.person, color: Colors.amber,size: 35,),
+        trailing: const Icon(
+          Icons.person,
+          color: Colors.amber,
+          size: 35,
+        ),
       ),
     );
   }
@@ -396,7 +419,7 @@ class _MemberListScreenState extends State<MemberListScreen> {
       children: [
         // Search and Settings Bar
         Container(
-          padding: EdgeInsets.all(16),
+          padding: const EdgeInsets.all(16),
           child: Row(
             children: [
               Expanded(
@@ -408,7 +431,7 @@ class _MemberListScreenState extends State<MemberListScreen> {
                   ),
                   child: TextField(
                     controller: searchController,
-                    decoration: InputDecoration(
+                    decoration: const InputDecoration(
                       hintText: 'Search by name or ID',
                       prefixIcon: Icon(Icons.search),
                       border: InputBorder.none,
@@ -421,58 +444,63 @@ class _MemberListScreenState extends State<MemberListScreen> {
               // Leave Room Text with Three Dots Menu
               if (widget.isJoined && !isCurrentUserAdmin && !isCurrentUserOwner)
                 PopupMenuButton<String>(
-                  icon: Icon(Icons.more_vert),
+                  icon: const Icon(Icons.more_vert),
                   onSelected: (value) async {
                     // Replace the leave logic section with this corrected version
                     if (value == 'leave') {
-
                       // Show confirmation dialog
                       final shouldLeave = await showDialog<bool>(
                         context: context,
                         builder: (context) => AlertDialog(
-                          title: Text('Leave Room'),
-                          content: Text('Are you sure you want to leave this room?'),
+                          title: const Text('Leave Room'),
+                          content: const Text(
+                              'Are you sure you want to leave this room?'),
                           actions: [
                             TextButton(
                               onPressed: () => Navigator.pop(context, false),
-                              child: Text('Cancel'),
+                              child: const Text('Cancel'),
                             ),
                             TextButton(
                               onPressed: () {
-                                _deleteDuplicateOnlineUserRecords(widget.currentUserId, widget.voiceRoomId);
+                                _deleteDuplicateOnlineUserRecords(
+                                    widget.currentUserId, widget.voiceRoomId);
                                 _leaving();
                                 print('Leave button pressed'); // Debug log
-                                Navigator.pop(context,true); // Close the dialog
+                                Navigator.pop(
+                                    context, true); // Close the dialog
                                 // Try to get the parent context
-                                final parentContext = context.findAncestorStateOfType<LivePageState>()?.context;
+                                final parentContext = context
+                                    .findAncestorStateOfType<LivePageState>()
+                                    ?.context;
                                 if (parentContext != null) {
                                   print('Found parent context'); // Debug log
                                   LivePage.handleLogout(parentContext);
                                 } else {
-                                  print('Parent context not found, using current context'); // Debug log
+                                  print(
+                                      'Parent context not found, using current context'); // Debug log
                                   LivePage.handleLogout(context);
                                 }
-                                Navigator.of(context, rootNavigator: true).pop(); // Close member list sheet
+                                Navigator.of(context, rootNavigator: true)
+                                    .pop(); // Close member list sheet
                               },
-                              child: Text('Leave', style: TextStyle(color: Colors.red)),
+                              child: const Text('Leave',
+                                  style: TextStyle(color: Colors.red)),
                             ),
                           ],
                         ),
                       );
 
-                      if (shouldLeave == true) {
-
-                      }
+                      if (shouldLeave == true) {}
                     }
                   },
                   itemBuilder: (context) => [
-                    PopupMenuItem(
+                    const PopupMenuItem(
                       value: 'leave',
                       child: Row(
-
                         children: [
                           SizedBox(width: 8),
-                          Text('Leave Room', style: TextStyle(color: Colors.red)),
+                          Text('Leave Room',
+                              style: TextStyle(color: Colors.red)),
                         ],
                       ),
                     ),
@@ -480,7 +508,7 @@ class _MemberListScreenState extends State<MemberListScreen> {
                 ),
               if (widget.currentUserId == ownerId)
                 IconButton(
-                  icon: Icon(Icons.settings),
+                  icon: const Icon(Icons.settings),
                   onPressed: _showSettingsDialog,
                 ),
             ],
@@ -490,107 +518,122 @@ class _MemberListScreenState extends State<MemberListScreen> {
         // Members List with Owner Profile at top
         Expanded(
           child: isLoading
-              ? Center(child: CircularProgressIndicator())
+              ? const Center(child: CircularProgressIndicator())
               : ListView(
-            padding: EdgeInsets.fromLTRB(16, 0, 16, 80),
-            children: [
-              _buildOwnerProfile(),
-              ...usersList.map((user) {
-                if (searchController.text.isNotEmpty &&
-                    !user['firstname'].toString().toLowerCase().contains(searchController.text.toLowerCase()) &&
-                    !user['id'].toString().toLowerCase().contains(searchController.text.toLowerCase())) {
-                  return SizedBox.shrink();
-                }
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 80),
+                  children: [
+                    _buildOwnerProfile(),
+                    ...usersList.map((user) {
+                      if (searchController.text.isNotEmpty &&
+                          !user['firstname']
+                              .toString()
+                              .toLowerCase()
+                              .contains(searchController.text.toLowerCase()) &&
+                          !user['id']
+                              .toString()
+                              .toLowerCase()
+                              .contains(searchController.text.toLowerCase())) {
+                        return const SizedBox.shrink();
+                      }
 
-                final isAdmin = user['isAdmin'] == true;
-                final isCurrentUser = widget.currentUserId == user['id'];
-                final isOwner = user['id'] == ownerId;
+                      final isAdmin = user['isAdmin'] == true;
+                      final isCurrentUser = widget.currentUserId == user['id'];
+                      final isOwner = user['id'] == ownerId;
 
-                return Container(
-                  height: 70,
-                  margin: EdgeInsets.only(bottom: 8),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(10),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.05),
-                        blurRadius: 4,
-                        offset: Offset(0, 2),
-                      ),
-                    ],
-                  ),
-                  child: ListTile(
-                    leading: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        if (isAdmin)
-                          Padding(
-                            padding: EdgeInsets.only(right: 8),
-                            child: Icon(
-                              Icons.person,
-                              color: Colors.blue,
-                              size: 20,
+                      return Container(
+                        height: 70,
+                        margin: const EdgeInsets.only(bottom: 8),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(10),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.05),
+                              blurRadius: 4,
+                              offset: const Offset(0, 2),
                             ),
+                          ],
+                        ),
+                        child: ListTile(
+                          leading: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              if (isAdmin)
+                                const Padding(
+                                  padding: EdgeInsets.only(right: 8),
+                                  child: Icon(
+                                    Icons.person,
+                                    color: Colors.blue,
+                                    size: 20,
+                                  ),
+                                ),
+                              ClipRRect(
+                                borderRadius: BorderRadius.circular(25),
+                                child: CachedNetworkImage(
+                                  imageUrl:
+                                      "$baseUrl/api/files/${user['collectionId']}/${user['id']}/${user['avatar']}",
+                                  width: 50,
+                                  height: 50,
+                                  fit: BoxFit.cover,
+                                  placeholder: (context, url) => Container(
+                                    color: Colors.grey[200],
+                                    child: const Center(
+                                        child: CircularProgressIndicator(
+                                            strokeWidth: 2)),
+                                  ),
+                                  errorWidget: (context, url, error) =>
+                                      Container(
+                                    color: Colors.grey[300],
+                                    child: Icon(Icons.person,
+                                        color: Colors.grey[400]),
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(25),
-                          child: CachedNetworkImage(
-                            imageUrl: "$baseUrl/api/files/${user['collectionId']}/${user['id']}/${user['avatar']}",
-                            width: 50,
-                            height: 50,
-                            fit: BoxFit.cover,
-                            placeholder: (context, url) => Container(
-                              color: Colors.grey[200],
-                              child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
-                            ),
-                            errorWidget: (context, url, error) => Container(
-                              color: Colors.grey[300],
-                              child: Icon(Icons.person, color: Colors.grey[400]),
-                            ),
+                          title: Text(
+                            user['firstname'] ?? "Unknown",
+                            style: const TextStyle(fontWeight: FontWeight.bold),
+                          ),
+                          subtitle: Text(
+                            user['bio'] ?? "No bio available",
+                            style: const TextStyle(fontSize: 12),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          trailing: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              if ((widget.currentUserId == ownerId ||
+                                      (adminIds
+                                              .contains(widget.currentUserId) &&
+                                          !isAdmin)) &&
+                                  widget.currentUserId != user['id'])
+                                IconButton(
+                                  icon: const Icon(Icons.remove_circle_outline,
+                                      color: Colors.red),
+                                  onPressed: () => removeUser(
+                                      user['id'], user['joinedUserId']),
+                                ),
+                            ],
                           ),
                         ),
-                      ],
-                    ),
-                    title: Text(
-                      user['firstname'] ?? "Unknown",
-                      style: TextStyle(fontWeight: FontWeight.bold),
-                    ),
-                    subtitle: Text(
-                      user['bio'] ?? "No bio available",
-                      style: TextStyle(fontSize: 12),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    trailing: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        if ((widget.currentUserId == ownerId ||
-                            (adminIds.contains(widget.currentUserId) && !isAdmin)) &&
-                            widget.currentUserId != user['id'])
-                          IconButton(
-                            icon: Icon(Icons.remove_circle_outline, color: Colors.red),
-                            onPressed: () => removeUser(user['id'], user['joinedUserId']),
-                          ),
-                      ],
-                    ),
-                  ),
-                );
-              }).toList(),
-            ],
-          ),
+                      );
+                    }),
+                  ],
+                ),
         ),
 
         // Empty container at bottom (previously join button)
         Container(
-          padding: EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
           decoration: BoxDecoration(
             color: Colors.white,
             boxShadow: [
               BoxShadow(
                 color: Colors.black.withOpacity(0.05),
                 blurRadius: 10,
-                offset: Offset(0, -5),
+                offset: const Offset(0, -5),
               ),
             ],
           ),
@@ -603,11 +646,11 @@ class _MemberListScreenState extends State<MemberListScreen> {
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.white,
-      shape: RoundedRectangleBorder(
+      shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
       builder: (context) => Container(
-        padding: EdgeInsets.symmetric(vertical: 24, horizontal: 16),
+        padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -615,7 +658,7 @@ class _MemberListScreenState extends State<MemberListScreen> {
             Container(
               width: 40,
               height: 4,
-              margin: EdgeInsets.only(bottom: 20),
+              margin: const EdgeInsets.only(bottom: 20),
               decoration: BoxDecoration(
                 color: Colors.grey[300],
                 borderRadius: BorderRadius.circular(2),
@@ -623,27 +666,27 @@ class _MemberListScreenState extends State<MemberListScreen> {
             ),
 
             // Title
-            Text(
+            const Text(
               'Room Settings',
               style: TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.bold,
               ),
             ),
-            SizedBox(height: 24),
+            const SizedBox(height: 24),
 
             // Set Admin Option
             ListTile(
               leading: Container(
-                padding: EdgeInsets.all(8),
+                padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
                   color: Colors.blue.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(8),
                 ),
-                child: Icon(Icons.person_add, color: Colors.blue),
+                child: const Icon(Icons.person_add, color: Colors.blue),
               ),
-              title: Text('Set Admin'),
-              subtitle: Text('Promote a member to admin'),
+              title: const Text('Set Admin'),
+              subtitle: const Text('Promote a member to admin'),
               onTap: () {
                 Navigator.pop(context);
                 Navigator.push(
@@ -657,20 +700,20 @@ class _MemberListScreenState extends State<MemberListScreen> {
               },
             ),
 
-            SizedBox(height: 12),
+            const SizedBox(height: 12),
 
             // Dismiss Admin Option
             ListTile(
               leading: Container(
-                padding: EdgeInsets.all(8),
+                padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
                   color: Colors.red.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(8),
                 ),
-                child: Icon(Icons.person_remove, color: Colors.red),
+                child: const Icon(Icons.person_remove, color: Colors.red),
               ),
-              title: Text('Dismiss Admin'),
-              subtitle: Text('Remove admin privileges'),
+              title: const Text('Dismiss Admin'),
+              subtitle: const Text('Remove admin privileges'),
               onTap: () {
                 Navigator.pop(context);
                 Navigator.push(
@@ -684,13 +727,10 @@ class _MemberListScreenState extends State<MemberListScreen> {
               },
             ),
 
-            SizedBox(height: 24),
+            const SizedBox(height: 24),
           ],
         ),
       ),
     );
   }
-
-
 }
-

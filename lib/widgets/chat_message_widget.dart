@@ -419,7 +419,7 @@ class _InlineMessageListState extends State<InlineMessageList> {
       ChatMessage message, bool isCurrentUser, BuildContext context) {
     final giftData = message.giftData;
     if (giftData == null) return Container();
-
+    print('🎨 Building gift UI - photoUrl: ${giftData.photoUrl}');
     return Container(
       alignment: Alignment.centerLeft,
       margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 16),
@@ -468,13 +468,13 @@ class _InlineMessageListState extends State<InlineMessageList> {
             Row(
               children: [
                 // Gift animation
-                if (giftData.giftUrl != null)
+                if (giftData.photoUrl != null)
                   ClipRRect(
                     borderRadius: BorderRadius.circular(8),
                     child: SizedBox(
                       width: 30,
                       height: 30,
-                      child: SVGASimpleImage(resUrl: giftData.giftUrl!),
+                      child: Image(image: NetworkImage(giftData.photoUrl!)),
                     ),
                   ),
                 const SizedBox(width: 8),

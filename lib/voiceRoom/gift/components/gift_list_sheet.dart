@@ -42,6 +42,9 @@ class GiftData {
           '', // Added to fromJson, note the API uses 'catagory'
     );
   }
+  String getPhotoUrl(String pocketbaseUrl) {
+    return '$pocketbaseUrl/api/files/$collectionId/$id/$giftPhoto';
+  }
 
   ZegoGiftItem toZegoGiftItem(String pocketbaseUrl) {
     // Construct full URLs for assets
@@ -194,6 +197,8 @@ class _ZegoGiftSheetState extends State<ZegoGiftSheet>
   final String pocketbaseUrl = 'http://145.223.21.62:8090';
   bool isLoading = false;
 
+  Map<String, List<GiftData>> originalGiftsByCategory = {};
+
   @override
   void initState() {
     super.initState();
@@ -258,11 +263,79 @@ class _ZegoGiftSheetState extends State<ZegoGiftSheet>
     }
   }
 
+  // Future<void> _loadGifts() async {
+  //   try {
+  //     List<GiftData> allGifts = [];
+  //     int page = 1;
+  //     int perPage = 50000;
+  //     bool hasMore = true;
+
+  //     while (hasMore) {
+  //       final response = await http.get(
+  //         Uri.parse(
+  //             '$pocketbaseUrl/api/collections/gifts/records?page=$page&perPage=$perPage'),
+  //       );
+
+  //       if (response.statusCode == 200) {
+  //         final data = json.decode(response.body);
+  //         final List<GiftData> pageGifts = (data['items'] as List)
+  //             .map((item) => GiftData.fromJson(item))
+  //             .toList();
+
+  //         allGifts.addAll(pageGifts);
+
+  //         // Check if there are more pages
+  //         hasMore = data['items'].length == perPage;
+  //         page++;
+
+  //         print(
+  //             'Loaded page $page: ${pageGifts.length} gifts (Total so far: ${allGifts.length}) ${data['items']}');
+  //       } else {
+  //         throw Exception('Failed to load gifts: ${response.statusCode}');
+  //       }
+  //     }
+
+  //     print('Total gifts loaded: ${allGifts.length}');
+
+  //     // Debug: Print all gifts and their categories
+  //     print('\n=== ALL GIFTS ===');
+  //     for (var gift in allGifts) {
+  //       print('Gift: "${gift.giftname}" -> Category: "${gift.category}"');
+  //     }
+
+  //     // Organize gifts by category
+  //     categorizedGifts.clear();
+  //     for (var category in categories) {
+  //       var matchingGifts = allGifts
+  //           .where((gift) => gift.category == category.categoryName)
+  //           .toList();
+
+  //       categorizedGifts[category.id] = matchingGifts
+  //           .map((gift) => gift.toZegoGiftItem(pocketbaseUrl))
+  //           .toList();
+
+  //       print(
+  //           'Category "${category.categoryName}" has ${categorizedGifts[category.id]?.length ?? 0} gifts');
+  //     }
+
+  //     if (mounted) {
+  //       setState(() {});
+  //     }
+  //   } catch (e) {
+  //     print('Error loading all gifts: $e');
+  //     if (mounted) {
+  //       ScaffoldMessenger.of(context).showSnackBar(
+  //         SnackBar(content: Text('Error loading gifts: ${e.toString()}')),
+  //       );
+  //     }
+  //   }
+  // }
+
   Future<void> _loadGifts() async {
     try {
       List<GiftData> allGifts = [];
       int page = 1;
-      int perPage = 50;
+      int perPage = 50000;
       bool hasMore = true;
 
       while (hasMore) {
@@ -279,7 +352,6 @@ class _ZegoGiftSheetState extends State<ZegoGiftSheet>
 
           allGifts.addAll(pageGifts);
 
-          // Check if there are more pages
           hasMore = data['items'].length == perPage;
           page++;
 
@@ -292,19 +364,19 @@ class _ZegoGiftSheetState extends State<ZegoGiftSheet>
 
       print('Total gifts loaded: ${allGifts.length}');
 
-      // Debug: Print all gifts and their categories
-      print('\n=== ALL GIFTS ===');
-      for (var gift in allGifts) {
-        print('Gift: "${gift.giftname}" -> Category: "${gift.category}"');
-      }
-
-      // Organize gifts by category
+      // Organize gifts by category and store both original and ZegoGiftItem versions
       categorizedGifts.clear();
+      originalGiftsByCategory.clear();
+
       for (var category in categories) {
         var matchingGifts = allGifts
             .where((gift) => gift.category == category.categoryName)
             .toList();
 
+        // Store original GiftData
+        originalGiftsByCategory[category.id] = matchingGifts;
+
+        // Store ZegoGiftItem version
         categorizedGifts[category.id] = matchingGifts
             .map((gift) => gift.toZegoGiftItem(pocketbaseUrl))
             .toList();
@@ -324,6 +396,18 @@ class _ZegoGiftSheetState extends State<ZegoGiftSheet>
         );
       }
     }
+  }
+
+  // Helper method to find original GiftData by ZegoGiftItem name
+  GiftData? _findOriginalGiftData(ZegoGiftItem giftItem) {
+    for (var categoryGifts in originalGiftsByCategory.values) {
+      for (var gift in categoryGifts) {
+        if (gift.giftname == giftItem.name) {
+          return gift;
+        }
+      }
+    }
+    return null;
   }
 
   Future<void> _loadUserBalance() async {
@@ -670,6 +754,98 @@ class _ZegoGiftSheetState extends State<ZegoGiftSheet>
   //   }
   // }
 
+  // Future<void> sendGift(ZegoGiftItem giftItem, int count, User receiver) async {
+  //   try {
+  //     print('Sending gift with following details:');
+  //     print('Receiver ID: ${receiver.id}');
+  //     print('Receiver Username: ${receiver.username}');
+  //     print('Gift Name: ${giftItem.name}');
+  //     print('Count: $count');
+  //     print('Room ID: ${widget.roomId}');
+
+  //     if (!_validateGiftItem(giftItem)) {
+  //       throw Exception('Invalid gift data');
+  //     }
+
+  //     final totalCost = giftItem.weight * count.toDouble();
+  //     final rewardAmount = totalCost * 0.4;
+
+  //     // Check balance first
+  //     if (!await _checkAndUpdateBalance(totalCost)) {
+  //       if (mounted) {
+  //         _showSnackBar('Insufficient balance!');
+  //       }
+  //       return;
+  //     }
+
+  //     // Prepare the payload
+  //     final payload = {
+  //       'sender_user_id': loggedUserId,
+  //       'reciever_user_id': receiver.id,
+  //       'gifts_url': giftItem.sourceURL,
+  //       'giftname': giftItem.name,
+  //       'gift_count': count,
+  //       'voiceRoomId': widget.roomId
+  //     };
+
+  //     print('Sending request with payload:');
+  //     print(json.encode(payload));
+
+  //     // Send to server first
+  //     final response = await http.post(
+  //         Uri.parse('http://145.223.21.62:6003/api/gifts/send'),
+  //         headers: {'Content-Type': 'application/json'},
+  //         body: json.encode(payload));
+
+  //     print('Server response status: ${response.statusCode}');
+  //     print('Server response body: ${response.body}');
+
+  //     if (response.statusCode != 200) {
+  //       throw Exception('Failed to send gift to server');
+  //     }
+
+  //     // Update receiver wallet BEFORE closing dialog
+  //     print('Updating receiver wallet...');
+  //     await _updateReceiverWallet(receiver.id, rewardAmount);
+  //     print('Receiver wallet updated successfully');
+
+  //     // Emit gift message BEFORE closing dialog
+  //     print('Emitting gift message...');
+  //     await _emitGiftMessage(giftItem, count, receiver, totalCost);
+  //     print('Gift message emitted successfully');
+
+  //     // Close dialog
+  //     if (mounted) {
+  //       Navigator.of(context).pop();
+  //     }
+
+  //     // Handle gift playback after dialog is closed
+  //     try {
+  //       await _handleGiftPlayback(giftItem, count);
+  //       print('Gift playback completed successfully');
+  //     } catch (e) {
+  //       print('Animation error: $e');
+  //       if (mounted) {
+  //         _showSnackBar('Gift sent but animation failed');
+  //       }
+  //       return; // Don't show success message if animation failed
+  //     }
+
+  //     // Show success message
+  //     if (mounted) {
+  //       Future.delayed(const Duration(milliseconds: 500), () {
+  //         if (mounted) {
+  //           _showSnackBar('Gift sent successfully!');
+  //         }
+  //       });
+  //     }
+  //   } catch (e) {
+  //     print('Error sending gift: $e');
+  //     if (mounted) {
+  //       _showSnackBar('Error sending gift: ${e.toString()}');
+  //     }
+  //   }
+  // }
   Future<void> sendGift(ZegoGiftItem giftItem, int count, User receiver) async {
     try {
       print('Sending gift with following details:');
@@ -694,11 +870,17 @@ class _ZegoGiftSheetState extends State<ZegoGiftSheet>
         return;
       }
 
+      // Find original gift data to get photo URL
+      final originalGift = _findOriginalGiftData(giftItem);
+      final giftPhotoUrl =
+          originalGift?.getPhotoUrl(pocketbaseUrl) ?? giftItem.icon;
+
       // Prepare the payload
       final payload = {
         'sender_user_id': loggedUserId,
         'reciever_user_id': receiver.id,
-        'gifts_url': giftItem.sourceURL,
+        'gifts_url': giftItem
+            .sourceURL, // This is still the SVGA/animation file for server storage
         'giftname': giftItem.name,
         'gift_count': count,
         'voiceRoomId': widget.roomId
@@ -725,9 +907,10 @@ class _ZegoGiftSheetState extends State<ZegoGiftSheet>
       await _updateReceiverWallet(receiver.id, rewardAmount);
       print('Receiver wallet updated successfully');
 
-      // Emit gift message BEFORE closing dialog
-      print('Emitting gift message...');
-      await _emitGiftMessage(giftItem, count, receiver, totalCost);
+      // Emit gift message BEFORE closing dialog - using photo URL instead of SVGA URL
+      print('Emitting gift message with photo URL: $giftPhotoUrl');
+      await _emitGiftMessage(
+          giftItem, count, receiver, totalCost, giftPhotoUrl);
       print('Gift message emitted successfully');
 
       // Close dialog
@@ -744,7 +927,7 @@ class _ZegoGiftSheetState extends State<ZegoGiftSheet>
         if (mounted) {
           _showSnackBar('Gift sent but animation failed');
         }
-        return; // Don't show success message if animation failed
+        return;
       }
 
       // Show success message
@@ -764,8 +947,27 @@ class _ZegoGiftSheetState extends State<ZegoGiftSheet>
   }
 
 // **NEW: Add this method to emit gift message via socket**
-  Future<void> _emitGiftMessage(
-      ZegoGiftItem giftItem, int count, User receiver, double totalCost) async {
+  // Future<void> _emitGiftMessage(
+  //     ZegoGiftItem giftItem, int count, User receiver, double totalCost) async {
+  //   try {
+  //     // Use the messageService that was passed to the widget
+  //     widget.messageService.sendGiftMessage(
+  //       receiverUserId: receiver.id,
+  //       receiverUserName: receiver.username,
+  //       giftName: giftItem.name,
+  //       giftCount: count,
+  //       giftUrl: giftItem.sourceURL,
+  //       totalCost: totalCost.toInt(),
+  //     );
+
+  //     print('Gift message sent via socket successfully');
+  //   } catch (e) {
+  //     print('Error emitting gift message: $e');
+  //   }
+  // }
+
+  Future<void> _emitGiftMessage(ZegoGiftItem giftItem, int count, User receiver,
+      double totalCost, String giftPhotoUrl) async {
     try {
       // Use the messageService that was passed to the widget
       widget.messageService.sendGiftMessage(
@@ -773,11 +975,13 @@ class _ZegoGiftSheetState extends State<ZegoGiftSheet>
         receiverUserName: receiver.username,
         giftName: giftItem.name,
         giftCount: count,
-        giftUrl: giftItem.sourceURL,
+        giftUrl: giftItem.sourceURL, // Use photo URL instead of SVGA URL
+        photourl: giftPhotoUrl,
         totalCost: totalCost.toInt(),
       );
 
-      print('Gift message sent via socket successfully');
+      print(
+          'Gift message sent via socket successfully with photo URL: $giftPhotoUrl');
     } catch (e) {
       print('Error emitting gift message: $e');
     }
@@ -965,8 +1169,10 @@ class _ZegoGiftSheetState extends State<ZegoGiftSheet>
               ],
               Container(
                 padding: EdgeInsets.only(
-                    top: 10,
-                    bottom: MediaQuery.of(context).padding.bottom + 10),
+                  top: 10,
+                  bottom: MediaQuery.of(context).viewInsets.bottom +
+                      MediaQuery.of(context).padding.bottom,
+                ),
                 decoration: BoxDecoration(
                   border: Border(
                     top: BorderSide(

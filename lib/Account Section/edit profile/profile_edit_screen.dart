@@ -375,10 +375,19 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                     children: [
                       ProfileEditTile(
                         icon: 'assets/icons/ic-user.svg',
-                        text: 'Name',
+                        text: 'First Name',
                         onTap: () => Navigator.pushNamed(context, 'edit-name'),
                         endWidget: TextWithArrow(
                           text: userData?['firstname'] ?? '',
+                        ),
+                      ),
+                      _buildDivider(),
+                      ProfileEditTile(
+                        icon: 'assets/icons/ic-user.svg',
+                        text: 'Last Name',
+                        onTap: () => Navigator.pushNamed(context, 'edit-lname'),
+                        endWidget: TextWithArrow(
+                          text: userData?['lastname'] ?? '',
                         ),
                       ),
                       _buildDivider(),

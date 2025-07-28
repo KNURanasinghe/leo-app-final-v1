@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import '../constants.dart';
 import 'badges/badges_screen.dart';
+import 'edi_lname.dart';
 import 'edit_bio.dart';
 import 'edit_motto.dart';
 import 'edit_name_screen.dart';
@@ -40,6 +41,7 @@ class MainProfile extends StatelessWidget {
           'edit-profile': (context) =>
               EditProfileScreen(firstname: name, userId: userId),
           'edit-name': (context) => EditNameScreen(userId: userId),
+          'edit-lname': (context) => EditLNameScreen(userId: userId),
           'edit-bio': (context) => EditBio(
                 userId: userId,
               ),

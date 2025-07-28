@@ -5,13 +5,14 @@ import 'dart:convert';
 class RankingBottomSheet extends StatefulWidget {
   final String roomId;
 
-  const RankingBottomSheet({Key? key, required this.roomId}) : super(key: key);
+  const RankingBottomSheet({super.key, required this.roomId});
 
   @override
   _RankingBottomSheetState createState() => _RankingBottomSheetState();
 }
 
-class _RankingBottomSheetState extends State<RankingBottomSheet> with SingleTickerProviderStateMixin {
+class _RankingBottomSheetState extends State<RankingBottomSheet>
+    with SingleTickerProviderStateMixin {
   late TabController _tabController;
   bool isLoading = true;
   List<Map<String, dynamic>> dailyRankings = [];
@@ -43,20 +44,21 @@ class _RankingBottomSheetState extends State<RankingBottomSheet> with SingleTick
   Future<void> _fetchGiftDiamondAmounts() async {
     try {
       print('Fetching gift diamond amounts...');
+      int page = 1;
+      const int perPage = 50000;
       final response = await http.get(
-        Uri.parse('http://145.223.21.62:8090/api/collections/gifts/records'),
+        Uri.parse(
+            'http://145.223.21.62:8090/api/collections/gifts/records?page=$page&perPage=$perPage'),
       );
-
+      print('diamond re ${response.body}');
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         final items = data['items'] as List;
 
-        diamondAmounts = Map.fromEntries(
-            items.map((item) => MapEntry(
+        diamondAmounts = Map.fromEntries(items.map((item) => MapEntry(
               item['giftname'],
               (item['diamond_amount'] as num).toDouble(),
-            ))
-        );
+            )));
         print('Fetched diamond amounts: $diamondAmounts');
       }
     } catch (e) {
@@ -70,7 +72,8 @@ class _RankingBottomSheetState extends State<RankingBottomSheet> with SingleTick
     try {
       print('Fetching user details for ID: $userId');
       final response = await http.get(
-        Uri.parse('http://145.223.21.62:8090/api/collections/users/records/$userId'),
+        Uri.parse(
+            'http://145.223.21.62:8090/api/collections/users/records/$userId'),
       );
 
       if (response.statusCode == 200) {
@@ -83,41 +86,117 @@ class _RankingBottomSheetState extends State<RankingBottomSheet> with SingleTick
     }
   }
 
+  // Future<void> _fetchRankings() async {
+  //   try {
+  //     print('Fetching rankings for room: ${widget.roomId}');
+  //     final response = await http.get(
+  //       Uri.parse(
+  //           'http://145.223.21.62:8090/api/collections/sending_recieving_gifts/records?filter=(voiceRoomId="${widget.roomId}")'),
+  //     );
+
+  //     if (response.statusCode == 200) {
+  //       final data = json.decode(response.body);
+  //       final gifts = data['items'] as List;
+
+  //       // Process for daily rankings
+  //       final now = DateTime.now();
+  //       final today = DateTime(now.year, now.month, now.day);
+  //       final dailyGifts = gifts
+  //           .where((gift) => DateTime.parse(gift['created']).isAfter(today))
+  //           .toList();
+
+  //       // Process for weekly rankings
+  //       final weekAgo = now.subtract(const Duration(days: 7));
+  //       final weeklyGifts = gifts
+  //           .where((gift) => DateTime.parse(gift['created']).isAfter(weekAgo))
+  //           .toList();
+
+  //       // Calculate rankings
+  //       dailyRankings = await _calculateRankings(dailyGifts);
+  //       weeklyRankings = await _calculateRankings(weeklyGifts);
+  //       totalRankings = await _calculateRankings(gifts);
+
+  //       setState(() {});
+  //     }
+  //   } catch (e) {
+  //     print('Error fetching rankings: $e');
+  //   }
+  // }
+
   Future<void> _fetchRankings() async {
     try {
       print('Fetching rankings for room: ${widget.roomId}');
-      final response = await http.get(
-        Uri.parse('http://145.223.21.62:8090/api/collections/sending_recieving_gifts/records?filter=(voiceRoomId="${widget.roomId}")'),
-      );
 
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        final gifts = data['items'] as List;
+      List<dynamic> allGifts = [];
+      int page = 1;
+      const int perPage = 500000; // Adjust based on your needs and API limits
+      bool hasMoreData = true;
 
-        // Process for daily rankings
-        final now = DateTime.now();
-        final today = DateTime(now.year, now.month, now.day);
-        final dailyGifts = gifts.where((gift) =>
-            DateTime.parse(gift['created']).isAfter(today)).toList();
+      // Fetch all pages
+      while (hasMoreData) {
+        final response = await http.get(
+          Uri.parse(
+              'http://145.223.21.62:8090/api/collections/sending_recieving_gifts/records?filter=(voiceRoomId="${widget.roomId}")&page=$page&perPage=$perPage&sort=-created'),
+        );
 
-        // Process for weekly rankings
-        final weekAgo = now.subtract(Duration(days: 7));
-        final weeklyGifts = gifts.where((gift) =>
-            DateTime.parse(gift['created']).isAfter(weekAgo)).toList();
+        if (response.statusCode == 200) {
+          final data = json.decode(response.body);
+          final gifts = data['items'] as List;
+          print('data from ranking ${data.toString()}');
 
-        // Calculate rankings
-        dailyRankings = await _calculateRankings(dailyGifts);
-        weeklyRankings = await _calculateRankings(weeklyGifts);
-        totalRankings = await _calculateRankings(gifts);
+          if (gifts.isEmpty) {
+            hasMoreData = false;
+          } else {
+            allGifts.addAll(gifts);
 
-        setState(() {});
+            // Check if we've fetched all available records
+            final totalItems = data['totalItems'] as int;
+            final totalPages = data['totalPages'] as int;
+
+            if (page >= totalPages || allGifts.length >= totalItems) {
+              hasMoreData = false;
+            } else {
+              page++;
+            }
+          }
+
+          print('Fetched page $page, total gifts so far: ${allGifts.length}');
+        } else {
+          print('Error: HTTP ${response.statusCode}');
+          hasMoreData = false;
+        }
       }
+
+      print('Total gifts fetched: ${allGifts.length}');
+
+      // Process for daily rankings
+      final now = DateTime.now();
+      final today = DateTime(now.year, now.month, now.day);
+      final dailyGifts = allGifts
+          .where((gift) => DateTime.parse(gift['created']).isAfter(today))
+          .toList();
+
+      // Process for weekly rankings
+      final weekAgo = now.subtract(const Duration(days: 7));
+      final weeklyGifts = allGifts
+          .where((gift) => DateTime.parse(gift['created']).isAfter(weekAgo))
+          .toList();
+
+      // Calculate rankings
+      dailyRankings = await _calculateRankings(dailyGifts);
+      weeklyRankings = await _calculateRankings(weeklyGifts);
+      totalRankings = await _calculateRankings(allGifts);
+      print(
+          'Daily rankings: $dailyRankings   Weekly rankings: $weeklyRankings');
+
+      setState(() {});
     } catch (e) {
       print('Error fetching rankings: $e');
     }
   }
 
-  Future<List<Map<String, dynamic>>> _calculateRankings(List<dynamic> gifts) async {
+  Future<List<Map<String, dynamic>>> _calculateRankings(
+      List<dynamic> gifts) async {
     Map<String, double> userTotals = {};
 
     for (var gift in gifts) {
@@ -126,32 +205,35 @@ class _RankingBottomSheetState extends State<RankingBottomSheet> with SingleTick
       final count = gift['gift_count'] as int;
       final diamondAmount = diamondAmounts[giftName] ?? 0.0;
 
-      userTotals[senderId] = (userTotals[senderId] ?? 0) + (count * diamondAmount);
+      userTotals[senderId] =
+          (userTotals[senderId] ?? 0) + (count * diamondAmount);
       await _fetchUserDetails(senderId);
     }
 
     var sortedUsers = userTotals.entries.toList()
       ..sort((a, b) => b.value.compareTo(a.value));
 
-    return sortedUsers.map((entry) => {
-      'userId': entry.key,
-      'total': entry.value,
-      'userDetails': userDetails[entry.key],
-    }).toList();
+    return sortedUsers
+        .map((entry) => {
+              'userId': entry.key,
+              'total': entry.value,
+              'userDetails': userDetails[entry.key],
+            })
+        .toList();
   }
 
   @override
   Widget build(BuildContext context) {
     return Container(
       height: MediaQuery.of(context).size.height * 0.7,
-      decoration: BoxDecoration(
+      decoration: const BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
       child: Column(
         children: [
           // Center-aligned title row
-          Row(
+          const Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Padding(
@@ -169,10 +251,10 @@ class _RankingBottomSheetState extends State<RankingBottomSheet> with SingleTick
 
           // Tab bar
           Container(
-            margin: EdgeInsets.only(top: 8),
+            margin: const EdgeInsets.only(top: 8),
             child: TabBar(
               controller: _tabController,
-              tabs: [
+              tabs: const [
                 Tab(text: 'Daily'),
                 Tab(text: 'Weekly'),
                 Tab(text: 'Total'),
@@ -180,22 +262,23 @@ class _RankingBottomSheetState extends State<RankingBottomSheet> with SingleTick
               labelColor: Colors.blue,
               unselectedLabelColor: Colors.grey,
               indicatorSize: TabBarIndicatorSize.label,
-              labelStyle: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+              labelStyle:
+                  const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
             ),
           ),
 
           // Content
           Expanded(
             child: isLoading
-                ? Center(child: CircularProgressIndicator())
+                ? const Center(child: CircularProgressIndicator())
                 : TabBarView(
-              controller: _tabController,
-              children: [
-                _buildRankingList(dailyRankings),
-                _buildRankingList(weeklyRankings),
-                _buildRankingList(totalRankings),
-              ],
-            ),
+                    controller: _tabController,
+                    children: [
+                      _buildRankingList(dailyRankings),
+                      _buildRankingList(weeklyRankings),
+                      _buildRankingList(totalRankings),
+                    ],
+                  ),
           ),
         ],
       ),
@@ -204,30 +287,30 @@ class _RankingBottomSheetState extends State<RankingBottomSheet> with SingleTick
 
   Widget _buildRankingList(List<Map<String, dynamic>> rankings) {
     return ListView.builder(
-      padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       itemCount: rankings.length,
       itemBuilder: (context, index) {
         final ranking = rankings[index];
         final userDetail = ranking['userDetails'];
 
         return Container(
-          margin: EdgeInsets.symmetric(vertical: 8),
+          margin: const EdgeInsets.symmetric(vertical: 8),
           child: Row(
             children: [
               // Rank number or medal
               Container(
                 width: 30,
-                margin: EdgeInsets.only(right: 12),
+                margin: const EdgeInsets.only(right: 12),
                 child: index < 3
                     ? Image.asset('assets/images/medal${index + 1}.png')
                     : Text(
-                  '${index + 1}',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w500,
-                    color: Colors.grey[600],
-                  ),
-                ),
+                        '${index + 1}',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w500,
+                          color: Colors.grey[600],
+                        ),
+                      ),
               ),
 
               // Profile image
@@ -239,14 +322,13 @@ class _RankingBottomSheetState extends State<RankingBottomSheet> with SingleTick
                   border: Border.all(color: Colors.grey[200]!),
                   image: DecorationImage(
                     image: NetworkImage(
-                        'http://145.223.21.62:8090/api/files/${userDetail['collectionId']}/${userDetail['id']}/${userDetail['avatar']}'
-                    ),
+                        'http://145.223.21.62:8090/api/files/${userDetail['collectionId']}/${userDetail['id']}/${userDetail['avatar']}'),
                     fit: BoxFit.cover,
                   ),
                 ),
               ),
 
-              SizedBox(width: 12),
+              const SizedBox(width: 12),
 
               // Name and motto
               Expanded(
@@ -255,7 +337,7 @@ class _RankingBottomSheetState extends State<RankingBottomSheet> with SingleTick
                   children: [
                     Text(
                       userDetail['firstname'] ?? 'Unknown',
-                      style: TextStyle(
+                      style: const TextStyle(
                         fontWeight: FontWeight.w600,
                         fontSize: 15,
                       ),
@@ -282,10 +364,10 @@ class _RankingBottomSheetState extends State<RankingBottomSheet> with SingleTick
                     width: 16,
                     height: 16,
                   ),
-                  SizedBox(width: 4),
+                  const SizedBox(width: 4),
                   Text(
                     '${ranking['total'].toStringAsFixed(0)}',
-                    style: TextStyle(
+                    style: const TextStyle(
                       fontWeight: FontWeight.w600,
                       fontSize: 14,
                       color: Colors.black,

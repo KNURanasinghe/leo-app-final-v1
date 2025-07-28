@@ -255,6 +255,8 @@ class LivePageState extends State<LivePage>
 
   bool ismute = false;
 
+  final Map<String, bool> _userAdminStates = {};
+
 // Convert existing methods to return Future<void> consistently
 
   void _playGiftAnimation({
@@ -768,7 +770,13 @@ class LivePageState extends State<LivePage>
 
                   // Link to pick custom file
                   Padding(
-                    padding: const EdgeInsets.all(16.0),
+                    padding: EdgeInsets.only(
+                        bottom: MediaQuery.of(context).viewInsets.bottom +
+                            MediaQuery.of(context).padding.bottom +
+                            10,
+                        top: 16,
+                        left: 16,
+                        right: 16),
                     child: InkWell(
                       onTap: () async {
                         Navigator.pop(context);
@@ -1245,6 +1253,38 @@ class LivePageState extends State<LivePage>
     }
   }
 
+  Future<bool> _fetchUserAdminState(String userId) async {
+    try {
+      final response = await http.get(
+        Uri.parse(
+            'http://145.223.21.62:8090/api/collections/joined_users/records'),
+        headers: {'Content-Type': 'application/json'},
+      );
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        final joinedUsers = data['items'] as List;
+
+        // Find the user by userId and voice_room_id (assuming you have roomId variable)
+        final userInRoom = joinedUsers.firstWhere(
+          (joinedUser) =>
+              joinedUser['userid'] == userId &&
+              joinedUser['voice_room_id'] ==
+                  widget.roomID, // Make sure you have roomId available
+          orElse: () => null,
+        );
+
+        if (userInRoom != null) {
+          // Check if admin_or_not field is true
+          return userInRoom['admin_or_not'] == true;
+        }
+      }
+    } catch (e) {
+      print('Error fetching user admin state: $e');
+    }
+    return false;
+  }
+
   @override
   void initState() {
     super.initState();
@@ -1404,11 +1444,14 @@ class LivePageState extends State<LivePage>
     });
 
 // In your initState() method
-    socket.on('userEntry', (data) {
+    socket.on('userEntry', (data) async {
       print('Received user entry: $data');
 
       if (mounted) {
+        final isAdmin1 = await _fetchUserAdminState(data['userId']);
+        print('User23 ${data['userId']} is admin: $isAdmin1');
         setState(() {
+          _userAdminStates[data['userId']] = isAdmin1;
           // Create entry animation widget with username
           _activeEntries[data['userId']] = _buildEntryAnimation(
             data['userName'],
@@ -3487,7 +3530,6 @@ class LivePageState extends State<LivePage>
       const double nameLabelHeight = 20;
       final double avatarSize =
           size.width * 0.66; // Make avatar 60% of seat width
-      final bool isUserAdmin = seatData['userId'] == widget.userId && isAdmin;
 
       String? currentUserId;
       if (user != null) {
@@ -3496,6 +3538,9 @@ class LivePageState extends State<LivePage>
 
       final bool isThisUserMuted =
           !ZegoUIKit().getMicrophoneStateNotifier(currentUserId ?? '').value;
+
+      final bool isSeatUserAdmin =
+          _userAdminStates[seatData['userId']] ?? false;
 
       return Column(
         children: [
@@ -3586,6 +3631,9 @@ class LivePageState extends State<LivePage>
                     const SizedBox(
                       width: 3,
                     ),
+                  ] else if (isSeatUserAdmin) ...[
+                    const Icon(Icons.person, size: 16, color: Colors.blue),
+                    const SizedBox(width: 3),
                   ],
                   Text(
                     "${seatData['userName']}",
@@ -3647,6 +3695,9 @@ class LivePageState extends State<LivePage>
 
   void _showSettingsDialog() {
     final roomNameController = TextEditingController(text: _voiceRoomName);
+    final bool isCurrentUserAdmin = _userAdminStates[widget.userId] == true;
+    print('current user admin $isCurrentUserAdmin');
+
     showDialog(
       context: context,
       builder: (context) => Dialog(
@@ -3837,7 +3888,7 @@ class LivePageState extends State<LivePage>
 
                 const Divider(color: Colors.white12, indent: 56),
 
-                // NEW: Announcement Setting
+                // Announcement Setting
                 ListTile(
                   leading: Container(
                     padding: const EdgeInsets.all(8),
@@ -3875,69 +3926,101 @@ class LivePageState extends State<LivePage>
 
                 const SizedBox(height: 20),
 
-                // Danger Zone
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: Colors.red.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: Colors.red.withOpacity(0.3),
-                      width: 1,
+                // Danger Zone - Only show for room owner (isAdmin), not for regular admins
+                if (isAdmin) // Only room owner can disband
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Colors.red.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: Colors.red.withOpacity(0.3),
+                        width: 1,
+                      ),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Danger Zone',
+                          style: TextStyle(
+                            fontFamily: 'poppins',
+                            color: Colors.red[300],
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        GestureDetector(
+                          onTap: () {
+                            Navigator.pop(context);
+                            _showDisbandConfirmation();
+                          },
+                          child: Row(
+                            children: [
+                              Icon(Icons.delete_forever,
+                                  color: Colors.red[400]),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      'Disband Group',
+                                      style: TextStyle(
+                                        fontFamily: 'poppins',
+                                        color: Colors.red[400],
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                    Text(
+                                      'Permanently delete this room',
+                                      style: TextStyle(
+                                        fontFamily: 'poppins',
+                                        color: Colors.red[200],
+                                        fontSize: 12,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Danger Zone',
-                        style: TextStyle(
-                          fontFamily: 'poppins',
-                          color: Colors.red[300],
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                        ),
+
+                // Show different message for admins who can't disband
+                if (isCurrentUserAdmin && !isAdmin)
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Colors.blue.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: Colors.blue.withOpacity(0.3),
+                        width: 1,
                       ),
-                      const SizedBox(height: 12),
-                      GestureDetector(
-                        onTap: () {
-                          Navigator.pop(context);
-                          _showDisbandConfirmation();
-                        },
-                        child: Row(
-                          children: [
-                            Icon(Icons.delete_forever, color: Colors.red[400]),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    'Disband Group',
-                                    style: TextStyle(
-                                      fontFamily: 'poppins',
-                                      color: Colors.red[400],
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                  Text(
-                                    'Permanently delete this room',
-                                    style: TextStyle(
-                                      fontFamily: 'poppins',
-                                      color: Colors.red[200],
-                                      fontSize: 12,
-                                    ),
-                                  ),
-                                ],
-                              ),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(Icons.info_outline, color: Colors.blue[300]),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            'You have admin privileges to manage room settings, but only the room owner can disband the group.',
+                            style: TextStyle(
+                              fontFamily: 'poppins',
+                              color: Colors.blue[200],
+                              fontSize: 12,
                             ),
-                          ],
+                          ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
-                ),
 
                 const SizedBox(height: 16),
               ],
@@ -4470,6 +4553,12 @@ class LivePageState extends State<LivePage>
 
   @override
   Widget build(BuildContext context) {
+    final bool isCurrentUserAdmin = _userAdminStates[widget.userId] == true;
+    final bool shouldShowSettings = isAdmin || isCurrentUserAdmin;
+
+    print('isAdmin: $isAdmin');
+    print('isCurrentUserAdmin: $isCurrentUserAdmin');
+    print('shouldShowSettings: $shouldShowSettings');
     return WillPopScope(
       onWillPop: () async {
         if (ZegoUIKitPrebuiltLiveAudioRoomController().minimize.isMinimizing) {
@@ -4675,6 +4764,12 @@ class LivePageState extends State<LivePage>
               bottom: MediaQuery.of(context).size.height * 0.12,
               child: Column(
                 children: [
+                  if (_activeGifts.isNotEmpty)
+                    ...(_activeGifts.entries.map((entry) {
+                      return Positioned.fill(
+                        child: entry.value,
+                      );
+                    }).toList()),
                   // These are completely separate components
                   // if (_messages.isEmpty) _buildWelcomeAndAnnouncement(),
 
@@ -4690,12 +4785,6 @@ class LivePageState extends State<LivePage>
               ),
             ),
 
-            if (_activeGifts.isNotEmpty)
-              ...(_activeGifts.entries.map((entry) {
-                return Positioned.fill(
-                  child: entry.value,
-                );
-              }).toList()),
             // In your build method, replace the current music player position with this
             Positioned(
               left: 0,
@@ -4951,11 +5040,21 @@ class LivePageState extends State<LivePage>
             //   ),
             // ),
 
-            if (isAdmin)
+            if (_activeEntries.isNotEmpty)
+              SizedBox(
+                width: double.infinity,
+                height: double.infinity,
+                child: Stack(
+                  children: _activeEntries.entries.map((entry) {
+                    return entry.value;
+                  }).toList(),
+                ),
+              ),
+
+            if (isAdmin || _userAdminStates[widget.userId] == true)
               Positioned(
                 top: MediaQuery.of(context).size.height * 0.02,
-                right: MediaQuery.of(context).size.width *
-                    0.13, // Responsive positioning
+                right: MediaQuery.of(context).size.width * 0.13,
                 child: GestureDetector(
                   onTap: _showSettingsDialog,
                   child: Container(
@@ -4975,21 +5074,13 @@ class LivePageState extends State<LivePage>
                   ),
                 ),
               ),
-            if (_activeEntries.isNotEmpty)
-              SizedBox(
-                width: double.infinity,
-                height: double.infinity,
-                child: Stack(
-                  children: _activeEntries.entries.map((entry) {
-                    return entry.value;
-                  }).toList(),
-                ),
-              ),
 
             // Share button
             Positioned(
               top: MediaQuery.of(context).size.height * 0.02,
-              right: isAdmin ? 100 : 55, // Adjust based on admin status
+              right: isAdmin || _userAdminStates[widget.userId] == true
+                  ? 100
+                  : 55, // Adjust based on admin status
               child: GestureDetector(
                 onTap: () => _showShareOptions(context),
                 child: Container(
