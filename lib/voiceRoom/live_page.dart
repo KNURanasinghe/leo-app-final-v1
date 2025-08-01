@@ -275,16 +275,16 @@ class LivePageState extends State<LivePage>
     _giftTimers.clear();
     _activeGifts.clear();
 
-    // setState(() {
-    //   // Add new gift animation
-    //   _activeGifts[animationId] = _buildGiftAnimation(
-    //     giftUrl: giftUrl,
-    //     giftCount: giftCount,
-    //     giftName: giftName,
-    //     senderName: senderName,
-    //     receiverName: receiverName,
-    //   );
-    // });
+    setState(() {
+      // Add new gift animation
+      _activeGifts[animationId] = _buildGiftAnimation(
+        giftUrl: giftUrl,
+        giftCount: giftCount,
+        giftName: giftName,
+        senderName: senderName,
+        receiverName: receiverName,
+      );
+    });
 
     // Remove animation after duration (adjust as needed)
     _giftTimers[animationId] = Timer(const Duration(seconds: 8), () {
@@ -300,107 +300,107 @@ class LivePageState extends State<LivePage>
         '🎬 Playing gift animation: $giftName (${giftCount}x) from $senderName to $receiverName');
   }
 
-  // Widget _buildGiftAnimation({
-  //   required String giftUrl,
-  //   required int giftCount,
-  //   required String giftName,
-  //   required String senderName,
-  //   required String receiverName,
-  // }) {
-  //   return Container(
-  //     width: double.infinity,
-  //     height: double.infinity,
-  //     color: Colors.black.withOpacity(0.3), // Semi-transparent overlay
-  //     child: Stack(
-  //       children: [
-  //         // Full-screen SVGA animation
-  //         Positioned.fill(
-  //           child: Center(
-  //             child: SVGASimpleImage(
-  //               resUrl: giftUrl,
-  //               // Cover the full screen
-  //             ),
-  //           ),
-  //         ),
+  Widget _buildGiftAnimation({
+    required String giftUrl,
+    required int giftCount,
+    required String giftName,
+    required String senderName,
+    required String receiverName,
+  }) {
+    return Container(
+      width: double.infinity,
+      height: double.infinity,
+      color: Colors.black.withOpacity(0.3), // Semi-transparent overlay
+      child: Stack(
+        children: [
+          // Full-screen SVGA animation
+          Positioned.fill(
+            child: Center(
+              child: SVGASimpleImage(
+                resUrl: giftUrl,
+                // Cover the full screen
+              ),
+            ),
+          ),
 
-  //         // Gift information overlay at the bottom
-  //         Positioned(
-  //           bottom: MediaQuery.of(context).size.height * 0.15,
-  //           left: 20,
-  //           right: 20,
-  //           child: Container(
-  //             padding: const EdgeInsets.all(16),
-  //             decoration: BoxDecoration(
-  //               color: Colors.black.withOpacity(0.7),
-  //               borderRadius: BorderRadius.circular(16),
-  //               border: Border.all(color: Colors.white.withOpacity(0.3)),
-  //             ),
-  //             child: Column(
-  //               mainAxisSize: MainAxisSize.min,
-  //               children: [
-  //                 // Gift count and name
-  //                 Row(
-  //                   mainAxisAlignment: MainAxisAlignment.center,
-  //                   children: [
-  //                     Text(
-  //                       '${giftCount}x ',
-  //                       style: const TextStyle(
-  //                         color: Colors.yellow,
-  //                         fontSize: 24,
-  //                         fontWeight: FontWeight.bold,
-  //                         decoration: TextDecoration.none,
-  //                       ),
-  //                     ),
-  //                     Text(
-  //                       giftName,
-  //                       style: const TextStyle(
-  //                         color: Colors.white,
-  //                         fontSize: 20,
-  //                         fontWeight: FontWeight.bold,
-  //                         decoration: TextDecoration.none,
-  //                       ),
-  //                     ),
-  //                   ],
-  //                 ),
-  //                 const SizedBox(height: 8),
-  //                 // Sender and receiver info
-  //                 RichText(
-  //                   textAlign: TextAlign.center,
-  //                   text: TextSpan(
-  //                     style: const TextStyle(
-  //                       fontSize: 16,
-  //                       decoration: TextDecoration.none,
-  //                     ),
-  //                     children: [
-  //                       TextSpan(
-  //                         text: senderName,
-  //                         style: const TextStyle(
-  //                           color: Colors.blue,
-  //                           fontWeight: FontWeight.bold,
-  //                         ),
-  //                       ),
-  //                       const TextSpan(
-  //                         text: ' sent ',
-  //                         style: TextStyle(color: Colors.white),
-  //                       ),
-  //                       TextSpan(
-  //                         text: receiverName,
-  //                         style: const TextStyle(
-  //                           color: Colors.pink,
-  //                           fontWeight: FontWeight.bold,
-  //                         ),
-  //                       ),
-  //                     ],
-  //                   ),
-  //                 ),
-  //               ],
-  //             ),
-  //           ),
-  //         ),
-  //       ],
-  //     ),
-  //   );
-  // }
+          // Gift information overlay at the bottom
+          // Positioned(
+          //   bottom: MediaQuery.of(context).size.height * 0.15,
+          //   left: 20,
+          //   right: 20,
+          //   child: Container(
+          //     padding: const EdgeInsets.all(16),
+          //     decoration: BoxDecoration(
+          //       color: Colors.black.withOpacity(0.7),
+          //       borderRadius: BorderRadius.circular(16),
+          //       border: Border.all(color: Colors.white.withOpacity(0.3)),
+          //     ),
+          //     child: Column(
+          //       mainAxisSize: MainAxisSize.min,
+          //       children: [
+          //         // Gift count and name
+          //         Row(
+          //           mainAxisAlignment: MainAxisAlignment.center,
+          //           children: [
+          //             Text(
+          //               '${giftCount}x ',
+          //               style: const TextStyle(
+          //                 color: Colors.yellow,
+          //                 fontSize: 24,
+          //                 fontWeight: FontWeight.bold,
+          //                 decoration: TextDecoration.none,
+          //               ),
+          //             ),
+          //             Text(
+          //               giftName,
+          //               style: const TextStyle(
+          //                 color: Colors.white,
+          //                 fontSize: 20,
+          //                 fontWeight: FontWeight.bold,
+          //                 decoration: TextDecoration.none,
+          //               ),
+          //             ),
+          //           ],
+          //         ),
+          //         const SizedBox(height: 8),
+          //         // Sender and receiver info
+          //         RichText(
+          //           textAlign: TextAlign.center,
+          //           text: TextSpan(
+          //             style: const TextStyle(
+          //               fontSize: 16,
+          //               decoration: TextDecoration.none,
+          //             ),
+          //             children: [
+          //               TextSpan(
+          //                 text: senderName,
+          //                 style: const TextStyle(
+          //                   color: Colors.blue,
+          //                   fontWeight: FontWeight.bold,
+          //                 ),
+          //               ),
+          //               const TextSpan(
+          //                 text: ' sent ',
+          //                 style: TextStyle(color: Colors.white),
+          //               ),
+          //               TextSpan(
+          //                 text: receiverName,
+          //                 style: const TextStyle(
+          //                   color: Colors.pink,
+          //                   fontWeight: FontWeight.bold,
+          //                 ),
+          //               ),
+          //             ],
+          //           ),
+          //         ),
+          //       ],
+          //     ),
+          //   ),
+          // ),
+        ],
+      ),
+    );
+  }
 
 // Load current user's active item for entry animations
   Future<void> _fetchAndSetUserActiveItemAsync() async {
@@ -958,11 +958,20 @@ class LivePageState extends State<LivePage>
   void _handleSeatTaken(String userId, int seatIndex) {
     if (socket.connected) {
       print('Handling seat taken: User $userId taking seat $seatIndex');
+      bool isUserAdmin = _userAdminStates[userId] ?? false;
       String? borderUrl = _userBorders[userId];
 
       if (userId == widget.userId && borderUrl == null) {
         // Try to get from any recent fetch
         borderUrl = _userBorders[widget.userId];
+      }
+      print(
+          'Checking admin1 state for current user: ${_userAdminStates[widget.userId]}');
+      if (userId == widget.userId && !_userAdminStates.containsKey(userId)) {
+        // Maybe the admin state is stored under a different key?
+        print(
+            'Checking admin state for current user: ${_userAdminStates[widget.userId]}');
+        isUserAdmin = _userAdminStates[widget.userId] ?? false;
       }
       // Emit the seat taken event with complete information
       socket.emit('seatTaken', {
@@ -971,7 +980,8 @@ class LivePageState extends State<LivePage>
         'seatIndex': seatIndex,
         'userAvatar': _userAvatarUrl,
         'userName': widget.username1,
-        'borderUrl': borderUrl
+        'borderUrl': borderUrl,
+        'isAdmin': isUserAdmin,
       });
 
       // Update our local state immediately for responsive UI
@@ -980,7 +990,8 @@ class LivePageState extends State<LivePage>
           'userId': userId,
           'userName': widget.username1,
           'userAvatar': _userAvatarUrl,
-          'borderUrl': borderUrl
+          'borderUrl': borderUrl,
+          'isAdmin': isUserAdmin,
         };
       });
 
@@ -1346,7 +1357,8 @@ class LivePageState extends State<LivePage>
             'userId': data['userId'],
             'userName': data['userName'],
             'userAvatar': data['userAvatar'],
-            'borderUrl': data['borderUrl']
+            'borderUrl': data['borderUrl'],
+            'isAdmin': data['isAdmin'] ?? false,
           };
         });
         print('Seat taken updated: $_seatOccupants');
@@ -1379,7 +1391,8 @@ class LivePageState extends State<LivePage>
               'userId': data['userId'],
               'userName': data['userName'],
               'userAvatar': data['userAvatar'],
-              'borderUrl': data['borderUrl']
+              'borderUrl': data['borderUrl'],
+              'isAdmin': data['isAdmin'] ?? false,
             };
           } else {
             // Remove seat occupant data when seat is released
@@ -1513,7 +1526,7 @@ class LivePageState extends State<LivePage>
     WidgetsBinding.instance.addPostFrameCallback((timeStamp) {
       _initializePostFrameParallel();
       ZegoGiftManager().service.init(
-            appID: 970649463,
+            appID: 192529389,
             liveID: widget.roomID,
             localUserID: localUserID,
             localUserName: widget.username1,
@@ -1710,7 +1723,7 @@ class LivePageState extends State<LivePage>
     try {
       // Initialize ZEGO first (this must be sequential)
       ZegoGiftManager().service.init(
-            appID: 970649463,
+            appID: 192529389,
             liveID: widget.roomID,
             localUserID: localUserID,
             localUserName: widget.username1,
@@ -1834,14 +1847,15 @@ class LivePageState extends State<LivePage>
 
     socket.on('seatTaken', (data) {
       print(
-          'seat taken ${data['seatIndex']} ${data['userId']} ${data['userName']} ${data['userAvatar']} ${data['borderUrl']}');
+          'seat taken ${data['seatIndex']} ${data['userId']} ${data['userName']} ${data['userAvatar']} ${data['borderUrl']} ${data['isAdmin']}');
       if (mounted) {
         setState(() {
           _seatOccupants[data['seatIndex']] = {
             'userId': data['userId'],
             'userName': data['userName'],
             'userAvatar': data['userAvatar'],
-            'borderUrl': data['borderUrl']
+            'borderUrl': data['borderUrl'],
+            'isAdmin': data['isAdmin'],
           };
         });
       }
@@ -1869,10 +1883,11 @@ class LivePageState extends State<LivePage>
               'userId': data['userId'],
               'userName': data['userName'],
               'userAvatar': data['userAvatar'],
-              'borderUrl': data['borderUrl']
+              'borderUrl': data['borderUrl'],
+              'isAdmin': data['isAdmin'],
             };
             print(
-                'Seat istaken ${data['seatIndex']} taken by ${data['userId']} - ${data['userName']}');
+                'Seat istaken ${data['seatIndex']} taken by ${data['userId']} - ${data['userName']} - ${data['isAdmin']}');
           } else {
             _seatOccupants.remove(data['seatIndex']);
           }
@@ -2017,7 +2032,8 @@ class LivePageState extends State<LivePage>
                 'userId': seatData['userId'],
                 'userName': seatData['userName'],
                 'userAvatar': seatData['userAvatar'],
-                'borderUrl': seatData['borderUrl']
+                'borderUrl': seatData['borderUrl'],
+                'isAdmin': seatData['isAdmin'],
               };
             } else {
               _seatOccupants.remove(seatIndex); // Remove if seat is empty
@@ -3538,9 +3554,12 @@ class LivePageState extends State<LivePage>
 
       final bool isThisUserMuted =
           !ZegoUIKit().getMicrophoneStateNotifier(currentUserId ?? '').value;
+      print('is this user muted $isThisUserMuted');
 
       final bool isSeatUserAdmin =
-          _userAdminStates[seatData['userId']] ?? false;
+          seatData['isAdmin'] ?? _userAdminStates[seatData['userId']] ?? false;
+      print(
+          'seat useer admin ${seatData['isAdmin'] ?? _userAdminStates[seatData['userId']] ?? false}   $isSeatUserAdmin');
 
       return Column(
         children: [
@@ -4728,9 +4747,9 @@ class LivePageState extends State<LivePage>
           children: [
             // Main Zego UIKit widget
             ZegoUIKitPrebuiltLiveAudioRoom(
-              appID: 970649463,
+              appID: 192529389,
               appSign:
-                  '208a410cd46ba9cc218ebfbf27e366c1247991300164ae66512cce6eab7ec74c',
+                  'a7b8e7f82f93266b7a6df9d4f45360f4d9f056393f8d4fdd493bd4f24fe2a2f6',
               userID: localUserID,
               userName: widget.username1,
               roomID: widget.roomID,
@@ -4738,6 +4757,12 @@ class LivePageState extends State<LivePage>
               config: config,
             ),
 
+            if (_activeGifts.isNotEmpty)
+              ...(_activeGifts.entries.map((entry) {
+                return Positioned.fill(
+                  child: entry.value,
+                );
+              }).toList()),
 // In your build method, near where the emoji animation renderer is
             // if (_activeEntries.isNotEmpty)
             //   SizedBox(
@@ -4758,32 +4783,6 @@ class LivePageState extends State<LivePage>
             //   ),
 
             // In your build method, adjust the InlineMessageList positioning
-            Positioned(
-              left: 0,
-              right: 0,
-              bottom: MediaQuery.of(context).size.height * 0.12,
-              child: Column(
-                children: [
-                  if (_activeGifts.isNotEmpty)
-                    ...(_activeGifts.entries.map((entry) {
-                      return Positioned.fill(
-                        child: entry.value,
-                      );
-                    }).toList()),
-                  // These are completely separate components
-                  // if (_messages.isEmpty) _buildWelcomeAndAnnouncement(),
-
-                  // Only show this when there are messages (replaces welcome/announcement)
-                  if (_messages.isNotEmpty)
-                    InlineMessageList(
-                      messages: _messages,
-                      currentUserId: widget.userId,
-                      maxVisibleMessages: 5,
-                      welcome: _buildWelcomeAndAnnouncement(),
-                    ),
-                ],
-              ),
-            ),
 
             // In your build method, replace the current music player position with this
             Positioned(
@@ -4818,6 +4817,27 @@ class LivePageState extends State<LivePage>
               ),
             ),
             // _buildWelcomeAndAnnouncement(),
+
+            Positioned(
+              left: 0,
+              right: 0,
+              bottom: MediaQuery.of(context).size.height * 0.12,
+              child: Column(
+                children: [
+                  // These are completely separate components
+                  // if (_messages.isEmpty) _buildWelcomeAndAnnouncement(),
+
+                  // Only show this when there are messages (replaces welcome/announcement)
+                  if (_messages.isNotEmpty)
+                    InlineMessageList(
+                      messages: _messages,
+                      currentUserId: widget.userId,
+                      maxVisibleMessages: 5,
+                      welcome: _buildWelcomeAndAnnouncement(),
+                    ),
+                ],
+              ),
+            ),
 
             // if (_activeEmojis.isNotEmpty)
             //   SizedBox(
