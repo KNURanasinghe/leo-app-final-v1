@@ -1170,8 +1170,7 @@ class _ZegoGiftSheetState extends State<ZegoGiftSheet>
               Container(
                 padding: EdgeInsets.only(
                   top: 10,
-                  bottom: MediaQuery.of(context).viewInsets.bottom +
-                      MediaQuery.of(context).padding.bottom,
+                  bottom: MediaQuery.of(context).viewInsets.bottom,
                 ),
                 decoration: BoxDecoration(
                   border: Border(

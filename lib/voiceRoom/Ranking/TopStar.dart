@@ -9,23 +9,23 @@ class TopGifterCard extends StatelessWidget {
   final double totalAmount;
 
   const TopGifterCard({
-    Key? key,
+    super.key,
     required this.userDetails,
     required this.totalAmount,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      margin: EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-      padding: EdgeInsets.all(12),
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: [
-            Color(0xFF3CB371).withOpacity(0.95),  // Medium sea green
-            Color(0xFF006400).withOpacity(0.90),
+            const Color(0xFF3CB371).withOpacity(0.95), // Medium sea green
+            const Color(0xFF006400).withOpacity(0.90),
           ],
         ),
         borderRadius: BorderRadius.circular(12),
@@ -34,7 +34,7 @@ class TopGifterCard extends StatelessWidget {
             color: Colors.blue.withOpacity(0.2),
             spreadRadius: 1,
             blurRadius: 4,
-            offset: Offset(0, 2),
+            offset: const Offset(0, 2),
           ),
         ],
       ),
@@ -56,7 +56,7 @@ class TopGifterCard extends StatelessWidget {
                 child: Image.network(
                   'http://145.223.21.62:8090/api/files/${userDetails['collectionId']}/${userDetails['id']}/${userDetails['avatar']}',
                   fit: BoxFit.cover,
-                  errorBuilder: (context, error, stackTrace) => Icon(
+                  errorBuilder: (context, error, stackTrace) => const Icon(
                     Icons.person,
                     color: Colors.white,
                     size: 25,
@@ -64,13 +64,13 @@ class TopGifterCard extends StatelessWidget {
                 ),
               ),
             ),
-            SizedBox(width: 12),
+            const SizedBox(width: 12),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Row(
+                  const Row(
                     children: [
                       Icon(
                         Icons.workspace_premium,
@@ -89,10 +89,10 @@ class TopGifterCard extends StatelessWidget {
                       ),
                     ],
                   ),
-                  SizedBox(height: 4),
+                  const SizedBox(height: 4),
                   Text(
                     userDetails['firstname'] ?? 'Unknown',
-                    style: TextStyle(
+                    style: const TextStyle(
                       color: Colors.white,
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
@@ -112,7 +112,7 @@ class TopGifterCard extends StatelessWidget {
               ),
             ),
             Container(
-              padding: EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
               decoration: BoxDecoration(
                 color: Colors.white.withOpacity(0.15),
                 borderRadius: BorderRadius.circular(20),
@@ -129,10 +129,10 @@ class TopGifterCard extends StatelessWidget {
                     width: 16,
                     height: 16,
                   ),
-                  SizedBox(width: 4),
+                  const SizedBox(width: 4),
                   Text(
-                    '${totalAmount.toStringAsFixed(0)}',
-                    style: TextStyle(
+                    totalAmount.toStringAsFixed(0),
+                    style: const TextStyle(
                       color: Colors.white,
                       fontSize: 14,
                       fontWeight: FontWeight.bold,
@@ -149,6 +149,8 @@ class TopGifterCard extends StatelessWidget {
 }
 
 class Topstar extends StatefulWidget {
+  const Topstar({super.key});
+
   @override
   _TopstarState createState() => _TopstarState();
 }
@@ -161,7 +163,7 @@ class _TopstarState extends State<Topstar> with SingleTickerProviderStateMixin {
   List<Map<String, dynamic>> monthlyRankings = [];
   Map<String, dynamic>? lastWeekTopGifter;
 
-  static Map<String, DateTime> _lastFetchTime = {};
+  static final Map<String, DateTime> _lastFetchTime = {};
   static const cacheDuration = Duration(minutes: 5);
 
   @override
@@ -210,7 +212,8 @@ class _TopstarState extends State<Topstar> with SingleTickerProviderStateMixin {
 
   Future<void> _fetchDailyRankings() async {
     try {
-      final response = await http.get(Uri.parse('$STAR_API_URL/api/stars/daily'));
+      final response =
+          await http.get(Uri.parse('$STAR_API_URL/api/stars/daily'));
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         if (data['success'] == true && data['data'] != null) {
@@ -224,14 +227,16 @@ class _TopstarState extends State<Topstar> with SingleTickerProviderStateMixin {
     }
   }
 
-
   Future<void> _fetchLastWeekTopGifter() async {
     try {
-      final response = await http.get(Uri.parse('$STAR_API_URL/api/stars/last-week'));
+      final response =
+          await http.get(Uri.parse('$STAR_API_URL/api/stars/last-week'));
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
-        if (data['success'] == true && data['data'] != null && data['data'].isNotEmpty) {
+        if (data['success'] == true &&
+            data['data'] != null &&
+            data['data'].isNotEmpty) {
           final topStar = data['data'][0];
           setState(() {
             lastWeekTopGifter = {
@@ -250,7 +255,8 @@ class _TopstarState extends State<Topstar> with SingleTickerProviderStateMixin {
 
   Future<void> _fetchWeeklyRankings() async {
     try {
-      final response = await http.get(Uri.parse('$STAR_API_URL/api/stars/weekly'));
+      final response =
+          await http.get(Uri.parse('$STAR_API_URL/api/stars/weekly'));
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         if (data['success'] == true && data['data'] != null) {
@@ -266,7 +272,8 @@ class _TopstarState extends State<Topstar> with SingleTickerProviderStateMixin {
 
   Future<void> _fetchMonthlyRankings() async {
     try {
-      final response = await http.get(Uri.parse('$STAR_API_URL/api/stars/monthly'));
+      final response =
+          await http.get(Uri.parse('$STAR_API_URL/api/stars/monthly'));
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         if (data['success'] == true && data['data'] != null) {
@@ -280,8 +287,6 @@ class _TopstarState extends State<Topstar> with SingleTickerProviderStateMixin {
     }
   }
 
-
-
   @override
   Widget build(BuildContext context) {
     return Column(
@@ -294,10 +299,10 @@ class _TopstarState extends State<Topstar> with SingleTickerProviderStateMixin {
                 : (lastWeekTopGifter!['total'] as double? ?? 0.0),
           ),
         Container(
-          margin: EdgeInsets.only(top: 8),
+          margin: const EdgeInsets.only(top: 8),
           child: TabBar(
             controller: _tabController,
-            tabs: [
+            tabs: const [
               Tab(text: 'Today'),
               Tab(text: 'This Week'),
               Tab(text: 'This Month'),
@@ -305,20 +310,21 @@ class _TopstarState extends State<Topstar> with SingleTickerProviderStateMixin {
             labelColor: Colors.blue,
             unselectedLabelColor: Colors.grey,
             indicatorSize: TabBarIndicatorSize.label,
-            labelStyle: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+            labelStyle:
+                const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
           ),
         ),
         Expanded(
           child: isLoading
-              ? Center(child: CircularProgressIndicator())
+              ? const Center(child: CircularProgressIndicator())
               : TabBarView(
-            controller: _tabController,
-            children: [
-              _buildRankingList(dailyRankings),
-              _buildRankingList(weeklyRankings),
-              _buildRankingList(monthlyRankings),
-            ],
-          ),
+                  controller: _tabController,
+                  children: [
+                    _buildRankingList(dailyRankings),
+                    _buildRankingList(weeklyRankings),
+                    _buildRankingList(monthlyRankings),
+                  ],
+                ),
         ),
       ],
     );
@@ -328,20 +334,23 @@ class _TopstarState extends State<Topstar> with SingleTickerProviderStateMixin {
     String refreshMessage = '';
     switch (_tabController.index) {
       case 0:
-        refreshMessage = 'This ranking will refresh every day at 00:00 (GMT+5:30)';
+        refreshMessage =
+            'This ranking will refresh every day at 00:00 (GMT+5:30)';
         break;
       case 1:
-        refreshMessage = 'This ranking will refresh every Sunday at 00:00 (GMT+5:30)';
+        refreshMessage =
+            'This ranking will refresh every Sunday at 00:00 (GMT+5:30)';
         break;
       case 2:
-        refreshMessage = 'This ranking will refresh at the end of every month at 00:00 (GMT+5:30)';
+        refreshMessage =
+            'This ranking will refresh at the end of every month at 00:00 (GMT+5:30)';
         break;
     }
 
     return Column(
       children: [
         Container(
-          padding: EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+          padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
           width: double.infinity,
           decoration: BoxDecoration(
             gradient: LinearGradient(
@@ -362,7 +371,7 @@ class _TopstarState extends State<Topstar> with SingleTickerProviderStateMixin {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              SizedBox(width: 8),
+              const SizedBox(width: 8),
               Expanded(
                 child: Text(
                   refreshMessage,
@@ -379,29 +388,29 @@ class _TopstarState extends State<Topstar> with SingleTickerProviderStateMixin {
         ),
         Expanded(
           child: ListView.builder(
-            padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             itemCount: rankings.length,
             itemBuilder: (context, index) {
               final ranking = rankings[index];
               final userDetail = ranking['userDetails'];
 
               return Container(
-                margin: EdgeInsets.symmetric(vertical: 8),
+                margin: const EdgeInsets.symmetric(vertical: 8),
                 child: Row(
                   children: [
                     Container(
                       width: 30,
-                      margin: EdgeInsets.only(right: 12),
+                      margin: const EdgeInsets.only(right: 12),
                       child: index < 3
                           ? Image.asset('assets/images/medal${index + 1}.png')
                           : Text(
-                        '${index + 1}',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w500,
-                          color: Colors.grey[600],
-                        ),
-                      ),
+                              '${index + 1}',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w500,
+                                color: Colors.grey[600],
+                              ),
+                            ),
                     ),
                     Container(
                       width: 50,
@@ -411,20 +420,19 @@ class _TopstarState extends State<Topstar> with SingleTickerProviderStateMixin {
                         border: Border.all(color: Colors.grey[200]!),
                         image: DecorationImage(
                           image: NetworkImage(
-                              'http://145.223.21.62:8090/api/files/${userDetail['collectionId']}/${userDetail['id']}/${userDetail['avatar']}'
-                          ),
+                              'http://145.223.21.62:8090/api/files/${userDetail['collectionId']}/${userDetail['id']}/${userDetail['avatar']}'),
                           fit: BoxFit.cover,
                         ),
                       ),
                     ),
-                    SizedBox(width: 12),
+                    const SizedBox(width: 12),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
                             userDetail['firstname'] ?? 'Unknown',
-                            style: TextStyle(
+                            style: const TextStyle(
                               fontWeight: FontWeight.w600,
                               fontSize: 15,
                             ),
@@ -449,10 +457,10 @@ class _TopstarState extends State<Topstar> with SingleTickerProviderStateMixin {
                           width: 16,
                           height: 16,
                         ),
-                        SizedBox(width: 4),
+                        const SizedBox(width: 4),
                         Text(
                           '${ranking['total'].toStringAsFixed(0)}',
-                          style: TextStyle(
+                          style: const TextStyle(
                             fontWeight: FontWeight.w600,
                             fontSize: 14,
                             color: Colors.black,

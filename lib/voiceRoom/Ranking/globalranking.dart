@@ -17,23 +17,23 @@ class TopRoomCard extends StatelessWidget {
   final double totalAmount;
 
   const TopRoomCard({
-    Key? key,
+    super.key,
     required this.roomDetails,
     required this.totalAmount,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      margin: EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-      padding: EdgeInsets.all(12),
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: [
-            Color(0xFFFF8C00).withOpacity(0.95),  // Dark orange
-            Color(0xFFDC143C).withOpacity(0.90),
+            const Color(0xFFFF8C00).withOpacity(0.95), // Dark orange
+            const Color(0xFFDC143C).withOpacity(0.90),
           ],
         ),
         borderRadius: BorderRadius.circular(12),
@@ -42,7 +42,7 @@ class TopRoomCard extends StatelessWidget {
             color: Colors.blue.withOpacity(0.2),
             spreadRadius: 1,
             blurRadius: 4,
-            offset: Offset(0, 2),
+            offset: const Offset(0, 2),
           ),
         ],
       ),
@@ -59,15 +59,16 @@ class TopRoomCard extends StatelessWidget {
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(6),
                 child: CachedNetworkImage(
-                  imageUrl: 'http://145.223.21.62:8090/api/files/voiceRooms/${roomDetails['id']}/${roomDetails['group_photo']}',
+                  imageUrl:
+                      'http://145.223.21.62:8090/api/files/voiceRooms/${roomDetails['id']}/${roomDetails['group_photo']}',
                   fit: BoxFit.cover,
-                  placeholder: (context, url) => Center(
+                  placeholder: (context, url) => const Center(
                     child: CircularProgressIndicator(
                       strokeWidth: 2,
                       valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
                     ),
                   ),
-                  errorWidget: (context, url, error) => Icon(
+                  errorWidget: (context, url, error) => const Icon(
                     Icons.image_not_supported,
                     color: Colors.white,
                     size: 25,
@@ -75,13 +76,13 @@ class TopRoomCard extends StatelessWidget {
                 ),
               ),
             ),
-            SizedBox(width: 12),
+            const SizedBox(width: 12),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Row(
+                  const Row(
                     children: [
                       SizedBox(width: 4),
                       Text(
@@ -95,10 +96,10 @@ class TopRoomCard extends StatelessWidget {
                       ),
                     ],
                   ),
-                  SizedBox(height: 4),
+                  const SizedBox(height: 4),
                   Text(
                     roomDetails['voice_room_name'] ?? 'Unknown',
-                    style: TextStyle(
+                    style: const TextStyle(
                       color: Colors.white,
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
@@ -118,7 +119,7 @@ class TopRoomCard extends StatelessWidget {
               ),
             ),
             Container(
-              padding: EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
               decoration: BoxDecoration(
                 color: Colors.white.withOpacity(0.15),
                 borderRadius: BorderRadius.circular(20),
@@ -135,10 +136,10 @@ class TopRoomCard extends StatelessWidget {
                     width: 16,
                     height: 16,
                   ),
-                  SizedBox(width: 4),
+                  const SizedBox(width: 4),
                   Text(
-                    '${totalAmount.toStringAsFixed(0)}',
-                    style: TextStyle(
+                    totalAmount.toStringAsFixed(0),
+                    style: const TextStyle(
                       color: Colors.white,
                       fontSize: 14,
                       fontWeight: FontWeight.bold,
@@ -155,13 +156,14 @@ class TopRoomCard extends StatelessWidget {
 }
 
 class GlobalRanking extends StatefulWidget {
-  const GlobalRanking({Key? key}) : super(key: key);
+  const GlobalRanking({super.key});
 
   @override
   _GlobalRankingState createState() => _GlobalRankingState();
 }
 
-class _GlobalRankingState extends State<GlobalRanking> with SingleTickerProviderStateMixin {
+class _GlobalRankingState extends State<GlobalRanking>
+    with SingleTickerProviderStateMixin {
   late TabController _tabController;
   String currentCategory = 'TopRooms';
   bool isLoading = true;
@@ -174,8 +176,8 @@ class _GlobalRankingState extends State<GlobalRanking> with SingleTickerProvider
   List<Map<String, dynamic>> monthlyRankings = [];
 
   // Cache mechanism
-  static Map<String, List<Map<String, dynamic>>> _rankingsCache = {};
-  static Map<String, DateTime> _lastFetchTime = {};
+  static final Map<String, List<Map<String, dynamic>>> _rankingsCache = {};
+  static final Map<String, DateTime> _lastFetchTime = {};
   static const cacheDuration = Duration(minutes: 5);
 
   @override
@@ -199,13 +201,16 @@ class _GlobalRankingState extends State<GlobalRanking> with SingleTickerProvider
     setState(() {
       switch (_tabController.index) {
         case 0:
-          refreshMessage = 'This ranking will refresh every day at 00:00 (GMT+5:30)';
+          refreshMessage =
+              'This ranking will refresh every day at 00:00 (GMT+5:30)';
           break;
         case 1:
-          refreshMessage = 'This ranking will refresh every Sunday at 00:00 (GMT+5:30)';
+          refreshMessage =
+              'This ranking will refresh every Sunday at 00:00 (GMT+5:30)';
           break;
         case 2:
-          refreshMessage = 'This ranking will refresh at the end of every month at 00:00 (GMT+5:30)';
+          refreshMessage =
+              'This ranking will refresh at the end of every month at 00:00 (GMT+5:30)';
           break;
       }
     });
@@ -250,7 +255,8 @@ class _GlobalRankingState extends State<GlobalRanking> with SingleTickerProvider
     }
 
     try {
-      final response = await http.get(Uri.parse('$ROOM_API_URL/api/rooms/daily'));
+      final response =
+          await http.get(Uri.parse('$ROOM_API_URL/api/rooms/daily'));
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
@@ -276,7 +282,8 @@ class _GlobalRankingState extends State<GlobalRanking> with SingleTickerProvider
     }
 
     try {
-      final response = await http.get(Uri.parse('$ROOM_API_URL/api/rooms/weekly'));
+      final response =
+          await http.get(Uri.parse('$ROOM_API_URL/api/rooms/weekly'));
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
@@ -302,7 +309,8 @@ class _GlobalRankingState extends State<GlobalRanking> with SingleTickerProvider
     }
 
     try {
-      final response = await http.get(Uri.parse('$ROOM_API_URL/api/rooms/monthly'));
+      final response =
+          await http.get(Uri.parse('$ROOM_API_URL/api/rooms/monthly'));
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
@@ -321,11 +329,14 @@ class _GlobalRankingState extends State<GlobalRanking> with SingleTickerProvider
 
   Future<void> _fetchLastWeekTopRoom() async {
     try {
-      final response = await http.get(Uri.parse('$ROOM_API_URL/api/rooms/last-week'));
+      final response =
+          await http.get(Uri.parse('$ROOM_API_URL/api/rooms/last-week'));
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
-        if (data['success'] == true && data['data'] != null && data['data'].isNotEmpty) {
+        if (data['success'] == true &&
+            data['data'] != null &&
+            data['data'].isNotEmpty) {
           final topRoom = data['data'][0];
           setState(() {
             lastWeekTopRoom = {
@@ -352,7 +363,7 @@ class _GlobalRankingState extends State<GlobalRanking> with SingleTickerProvider
     return Column(
       children: [
         Container(
-          padding: EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+          padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
           width: double.infinity,
           decoration: BoxDecoration(
             gradient: LinearGradient(
@@ -382,33 +393,33 @@ class _GlobalRankingState extends State<GlobalRanking> with SingleTickerProvider
         ),
         Expanded(
           child: ListView.builder(
-            padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             itemCount: rankings.length,
             itemBuilder: (context, index) {
               final ranking = rankings[index];
               final roomDetails = ranking['roomDetails'];
               final ownerDetails = ranking['ownerDetails'];
 
-              if (roomDetails == null) return SizedBox.shrink();
+              if (roomDetails == null) return const SizedBox.shrink();
 
               return Container(
-                margin: EdgeInsets.symmetric(vertical: 8),
+                margin: const EdgeInsets.symmetric(vertical: 8),
                 child: Row(
                   children: [
                     // Rank number/medal
                     Container(
                       width: 30,
-                      margin: EdgeInsets.only(right: 12),
+                      margin: const EdgeInsets.only(right: 12),
                       child: index < 3
                           ? Image.asset('assets/images/medal${index + 1}.png')
                           : Text(
-                        '${index + 1}',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w500,
-                          color: Colors.grey[600],
-                        ),
-                      ),
+                              '${index + 1}',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w500,
+                                color: Colors.grey[600],
+                              ),
+                            ),
                     ),
 
                     // Room image
@@ -422,9 +433,10 @@ class _GlobalRankingState extends State<GlobalRanking> with SingleTickerProvider
                       child: ClipRRect(
                         borderRadius: BorderRadius.circular(8),
                         child: CachedNetworkImage(
-                          imageUrl: 'http://145.223.21.62:8090/api/files/${roomDetails['collectionId']}/${roomDetails['id']}/${roomDetails['group_photo']}',
+                          imageUrl:
+                              'http://145.223.21.62:8090/api/files/${roomDetails['collectionId']}/${roomDetails['id']}/${roomDetails['group_photo']}',
                           fit: BoxFit.cover,
-                          placeholder: (context, url) => Center(
+                          placeholder: (context, url) => const Center(
                             child: CircularProgressIndicator(strokeWidth: 2),
                           ),
                           errorWidget: (context, url, error) => Icon(
@@ -435,7 +447,7 @@ class _GlobalRankingState extends State<GlobalRanking> with SingleTickerProvider
                       ),
                     ),
 
-                    SizedBox(width: 12),
+                    const SizedBox(width: 12),
 
                     // Room details
                     Expanded(
@@ -444,7 +456,7 @@ class _GlobalRankingState extends State<GlobalRanking> with SingleTickerProvider
                         children: [
                           Text(
                             roomDetails['voice_room_name'] ?? 'Unnamed Room',
-                            style: TextStyle(
+                            style: const TextStyle(
                               fontWeight: FontWeight.w600,
                               fontSize: 15,
                             ),
@@ -462,9 +474,10 @@ class _GlobalRankingState extends State<GlobalRanking> with SingleTickerProvider
                                   ),
                                 ),
                                 clipBehavior: Clip.antiAlias,
-                                child: _buildCountryFlag(roomDetails['voiceRoom_country']),
+                                child: _buildCountryFlag(
+                                    roomDetails['voiceRoom_country']),
                               ),
-                              SizedBox(width: 8),
+                              const SizedBox(width: 8),
                               Expanded(
                                 child: Text(
                                   roomDetails['team_moto'] ?? '',
@@ -491,10 +504,10 @@ class _GlobalRankingState extends State<GlobalRanking> with SingleTickerProvider
                           width: 16,
                           height: 16,
                         ),
-                        SizedBox(width: 4),
+                        const SizedBox(width: 4),
                         Text(
                           '${ranking['total'].toStringAsFixed(0)}',
-                          style: TextStyle(
+                          style: const TextStyle(
                             fontWeight: FontWeight.w600,
                             fontSize: 14,
                             color: Colors.black,
@@ -598,7 +611,7 @@ class _GlobalRankingState extends State<GlobalRanking> with SingleTickerProvider
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           // Category buttons row
-          Container(
+          SizedBox(
             height: 60,
             child: SingleChildScrollView(
               scrollDirection: Axis.horizontal,
@@ -671,11 +684,11 @@ class _GlobalRankingState extends State<GlobalRanking> with SingleTickerProvider
                 labelColor: Colors.blue,
                 unselectedLabelColor: Colors.grey,
                 indicatorColor: Colors.blue,
-                labelStyle: TextStyle(
+                labelStyle: const TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w600,
                 ),
-                unselectedLabelStyle: TextStyle(
+                unselectedLabelStyle: const TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w400,
                 ),
@@ -689,7 +702,7 @@ class _GlobalRankingState extends State<GlobalRanking> with SingleTickerProvider
 
           // Loading indicator
           if (isLoading)
-            Expanded(
+            const Expanded(
               child: Center(
                 child: CircularProgressIndicator(),
               ),
@@ -722,23 +735,25 @@ class _GlobalRankingState extends State<GlobalRanking> with SingleTickerProvider
           ],
         );
       case 'TopGifters':
-        return RankingBottomSheet();
+        return const RankingBottomSheet();
       case 'TopStars':
-        return Topstar();
+        return const Topstar();
       case 'Billionaires':
-        return RechargeRankings();
+        return const RechargeRankings();
       default:
         return Center(
-          child: Text('Category not found', style: TextStyle(color: Colors.grey[600])),
+          child: Text('Category not found',
+              style: TextStyle(color: Colors.grey[600])),
         );
     }
   }
 
-  Widget _buildCategoryButton(String title, List<Color> gradientColors, String category) {
+  Widget _buildCategoryButton(
+      String title, List<Color> gradientColors, String category) {
     bool isSelected = currentCategory == category;
 
     return AnimatedContainer(
-      duration: Duration(milliseconds: 200),
+      duration: const Duration(milliseconds: 200),
       curve: Curves.easeInOut,
       child: GestureDetector(
         onTap: () {
@@ -760,12 +775,12 @@ class _GlobalRankingState extends State<GlobalRanking> with SingleTickerProvider
             borderRadius: BorderRadius.circular(12),
             boxShadow: isSelected
                 ? [
-              BoxShadow(
-                color: gradientColors[0].withOpacity(0.3),
-                blurRadius: 8,
-                offset: Offset(0, 4),
-              ),
-            ]
+                    BoxShadow(
+                      color: gradientColors[0].withOpacity(0.3),
+                      blurRadius: 8,
+                      offset: const Offset(0, 4),
+                    ),
+                  ]
                 : [],
           ),
           child: Text(
@@ -788,7 +803,8 @@ class _GlobalRankingState extends State<GlobalRanking> with SingleTickerProvider
       barrierLabel: '',
       barrierColor: Colors.black87,
       transitionDuration: const Duration(milliseconds: 300),
-      pageBuilder: (context, animation1, animation2) => const RankingRewardPopup(),
+      pageBuilder: (context, animation1, animation2) =>
+          const RankingRewardPopup(),
       transitionBuilder: (context, animation1, animation2, child) {
         return FadeTransition(
           opacity: animation1,

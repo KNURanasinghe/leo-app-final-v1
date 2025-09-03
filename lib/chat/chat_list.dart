@@ -9,9 +9,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 import '../widgets/chat_request_screen.dart';
-// Import your existing CallButtons widget
-
-import '../widgets/custom_call_button.dart'; // Adjust the path as needed
+import '../widgets/custom_call_button.dart';
 
 class ChatListScreenUser extends StatefulWidget {
   final String currentUserId;
@@ -27,15 +25,13 @@ class _ChatListScreenState extends State<ChatListScreenUser>
     with TickerProviderStateMixin, WidgetsBindingObserver {
   final SocketService _socketService = SocketService();
   final Map<String, dynamic> _userStatus = {};
-  final List<String> _chatUsers = []; // Combined list of all chat users
-  final Map<String, Message> _latestMessages =
-      {}; // Store latest messages per user
-  // Add this near your other state variables
-  final Map<String, dynamic> _userProfiles = {}; // Store user profile data
+  final List<String> _chatUsers = [];
+  final Map<String, Message> _latestMessages = {};
+  final Map<String, dynamic> _userProfiles = {};
   bool _isLoading = true;
-  final Map<String, int> _unreadCounts = {}; // Track unread messages per user
+  bool _hasInitialDataLoaded = false; // Add this flag
+  final Map<String, int> _unreadCounts = {};
 
-  // Add TabController
   late TabController _tabController;
   final FocusNode _focusNode = FocusNode();
   bool _isFirstLoad = true;
@@ -45,21 +41,19 @@ class _ChatListScreenState extends State<ChatListScreenUser>
   final List<String> _blockedUsers = [];
   bool _isLoadingBlockedUsers = true;
 
-  void _startPeriodicRefresh() {
-    // Cancel any existing timer first
-    _stopPeriodicRefresh();
+  // Add a timeout for initial data loading
+  Timer? _initialLoadTimeout;
 
-    // Start a new timer that refreshes every second
+  void _startPeriodicRefresh() {
+    _stopPeriodicRefresh();
     _refreshTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      if (_isOnChatListScreen && mounted) {
+      if (_isOnChatListScreen && mounted && _hasInitialDataLoaded) {
         print('📊 Periodic refresh: Updating chat list');
         _socketService.getChattedUsers(widget.currentUserId);
         _socketService.getUnreadCounts(widget.currentUserId);
-        _socketService
-            .getUserStatus(); // Make sure to request user status updates
+        _socketService.getUserStatus();
       }
     });
-
     print('⏰ Started periodic refresh timer');
   }
 
@@ -71,15 +65,36 @@ class _ChatListScreenState extends State<ChatListScreenUser>
     _refreshTimer = null;
   }
 
+  void _startInitialLoadTimeout() {
+    _initialLoadTimeout = Timer(const Duration(seconds: 3), () {
+      if (mounted && _isLoading) {
+        print('⏱️ Initial load timeout - showing current data');
+        setState(() {
+          _isLoading = false;
+          _hasInitialDataLoaded = true;
+        });
+        _startPeriodicRefresh();
+      }
+    });
+  }
+
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _focusNode.addListener(_onFocusChange);
-    _startPeriodicRefresh();
 
-    // Initialize the TabController
     _tabController = TabController(length: 1, vsync: this);
+
+    // Start the timeout for initial loading
+    _startInitialLoadTimeout();
+
+    _setupSocketListeners();
+    _fetchBlockedUsers();
+    _initializeData();
+  }
+
+  void _setupSocketListeners() {
     _socketService.onUserBlocked = (blockedUserId) {
       print("🔒 User blocked: $blockedUserId");
       setState(() {
@@ -96,17 +111,17 @@ class _ChatListScreenState extends State<ChatListScreenUser>
       });
     };
 
-    // Fetch blocked users initially
-    _fetchBlockedUsers();
     _socketService.onChattedUsers = (List<String> userIds) {
       print('📦 RECEIVED chatted users: $userIds');
       setState(() {
         _chatUsers.clear();
         _chatUsers.addAll(userIds);
-        _isLoading = false;
+        if (!_hasInitialDataLoaded) {
+          _isLoading = false;
+          _hasInitialDataLoaded = true;
+          _startPeriodicRefresh();
+        }
       });
-
-      // Fetch user profiles for these IDs
       _fetchUserProfiles(userIds);
     };
 
@@ -121,46 +136,33 @@ class _ChatListScreenState extends State<ChatListScreenUser>
     _socketService.onUnreadCountUpdate = (Map<String, dynamic> data) {
       final fromUserId = data['fromUserId'];
       final count = data['count'] as int;
-
       print('📬 Unread count update from $fromUserId: $count');
-
       setState(() {
         _unreadCounts[fromUserId] = count;
       });
     };
 
-    // Properly handle user status updates
     _socketService.onUserStatus = (Map<String, dynamic> statusMap) {
       print('👤 Received user status update: $statusMap');
       setState(() {
-        // Update our local user status map
         _userStatus.addAll(statusMap);
       });
     };
 
-    // Set up a socket listener for user status updates
-    _socketService.getChattedUsers(widget.currentUserId);
-    print('uid chat list: ${widget.currentUserId}');
-
-    // Set up a single message listener for all types of messages
     _socketService.onNewMessage = (message) {
       setState(() {
-        // Handle direct messages
         if (message.receiverId == widget.currentUserId ||
             message.senderId == widget.currentUserId) {
           String otherUserId = message.senderId == widget.currentUserId
               ? message.receiverId
               : message.senderId;
 
-          // Add user to chat list if not already present
           if (!_chatUsers.contains(otherUserId)) {
             _chatUsers.add(otherUserId);
           }
 
-          // Store latest message
           _latestMessages[otherUserId] = message;
 
-          // Only increment unread count if we are the receiver (not the sender)
           if (message.receiverId == widget.currentUserId &&
               message.senderId != widget.currentUserId) {
             _unreadCounts[message.senderId] =
@@ -169,7 +171,6 @@ class _ChatListScreenState extends State<ChatListScreenUser>
                 'Unread count for ${message.senderId}: ${_unreadCounts[message.senderId]}');
           }
 
-          // Update timestamps to force re-sort of the chat list
           _sortChatUsers();
         }
       });
@@ -177,28 +178,14 @@ class _ChatListScreenState extends State<ChatListScreenUser>
 
     _socketService.onConnect = () {
       print("Socket connected, now requesting data");
-      _socketService.getChattedUsers(widget.currentUserId);
-      _socketService.getUnreadCounts(widget.currentUserId);
-      _socketService.getUserStatus(); // Request user status right away
+      _requestInitialData();
     };
 
-    // Make sure we're connected and request unread counts
-    if (!_socketService.isConnected) {
-      print("Connecting socket for user: ${widget.currentUserId}");
-      _socketService.connect(widget.currentUserId);
-    } else {
-      _socketService.getChattedUsers(widget.currentUserId);
-      _socketService.getUnreadCounts(widget.currentUserId);
-      _socketService.getUserStatus();
-    }
-
-    // Handle chat history response to build chat list
     _socketService.onChatHistory = (messages) {
       if (messages.isEmpty) {
-        return; // No messages found for this chat
+        return;
       }
 
-      // Determine the other user ID by looking at first message
       final message = messages.first;
       final otherUserId = message.senderId == widget.currentUserId
           ? message.receiverId
@@ -207,14 +194,12 @@ class _ChatListScreenState extends State<ChatListScreenUser>
       print(
           '📱 Got chat history with: $otherUserId (${messages.length} messages)');
 
-      // Add this user to our chat list if not already there
       if (!_chatUsers.contains(otherUserId)) {
         setState(() {
           _chatUsers.add(otherUserId);
         });
       }
 
-      // Find the latest message for this user
       Message? latestMessage =
           messages.fold(null, (Message? latest, Message current) {
         if (latest == null || current.timestamp > latest.timestamp) {
@@ -226,20 +211,26 @@ class _ChatListScreenState extends State<ChatListScreenUser>
       if (latestMessage != null) {
         setState(() {
           _latestMessages[otherUserId] = latestMessage;
-          _isLoading = false;
-
-          // Re-sort the chat list when a new latest message arrives
           _sortChatUsers();
         });
       }
     };
+  }
 
-    // Request user status
-    _socketService.getUserStatus();
+  void _initializeData() {
+    if (!_socketService.isConnected) {
+      print("Connecting socket for user: ${widget.currentUserId}");
+      _socketService.connect(widget.currentUserId);
+    } else {
+      _requestInitialData();
+    }
+  }
 
-    // Load chat history for recent chats
+  void _requestInitialData() {
+    print("🚀 Requesting initial data for: ${widget.currentUserId}");
     _socketService.getChattedUsers(widget.currentUserId);
-    print("⭐ Requested chatted users for: ${widget.currentUserId}");
+    _socketService.getUnreadCounts(widget.currentUserId);
+    _socketService.getUserStatus();
   }
 
   void _fetchBlockedUsers() {
@@ -259,22 +250,18 @@ class _ChatListScreenState extends State<ChatListScreenUser>
     });
   }
 
-  // Sort chat users based on latest message timestamp (newest first)
   void _sortChatUsers() {
     setState(() {
       _chatUsers.sort((a, b) {
-        // Get timestamps for the latest messages from both users
         final aTimestamp = _latestMessages[a]?.timestamp ?? 0;
         final bTimestamp = _latestMessages[b]?.timestamp ?? 0;
-
-        // Sort in descending order (newest first)
         return bTimestamp.compareTo(aTimestamp);
       });
     });
   }
 
   void _onFocusChange() {
-    if (_focusNode.hasFocus && !_isFirstLoad) {
+    if (_focusNode.hasFocus && !_isFirstLoad && _hasInitialDataLoaded) {
       print('Screen got focus - refreshing data');
       _refreshData();
     }
@@ -283,25 +270,22 @@ class _ChatListScreenState extends State<ChatListScreenUser>
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) {
+    if (state == AppLifecycleState.resumed && _hasInitialDataLoaded) {
       print('App resumed - refreshing data');
       _refreshData();
     }
-    if (_isOnChatListScreen) {
+    if (_isOnChatListScreen && _hasInitialDataLoaded) {
       _startPeriodicRefresh();
     } else if (state == AppLifecycleState.paused) {
-      // Stop timer when app goes to background
       _stopPeriodicRefresh();
     }
   }
 
   void _refreshData() {
-    // Refresh all data here
     _socketService.getChattedUsers(widget.currentUserId);
     _socketService.getUnreadCounts(widget.currentUserId);
     _socketService.getUserStatus();
     _fetchBlockedUsers();
-    // Fetch user profiles
     if (_chatUsers.isNotEmpty) {
       _fetchUserProfiles(_chatUsers);
     }
@@ -310,10 +294,7 @@ class _ChatListScreenState extends State<ChatListScreenUser>
   void _fetchUserProfiles(List<String> userIds) async {
     for (final userId in userIds) {
       try {
-        // Replace this with your actual PocketBase fetch code
-        // This is a placeholder based on your data structure
         final userData = await fetchUserFromPocketBase(userId);
-
         if (userData != null) {
           setState(() {
             _userProfiles[userId] = userData;
@@ -327,29 +308,21 @@ class _ChatListScreenState extends State<ChatListScreenUser>
 
   Future<Map<String, dynamic>?> fetchUserFromPocketBase(String userId) async {
     try {
-      // Replace with your actual PocketBase URL
       const baseUrl = 'http://145.223.21.62:8090';
-
-      // Make HTTP request to fetch user data
       final response = await http.get(
         Uri.parse('$baseUrl/api/collections/users/records/$userId'),
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: {'Content-Type': 'application/json'},
       );
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         print('👤 Fetched user data for user $userId: $data');
-        // Process the profile image URL
         String? profileImageUrl;
         if (data['avatar'] != null && data['avatar'].toString().isNotEmpty) {
-          // Construct the full URL for the profile image
           profileImageUrl =
               '$baseUrl/api/files/users/${data['id']}/${data['avatar']}';
         }
 
-        // Return user data with the proper image URL
         return {
           "id": data['id'],
           "firstname": data['firstname'] ?? '',
@@ -366,7 +339,6 @@ class _ChatListScreenState extends State<ChatListScreenUser>
       } else {
         print(
             'Failed to fetch user $userId. Status code: ${response.statusCode}');
-        print('Response: ${response.body}');
         return null;
       }
     } catch (e) {
@@ -375,75 +347,18 @@ class _ChatListScreenState extends State<ChatListScreenUser>
     }
   }
 
-  void _loadAllChatHistory() {
-    print('🔍 Current user ID: ${widget.currentUserId}');
-
-    // Make sure current user ID is valid before requesting
-    if (widget.currentUserId.isEmpty) {
-      print('❌ ERROR: Current user ID is empty!');
-      setState(() {
-        _isLoading = false;
-      });
-      return;
-    }
-
-    print('📤 Loading chat history for: ${widget.currentUserId}');
-
-    // Hardcoded list of potential users to check for chat history
-    // This is a workaround for now - you can extend this list with known users
-    // or implement a proper user discovery mechanism in the future
-    final potentialUsers = [
-      '8fq57hv3qkfidjt',
-      'yxd2ekx4n54tfun',
-      'user5',
-      'user6',
-      'user7',
-      'user8',
-      'user9',
-      'user10',
-      'user11',
-      'user12'
-    ];
-
-    // Filter out current user
-    final usersToCheck =
-        potentialUsers.where((id) => id != widget.currentUserId).toList();
-
-    print(
-        '🔄 Checking chat history with ${usersToCheck.length} potential users');
-
-    // Request chat history for all potential users
-    for (final userId in usersToCheck) {
-      _socketService.getChatHistory(widget.currentUserId, userId, limit: 10);
-    }
-
-    // If we don't hear back in 5 seconds or don't find any chats, stop showing loading state
-    Future.delayed(const Duration(seconds: 5), () {
-      if (mounted && _isLoading) {
-        if (_chatUsers.isEmpty) {
-          print('⏱️ Timeout waiting for chat history - no conversations found');
-        } else {
-          print('✅ Found ${_chatUsers.length} conversations after timeout');
-        }
-        setState(() {
-          _isLoading = false;
-        });
-      }
-    });
-  }
-
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _focusNode.removeListener(_onFocusChange);
     _focusNode.dispose();
+    _initialLoadTimeout?.cancel();
+    _stopPeriodicRefresh();
     _socketService.onChattedUsers = null;
     _socketService.onUserBlocked = null;
     _socketService.onUserUnblocked = null;
-    // Dispose the TabController
     _tabController.removeListener(() {});
     _tabController.dispose();
-    // Don't disconnect here as we will reuse the connection
     super.dispose();
   }
 
@@ -453,26 +368,11 @@ class _ChatListScreenState extends State<ChatListScreenUser>
       focusNode: _focusNode,
       child: Scaffold(
         body: _buildChatsTab(),
-        // floatingActionButton: FloatingActionButton(
-        //   onPressed: () => _showNewChatDialog(),
-        //   child: const Icon(Icons.chat),
-        // ),
-        // appBar: AppBar(
-        //   title: const Text('Chats'),
-        //   actions: [
-        //     ChatRequestIndicator(userId: widget.currentUserId),
-        //     const SizedBox(width: 12),
-        //     // Your other actions like search
-        //   ],
-        //   rest of the AppBar properties
-        // ),
       ),
     );
   }
 
   void _showNewChatDialog() {
-    // This would show a dialog with a list of users to start a new chat with
-    // You'll need to implement a method to fetch all users from your backend
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -490,27 +390,54 @@ class _ChatListScreenState extends State<ChatListScreenUser>
   }
 
   Widget _buildChatsTab() {
-    if (_isLoading || _isLoadingBlockedUsers) {
+    // Show loading only during initial load and if blocked users are still loading
+    if (_isLoading && !_hasInitialDataLoaded) {
       return const Center(child: CircularProgressIndicator());
     }
 
-    // Filter out blocked users from the chat list
-    final filteredChatUsers =
-        _chatUsers.where((userId) => !_blockedUsers.contains(userId)).toList();
+    // If still loading blocked users but have chat data, show chat list
+    final filteredChatUsers = _isLoadingBlockedUsers
+        ? _chatUsers // Show all users while loading blocked list
+        : _chatUsers
+            .where((userId) => !_blockedUsers.contains(userId))
+            .toList();
 
-    // Your existing chat list building code, but use filteredChatUsers instead of _chatUsers
     if (filteredChatUsers.isEmpty) {
       return const Center(
-        child: Text('No conversations available'),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.chat_bubble_outline,
+              size: 64,
+              color: Colors.grey,
+            ),
+            SizedBox(height: 16),
+            Text(
+              'No conversations yet',
+              style: TextStyle(
+                fontSize: 18,
+                color: Colors.grey,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+            SizedBox(height: 8),
+            Text(
+              'Start a conversation to see it here',
+              style: TextStyle(
+                fontSize: 14,
+                color: Colors.grey,
+              ),
+            ),
+          ],
+        ),
       );
     }
 
-    // Sort the filtered list
     _sortFilteredChatUsers(filteredChatUsers);
 
     return ListView(
       children: [
-        // Regular users section
         if (filteredChatUsers.isNotEmpty) ...[
           const Padding(
             padding: EdgeInsets.fromLTRB(16, 8, 16, 8),
@@ -531,11 +458,8 @@ class _ChatListScreenState extends State<ChatListScreenUser>
 
   void _sortFilteredChatUsers(List<String> users) {
     users.sort((a, b) {
-      // Get timestamps for the latest messages from both users
       final aTimestamp = _latestMessages[a]?.timestamp ?? 0;
       final bTimestamp = _latestMessages[b]?.timestamp ?? 0;
-
-      // Sort in descending order (newest first)
       return bTimestamp.compareTo(aTimestamp);
     });
   }
@@ -546,22 +470,18 @@ class _ChatListScreenState extends State<ChatListScreenUser>
     final hasLatestMessage = _latestMessages.containsKey(userId);
     final latestMessage = hasLatestMessage ? _latestMessages[userId]! : null;
 
-    // Get profile data if available
     final hasProfile = _userProfiles.containsKey(userId);
     final profileData = hasProfile ? _userProfiles[userId] : null;
 
-    // Get display name from profile or use userId as fallback
     final String displayName = hasProfile
         ? "${profileData['firstname']} ${profileData['lastname']}"
         : userId;
 
-    // Get profile image URL if available
     final String? profileImageUrl = hasProfile ? profileData['avatar'] : null;
 
     return ListTile(
       leading: Stack(
         children: [
-          // Use profile image if available, otherwise show initials
           profileImageUrl != null && profileImageUrl.isNotEmpty
               ? CircleAvatar(
                   backgroundImage: NetworkImage(profileImageUrl),
@@ -622,13 +542,11 @@ class _ChatListScreenState extends State<ChatListScreenUser>
       trailing: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          // Timestamp and unread count column
           Column(
             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
             crossAxisAlignment: CrossAxisAlignment.end,
             mainAxisSize: MainAxisSize.min,
             children: [
-              // Show timestamp
               if (hasLatestMessage)
                 Text(
                   _formatTimestamp(latestMessage!.timestamp),
@@ -640,7 +558,6 @@ class _ChatListScreenState extends State<ChatListScreenUser>
                         unreadCount > 0 ? FontWeight.bold : FontWeight.normal,
                   ),
                 ),
-              // Show unread count in WhatsApp style
               if (unreadCount > 0)
                 Container(
                   margin: const EdgeInsets.only(top: 4),
@@ -661,13 +578,12 @@ class _ChatListScreenState extends State<ChatListScreenUser>
             ],
           ),
           const SizedBox(width: 8),
-          // Use your existing CallButtons widget but only show audio call
           CallButtons(
             currentUserId: widget.currentUserId,
             targetUserId: userId,
             name: displayName,
             image: profileImageUrl ?? '',
-            showAudioOnly: true, // Only show the audio call button
+            showAudioOnly: true,
           ),
         ],
       ),
@@ -691,18 +607,10 @@ class _ChatListScreenState extends State<ChatListScreenUser>
           ),
         ).then((_) {
           print('Returned from chat screen - refreshing data');
-          setState(() {
-            _isLoading = true; // Show loading indicator
-          });
           HomeScreen.setBottomBarVisibility(true);
           _isOnChatListScreen = true;
-          // Force widget rebuild and data refresh
-          _socketService.getChattedUsers(widget.currentUserId);
-          _socketService.getUnreadCounts(widget.currentUserId);
-          _socketService.getUserStatus();
-          _fetchBlockedUsers();
+          _refreshData();
           _startPeriodicRefresh();
-          // Also refresh the specific chat history
           _socketService.getChatHistory(widget.currentUserId, userId, limit: 1);
         });
       },
@@ -722,8 +630,6 @@ class _ChatListScreenState extends State<ChatListScreenUser>
     }
   }
 }
-
-// No need for separate AudioCallButton widget anymore
 
 class ChatRequestIndicator extends StatefulWidget {
   final String userId;
@@ -763,7 +669,6 @@ class _ChatRequestIndicatorState extends State<ChatRequestIndicator> {
           _pendingRequests++;
         });
 
-        // Show a notification
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('New chat request from ${request.senderName}'),
@@ -787,7 +692,6 @@ class _ChatRequestIndicatorState extends State<ChatRequestIndicator> {
 
     _socketService.onChatRequestUpdated = (request) {
       if (request.status != 'pending' && request.receiverId == widget.userId) {
-        // Refresh the count when a request is approved/rejected
         _loadPendingRequests();
       }
     };
@@ -809,7 +713,6 @@ class _ChatRequestIndicatorState extends State<ChatRequestIndicator> {
             ),
           ),
         ).then((_) {
-          // Refresh count when returning from the requests screen
           _loadPendingRequests();
         });
       },

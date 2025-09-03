@@ -377,8 +377,10 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                         icon: 'assets/icons/ic-user.svg',
                         text: 'First Name',
                         onTap: () => Navigator.pushNamed(context, 'edit-name'),
-                        endWidget: TextWithArrow(
-                          text: userData?['firstname'] ?? '',
+                        endWidget: Flexible(
+                          child: TextWithArrow(
+                            text: userData?['firstname'] ?? '',
+                          ),
                         ),
                       ),
                       _buildDivider(),
@@ -386,8 +388,10 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                         icon: 'assets/icons/ic-user.svg',
                         text: 'Last Name',
                         onTap: () => Navigator.pushNamed(context, 'edit-lname'),
-                        endWidget: TextWithArrow(
-                          text: userData?['lastname'] ?? '',
+                        endWidget: Flexible(
+                          child: TextWithArrow(
+                            text: userData?['lastname'] ?? '',
+                          ),
                         ),
                       ),
                       _buildDivider(),
@@ -395,9 +399,11 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                         icon: 'assets/icons/ic-info.svg',
                         text: 'ID',
                         onTap: () {},
-                        endWidget: TextWithArrow(
-                          text: _formatIdToInteger(widget.userId),
-                          showArrow: false,
+                        endWidget: Flexible(
+                          child: TextWithArrow(
+                            text: _formatIdToInteger(widget.userId),
+                            showArrow: false,
+                          ),
                         ),
                       ),
                       _buildDivider(),
@@ -431,8 +437,10 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                             onSelect: _saveCountryToDatabase,
                           );
                         },
-                        endWidget: TextWithArrow(
-                          text: userData?['country'] ?? 'Not set',
+                        endWidget: Flexible(
+                          child: TextWithArrow(
+                            text: userData?['country'] ?? 'Not set',
+                          ),
                         ),
                       ),
                       _buildDivider(),
@@ -469,8 +477,11 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                         icon: 'assets/icons/ic-list.svg',
                         text: 'Bio',
                         onTap: () => Navigator.pushNamed(context, 'edit-bio'),
-                        endWidget: TextWithArrow(
-                          text: userData?['bio'] ?? '',
+                        endWidget: Flexible(
+                          // Use Flexible instead of Expanded
+                          child: TextWithArrow(
+                            text: userData?['bio'] ?? '',
+                          ),
                         ),
                       ),
                       _buildDivider(),
@@ -478,8 +489,10 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                         icon: 'assets/icons/ic-motto.svg',
                         text: 'Motto',
                         onTap: () => Navigator.pushNamed(context, 'edit-motto'),
-                        endWidget: TextWithArrow(
-                          text: userData?['moto'] ?? '',
+                        endWidget: Flexible(
+                          child: TextWithArrow(
+                            text: userData?['moto'] ?? '',
+                          ),
                         ),
                       ),
                     ],

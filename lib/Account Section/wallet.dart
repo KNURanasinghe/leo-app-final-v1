@@ -15,7 +15,7 @@ class WalletScreen extends material.StatefulWidget {
 class _WalletScreenState extends material.State<WalletScreen> {
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
 
-  String API_BASE_URL = 'http://145.223.21.62:6000';
+  String API_BASE_URL = 'http://145.223.21.62:6007';
   String? _selectedPaymentMethod;
   int? _diamondAmount;
   final TextEditingController firstNameController = TextEditingController();
@@ -33,6 +33,7 @@ class _WalletScreenState extends material.State<WalletScreen> {
       );
 
       if (response.statusCode == 200) {
+        _fetchDiamondAmount();
         material.ScaffoldMessenger.of(context).showSnackBar(
           const material.SnackBar(
               content: material.Text("User diamonds updated successfully")),

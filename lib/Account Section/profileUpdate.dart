@@ -8,7 +8,7 @@ import 'dart:convert';
 class EditProfileScreen extends StatefulWidget {
   final String userId;
 
-  const EditProfileScreen({Key? key, required this.userId}) : super(key: key);
+  const EditProfileScreen({super.key, required this.userId});
 
   @override
   State<EditProfileScreen> createState() => _EditProfileScreenState();
@@ -47,7 +47,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
     try {
       final response = await http.get(
-        Uri.parse('http://145.223.21.62:8090/api/collections/users/records/${widget.userId}'),
+        Uri.parse(
+            'http://145.223.21.62:8090/api/collections/users/records/${widget.userId}'),
       );
 
       if (response.statusCode == 200) {
@@ -91,7 +92,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     try {
       var request = http.MultipartRequest(
         'PATCH',
-        Uri.parse('http://145.223.21.62:8090/api/collections/users/records/${widget.userId}'),
+        Uri.parse(
+            'http://145.223.21.62:8090/api/collections/users/records/${widget.userId}'),
       );
 
       request.fields['firstname'] = _firstNameController.text;
@@ -174,43 +176,44 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       ),
       body: _isLoading
           ? Center(
-        child: CircularProgressIndicator(
-          valueColor: AlwaysStoppedAnimation<Color>(primaryBlue),
-        ),
-      )
+              child: CircularProgressIndicator(
+                valueColor: AlwaysStoppedAnimation<Color>(primaryBlue),
+              ),
+            )
           : SingleChildScrollView(
-        child: Stack(
-          children: [
-            Column(
-              children: [
-                _buildHeaderCurve(),
-                const SizedBox(height: 60), // Add space for avatar overflow
-                Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: Form(
-                    key: _formKey,
-                    child: Column(
-                      children: [
-                        const SizedBox(height: 30),
-                        _buildInputFields(),
-                        const SizedBox(height: 40),
-                        _buildUpdateButton(),
-                        const SizedBox(height: 20),
-                      ],
-                    ),
+              child: Stack(
+                children: [
+                  Column(
+                    children: [
+                      _buildHeaderCurve(),
+                      const SizedBox(
+                          height: 60), // Add space for avatar overflow
+                      Padding(
+                        padding: const EdgeInsets.all(16.0),
+                        child: Form(
+                          key: _formKey,
+                          child: Column(
+                            children: [
+                              const SizedBox(height: 30),
+                              _buildInputFields(),
+                              const SizedBox(height: 40),
+                              _buildUpdateButton(),
+                              const SizedBox(height: 20),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
-                ),
-              ],
+                  Positioned(
+                    top: 40, // Adjust this value to position the avatar
+                    left: 0,
+                    right: 0,
+                    child: _buildAvatarSection(),
+                  ),
+                ],
+              ),
             ),
-            Positioned(
-              top: 40, // Adjust this value to position the avatar
-              left: 0,
-              right: 0,
-              child: _buildAvatarSection(),
-            ),
-          ],
-        ),
-      ),
     );
   }
 
@@ -250,15 +253,15 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
               ],
               image: _avatarFile != null
                   ? DecorationImage(
-                image: FileImage(_avatarFile!),
-                fit: BoxFit.cover,
-              )
+                      image: FileImage(_avatarFile!),
+                      fit: BoxFit.cover,
+                    )
                   : _currentAvatarUrl != null
-                  ? DecorationImage(
-                image: NetworkImage(_currentAvatarUrl!),
-                fit: BoxFit.cover,
-              )
-                  : null,
+                      ? DecorationImage(
+                          image: NetworkImage(_currentAvatarUrl!),
+                          fit: BoxFit.cover,
+                        )
+                      : null,
             ),
             child: _avatarFile == null && _currentAvatarUrl == null
                 ? Icon(Icons.person, size: 60, color: primaryBlue)
@@ -292,7 +295,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       ),
     );
   }
-
 
   Widget _buildInputFields() {
     return Column(
@@ -365,7 +367,10 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         style: TextStyle(color: darkBlue),
         decoration: InputDecoration(
           labelText: label,
-          labelStyle: TextStyle(color: primaryBlue),
+          labelStyle: TextStyle(
+            color: primaryBlue,
+            overflow: TextOverflow.ellipsis,
+          ),
           prefixIcon: Icon(icon, color: primaryBlue),
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(15),
@@ -373,7 +378,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
           ),
           enabledBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(15),
-            borderSide: BorderSide(color: primaryBlue.withOpacity(0.3), width: 1),
+            borderSide:
+                BorderSide(color: primaryBlue.withOpacity(0.3), width: 1),
           ),
           focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(15),
@@ -381,7 +387,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
           ),
           filled: true,
           fillColor: Colors.white,
-          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          contentPadding:
+              const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         ),
       ),
     );
@@ -414,21 +421,21 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         ),
         child: _isLoading
             ? const SizedBox(
-          width: 24,
-          height: 24,
-          child: CircularProgressIndicator(
-            strokeWidth: 2.5,
-            valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-          ),
-        )
+                width: 24,
+                height: 24,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2.5,
+                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                ),
+              )
             : const Text(
-          'Update Profile',
-          style: TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.bold,
-            letterSpacing: 0.5,
-          ),
-        ),
+                'Update Profile',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 0.5,
+                ),
+              ),
       ),
     );
   }

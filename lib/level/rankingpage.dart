@@ -8,6 +8,7 @@ import 'package:leo_app_01/level/question.dart';
 import 'package:leo_app_01/level/statemanegemnt/fillcount.dart';
 import 'package:pocketbase/pocketbase.dart';
 import 'package:provider/provider.dart';
+
 class RankingPagelevel extends StatefulWidget {
   String ID;
   RankingPagelevel({required this.ID, super.key});
@@ -18,8 +19,10 @@ class RankingPagelevel extends StatefulWidget {
 
 class _RankingPagelevelState extends State<RankingPagelevel> {
   String backgroundimage = "assetss/images/Bronze NO UI copy.jpg";
-  String frame = 'http://145.223.21.62:8090/api/files/vnhwix61fv2fpio/585esvwsyw2u53n/bframe_AJRKcd5iAi.png?token=';
-  String legacy = "http://145.223.21.62:8090/api/files/vnhwix61fv2fpio/butw0x7a2kuw8gd/bronze_rhZJjww6V0.png?token=";
+  String frame =
+      'http://145.223.21.62:8090/api/files/vnhwix61fv2fpio/585esvwsyw2u53n/bframe_AJRKcd5iAi.png?token=';
+  String legacy =
+      "http://145.223.21.62:8090/api/files/vnhwix61fv2fpio/butw0x7a2kuw8gd/bronze_rhZJjww6V0.png?token=";
   String how = 'assetss/images/bronzehow.png';
   String badge = 'assetss/images/br0.png';
   String rewards = "assetss/images/bronzereward.png";
@@ -31,36 +34,32 @@ class _RankingPagelevelState extends State<RankingPagelevel> {
   List<String> imageUrls = []; // To hold the list of image URLs
   bool isLoading = true; // To show loading state
   String errorMessage = '';
-String profilepic='';
-final idFromOtherPage = "abc123"; // Replace with the actual ID you receive
+  String profilepic = '';
+  final idFromOtherPage = "abc123"; // Replace with the actual ID you receive
 
+  Future<void> fetchAndUpdateNobelCount() async {
+    try {
+      // Fetch user information
+      final user = await pb.collection('users').getFirstListItem(
+            'id="${widget.ID}"',
+          );
+      final avatar = user.data['avatar'].toString();
 
-Future<void> fetchAndUpdateNobelCount() async {
-  try {
-    // Fetch user information
-    final user = await pb.collection('users').getFirstListItem(
-      'id="${widget.ID}"',
-    );
-    final avatar = user.data['avatar'].toString();
+      // Construct the full URL if avatar is not empty
+      if (avatar.isNotEmpty) {
+        profilepic = '${pb.baseUrl}/api/files/users/${user.id}/$avatar';
+      } else {
+        profilepic = ''; // Handle case where no avatar exists
+      }
 
-    // Construct the full URL if avatar is not empty
-    if (avatar.isNotEmpty) {
-      profilepic = '${pb.baseUrl}/api/files/users/${user.id}/$avatar';
-    } else {
-      profilepic = ''; // Handle case where no avatar exists
+      print('User Avatar URL: $profilepic');
+
+      // Fetch all records for the user in the level_Timer collection (if needed)
+      // ...
+    } catch (e) {
+      print("Error fetching user data: $e");
     }
-
-    print('User Avatar URL: $profilepic');
-
-    // Fetch all records for the user in the level_Timer collection (if needed)
-    // ...
-  } catch (e) {
-    print("Error fetching user data: $e");
   }
-}
-
-
-
 
   Future<void> fetchAndAddImageUrls(String userId) async {
     try {
@@ -106,95 +105,74 @@ Future<void> fetchAndUpdateNobelCount() async {
       return [];
     }
   }
-String generateFixedLengthId(int length) {
-  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-  final random = Random();
-  return List.generate(length, (index) => chars[random.nextInt(chars.length)]).join();
-}
 
-Future<void> sendTextToPrivilegeCollection(final timemin,String specificId) async {
-  String nameitem;
-  final fillcount = fillCount.fillCount;
-
-if (specificId.length != 15) {
-    print('Error: The provided ID must be exactly 15 characters long.');
-    return;
+  String generateFixedLengthId(int length) {
+    const chars =
+        'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+    final random = Random();
+    return List.generate(length, (index) => chars[random.nextInt(chars.length)])
+        .join();
   }
 
-  // Determine the nameitem based on nobelcount
-   if (timemin >= 0 && timemin < 210) {
-    nameitem = "Bronve";
+  Future<void> sendTextToPrivilegeCollection(
+      final timemin, String specificId) async {
+    String nameitem;
+    final fillcount = fillCount.fillCount;
+
+    if (specificId.length != 15) {
+      print('Error: The provided ID must be exactly 15 characters long.');
+      return;
+    }
+
+    // Determine the nameitem based on nobelcount
+    if (timemin >= 0 && timemin < 210) {
+      nameitem = "Bronve";
     } else if (timemin >= 210 && timemin < 810) {
-    nameitem = "Silver";
+      nameitem = "Silver";
     } else if (timemin >= 810 && timemin < 2100) {
-    nameitem = "Gold";
+      nameitem = "Gold";
     } else if (timemin >= 2100 && timemin < 4650) {
-    nameitem = "Platinum";
+      nameitem = "Platinum";
     } else if (timemin >= 4650) {
-    nameitem = "Diamond";
+      nameitem = "Diamond";
     } else {
-    print('Nobel count does not match any range.');
-    return;
-  }
+      print('Nobel count does not match any range.');
+      return;
+    }
 
+    try {
+      // Check if the specific ID exists
+      final existingEntry =
+          await pb.collection('recieved_badges').getOne(specificId);
 
-
-
-  try {
-    // Check if the specific ID exists
-    final existingEntry = await pb.collection('recieved_badges').getOne(specificId);
-
-    // Update the existing record
-    final updatedEntry = {
-      'batch_name': "${nameitem} level $fillcount",
-      'userId': widget.ID,
-    };
-
-    await pb.collection('recieved_badges').update(specificId, body: updatedEntry);
-    print('Updated existing entry in received_badges: $updatedEntry');
-  } catch (error) {
-    // Handle the case where the record doesn't exist (404)
-    if (error.toString().contains("404")) {
-      print('Record not found, creating a new entry.');
-
-      final newEntry = {
+      // Update the existing record
+      final updatedEntry = {
         'batch_name': "${nameitem} level $fillcount",
         'userId': widget.ID,
-        'id': specificId, // Use the same specific ID
       };
 
-      await pb.collection('recieved_badges').create(body: newEntry);
-      print('Created new entry in received_badges: $newEntry');
-    } else {
-      print('Error updating or creating entry in received_badges: $error');
+      await pb
+          .collection('recieved_badges')
+          .update(specificId, body: updatedEntry);
+      print('Updated existing entry in received_badges: $updatedEntry');
+    } catch (error) {
+      // Handle the case where the record doesn't exist (404)
+      if (error.toString().contains("404")) {
+        print('Record not found, creating a new entry.');
+
+        final newEntry = {
+          'batch_name': "${nameitem} level $fillcount",
+          'userId': widget.ID,
+          'id': specificId, // Use the same specific ID
+        };
+
+        await pb.collection('recieved_badges').create(body: newEntry);
+        print('Created new entry in received_badges: $newEntry');
+      } else {
+        print('Error updating or creating entry in received_badges: $error');
+      }
     }
   }
-}
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
   void getting(final fillingcount, final timemin) async {
     // Check if the imageUrls list is empty, and if so, fetch the images.
@@ -206,7 +184,8 @@ if (specificId.length != 15) {
     // Now safely access the imageUrls list
     if (timemin >= 0 && timemin < 210) {
       backgroundimage = "assetss/images/Bronze NO UI copy.jpg";
-      frame = 'http://145.223.21.62:8090/api/files/vnhwix61fv2fpio/585esvwsyw2u53n/bframe_AJRKcd5iAi.png?token=';
+      frame =
+          'http://145.223.21.62:8090/api/files/vnhwix61fv2fpio/585esvwsyw2u53n/bframe_AJRKcd5iAi.png?token=';
       legacy =
           "http://145.223.21.62:8090/api/files/vnhwix61fv2fpio/butw0x7a2kuw8gd/bronze_rhZJjww6V0.png?token=";
       how = 'assetss/images/bronzehow.png';
@@ -221,7 +200,8 @@ if (specificId.length != 15) {
     } else if (timemin >= 210 && timemin < 810) {
       await fetchAndAddImageUrls("9knou40t8xgcu49");
       backgroundimage = "assetss/images/Silver NO UI copy.jpg";
-      frame = 'http://145.223.21.62:8090/api/files/vnhwix61fv2fpio/585esvwsyw2u53n/sframe_cwENVGvfMl.png?token=';
+      frame =
+          'http://145.223.21.62:8090/api/files/vnhwix61fv2fpio/585esvwsyw2u53n/sframe_cwENVGvfMl.png?token=';
       legacy =
           'http://145.223.21.62:8090/api/files/vnhwix61fv2fpio/butw0x7a2kuw8gd/silver_Pz8UaLptW9.png?token=';
       how = 'assetss/images/silverhow.png';
@@ -237,8 +217,10 @@ if (specificId.length != 15) {
     } else if (timemin >= 810 && timemin < 2100) {
       await fetchAndAddImageUrls("xxbuxvnt9afq1y4");
       backgroundimage = "assetss/images/Gold NO UI copy.jpg";
-      frame = 'http://145.223.21.62:8090/api/files/vnhwix61fv2fpio/585esvwsyw2u53n/gframe_rzuqY4FrJ2.png?token=';
-      legacy = 'http://145.223.21.62:8090/api/files/vnhwix61fv2fpio/butw0x7a2kuw8gd/gold_i5wi6ZVrI6.png?token=';
+      frame =
+          'http://145.223.21.62:8090/api/files/vnhwix61fv2fpio/585esvwsyw2u53n/gframe_rzuqY4FrJ2.png?token=';
+      legacy =
+          'http://145.223.21.62:8090/api/files/vnhwix61fv2fpio/butw0x7a2kuw8gd/gold_i5wi6ZVrI6.png?token=';
       how = 'assetss/images/goldhow.png';
       badge = imageUrls.isNotEmpty
           ? imageUrls[fillingcount]
@@ -251,8 +233,10 @@ if (specificId.length != 15) {
     } else if (timemin >= 2100 && timemin < 4650) {
       await fetchAndAddImageUrls("l2z2sjy2c9djo0o");
       backgroundimage = "assetss/images/Platinum NO UI copy.jpg";
-      frame = 'http://145.223.21.62:8090/api/files/vnhwix61fv2fpio/585esvwsyw2u53n/pframe_JUI9lvwSEo.png?token=';
-      legacy = 'http://145.223.21.62:8090/api/files/vnhwix61fv2fpio/butw0x7a2kuw8gd/platinum_IlpEQ1SpSS.png?token=';
+      frame =
+          'http://145.223.21.62:8090/api/files/vnhwix61fv2fpio/585esvwsyw2u53n/pframe_JUI9lvwSEo.png?token=';
+      legacy =
+          'http://145.223.21.62:8090/api/files/vnhwix61fv2fpio/butw0x7a2kuw8gd/platinum_IlpEQ1SpSS.png?token=';
       how = 'assetss/images/platinumhow.png';
       badge = imageUrls.isNotEmpty
           ? imageUrls[fillingcount]
@@ -265,8 +249,10 @@ if (specificId.length != 15) {
     } else if (timemin >= 4650) {
       await fetchAndAddImageUrls("fvwi1h25xvjvsfh");
       backgroundimage = "assetss/images/Diamond NO UI copy.jpg";
-      frame = 'http://145.223.21.62:8090/api/files/vnhwix61fv2fpio/585esvwsyw2u53n/dframe_O3HPn1K2Jb.png?token=';
-      legacy = 'http://145.223.21.62:8090/api/files/vnhwix61fv2fpio/butw0x7a2kuw8gd/diamond_9yvM3gxc8L.png?token=';
+      frame =
+          'http://145.223.21.62:8090/api/files/vnhwix61fv2fpio/585esvwsyw2u53n/dframe_O3HPn1K2Jb.png?token=';
+      legacy =
+          'http://145.223.21.62:8090/api/files/vnhwix61fv2fpio/butw0x7a2kuw8gd/diamond_9yvM3gxc8L.png?token=';
       how = 'assetss/images/how.png';
       badge = imageUrls.isNotEmpty
           ? imageUrls[fillingcount]
@@ -277,9 +263,10 @@ if (specificId.length != 15) {
       first = const Color.fromARGB(255, 188, 172, 216);
       second = const Color.fromARGB(255, 151, 144, 210);
     }
-  sendTextToPrivilegeCollection(timemin,"123456789012345");  
+    sendTextToPrivilegeCollection(timemin, "123456789012345");
   }
-late Timer _timer;
+
+  late Timer _timer;
 
   @override
   void initState() {
@@ -296,13 +283,14 @@ late Timer _timer;
     _timer.cancel(); // Cancel the timer when the widget is disposed
     super.dispose();
   }
+
   @override
   Widget build(BuildContext context) {
     final fillcount = fillCount.fillCount;
     final timemin = fillCount.fetchedMinutes;
     final want = fillCount.want;
 
-print("fill count  $fillcount");
+    print("fill count  $fillcount");
 
     getting(fillcount, timemin);
 
@@ -391,7 +379,7 @@ print("fill count  $fillcount");
                               decoration: BoxDecoration(
                                 shape: BoxShape.circle,
                                 image: DecorationImage(
-                                  image : NetworkImage(profilepic),
+                                  image: NetworkImage(profilepic),
                                   fit: BoxFit.cover,
                                 ),
                               ),
@@ -590,9 +578,6 @@ print("fill count  $fillcount");
                                     ),
                                   ),
                                 ),
-                               
-                               
-                               
                                 Expanded(
                                   flex: 2,
                                   child: Container(

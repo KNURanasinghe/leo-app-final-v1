@@ -177,6 +177,8 @@ class _AccountScreen1State extends State<AccountScreen1> {
                   children: [
                     Text(
                       "${userData?['firstname']} ${userData?['lastname'] ?? ''}",
+                      overflow: TextOverflow.ellipsis,
+                      maxLines: 2,
                       style: TextStyle(
                         fontSize: 16.sp,
                         color: kTextColor,
@@ -420,15 +422,19 @@ class _AccountScreen1State extends State<AccountScreen1> {
   void _navigateToLevel(BuildContext context) async {
     final prefs = await SharedPreferences.getInstance();
     final userId = prefs.getString('userId') ?? 'd1k9aih2t9t9wo3';
-    Navigator.of(context)
-        .push(MaterialPageRoute(builder: (_) => RankingPagelevel(ID: userId)));
+    // Navigator.of(context)
+    //     .push(MaterialPageRoute(builder: (_) => RankingPagelevel(ID: userId)));
+    Navigator.of(context).push(MaterialPageRoute(
+        builder: (_) => const ComingSoonScreen(screenTitle: "Level")));
   }
 
   void _navigateToNobel(BuildContext context) async {
     final prefs = await SharedPreferences.getInstance();
     final userId = prefs.getString('userId') ?? 'd1k9aih2t9t9wo3';
+    // Navigator.of(context).push(MaterialPageRoute(
+    //     builder: (_) => profilepage(userId: userId, ID: userId)));
     Navigator.of(context).push(MaterialPageRoute(
-        builder: (_) => profilepage(userId: userId, ID: userId)));
+        builder: (_) => const ComingSoonScreen(screenTitle: "MY NOBEL")));
   }
 
   void _navigateToSVIP(BuildContext context) {
@@ -455,15 +461,20 @@ class _AccountScreen1State extends State<AccountScreen1> {
   }
 
   void _navigateToAchievements(BuildContext context) {
-    Navigator.of(context)
-        .push(MaterialPageRoute(builder: (_) => const AchievementPage()));
+    // Navigator.of(context)
+    //     .push(MaterialPageRoute(builder: (_) => const AchievementPage()));
+    Navigator.of(context).push(MaterialPageRoute(
+        builder: (_) => const ComingSoonScreen(screenTitle: "Achievement")));
   }
 
   void _navigateToInviteFriends(BuildContext context) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (context) => const InviteFriendsPage()),
-    );
+    // Navigator.push(
+    //   context,
+    //   MaterialPageRoute(builder: (context) => const InviteFriendsPage()),
+    // );
+    Navigator.of(context).push(MaterialPageRoute(
+        builder: (_) =>
+            const ComingSoonScreen(screenTitle: "Invited Friends")));
   }
 
   void _navigateToLanguage(BuildContext context) {

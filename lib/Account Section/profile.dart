@@ -8,9 +8,9 @@ class ProfileApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
+    return const MaterialApp(
       debugShowCheckedModeBanner: false,
-      home: const ProfileUI(),
+      home: ProfileUI(),
     );
   }
 }
@@ -40,7 +40,8 @@ class _ProfileUIState extends State<ProfileUI> {
 
       // Make API request to fetch user data
       final response = await http.get(
-        Uri.parse("http://145.223.21.62:8090//api/collections/users/records/$userId"),
+        Uri.parse(
+            "http://145.223.21.62:8090//api/collections/users/records/$userId"),
       );
 
       if (response.statusCode == 200) {
@@ -72,112 +73,117 @@ class _ProfileUIState extends State<ProfileUI> {
       body: isLoading
           ? const Center(child: CircularProgressIndicator())
           : SingleChildScrollView(
-        child: Column(
-          children: [
-            // Header Section
-            Container(
-              width: double.infinity,
-              decoration: const BoxDecoration(
-                color: Colors.blueAccent,
-                borderRadius: BorderRadius.vertical(
-                  bottom: Radius.circular(30),
-                ),
-              ),
               child: Column(
                 children: [
-                  const SizedBox(height: 20),
-                  CircleAvatar(
-                    radius: 50,
-                    backgroundImage: userData != null && userData!["avatar"] != null
-                        ? NetworkImage("http://your-pocketbase-url/api/files/${userData!['collectionId']}/${userData!['id']}/${userData!['avatar']}")
-                        : const AssetImage("assets/images/profile.jpg") as ImageProvider,
-                  ),
-                  const SizedBox(height: 10),
-                  Text(
-                    userData?["firstname"] ?? "Unknown",
-                    style: const TextStyle(
-                      fontSize: 22,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
-                    ),
-                  ),
-                  Text(
-                    "ID: ${userData?['id'] ?? 'Unknown'}",
-                    style: const TextStyle(color: Colors.white70),
-                  ),
-                  const SizedBox(height: 5),
-                  Wrap(
-                    spacing: 8,
-                    children: (userData?["badges"] as List<dynamic>?)
-                        ?.map((badge) => Chip(label: Text(badge)))
-                        .toList() ??
-                        [const Chip(label: Text("Entrepreneur"))],
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.all(10),
-                    child: Text(
-                      userData?["bio"] ?? "Entrepreneur",
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(
-                        fontSize: 14,
-                        color: Colors.white70,
+                  // Header Section
+                  Container(
+                    width: double.infinity,
+                    decoration: const BoxDecoration(
+                      color: Colors.blueAccent,
+                      borderRadius: BorderRadius.vertical(
+                        bottom: Radius.circular(30),
                       ),
                     ),
+                    child: Column(
+                      children: [
+                        const SizedBox(height: 20),
+                        CircleAvatar(
+                          radius: 50,
+                          backgroundImage: userData != null &&
+                                  userData!["avatar"] != null
+                              ? NetworkImage(
+                                  "http://your-pocketbase-url/api/files/${userData!['collectionId']}/${userData!['id']}/${userData!['avatar']}")
+                              : const AssetImage("assets/images/profile.jpg")
+                                  as ImageProvider,
+                        ),
+                        const SizedBox(height: 10),
+                        Text(
+                          userData?["firstname"] ?? "Unknown",
+                          style: const TextStyle(
+                            fontSize: 22,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                          ),
+                        ),
+                        Text(
+                          "ID: ${userData?['id'] ?? 'Unknown'}",
+                          style: const TextStyle(color: Colors.white70),
+                        ),
+                        const SizedBox(height: 5),
+                        Wrap(
+                          spacing: 8,
+                          children: (userData?["badges"] as List<dynamic>?)
+                                  ?.map((badge) => Chip(label: Text(badge)))
+                                  .toList() ??
+                              [const Chip(label: Text("Entrepreneur"))],
+                        ),
+                        Padding(
+                          padding: const EdgeInsets.all(10),
+                          child: Text(
+                            userData?["bio"] ?? "Entrepreneur",
+                            textAlign: TextAlign.center,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 14,
+                              color: Colors.white70,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 20),
+                      ],
+                    ),
                   ),
-                  const SizedBox(height: 20),
+
+                  // Followers Section
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 10),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                      children: [
+                        _buildStatItem("Followers", "11"),
+                        _buildStatItem("Fans", "2"),
+                        _buildStatItem("Visitors", "22"),
+                      ],
+                    ),
+                  ),
+
+                  // Gifts Section
+                  const SectionTitle(title: "Gifts"),
+                  HorizontalList(
+                    items: userData?["gift"] ?? [],
+                  ),
+
+                  // Badges Section
+                  const SectionTitle(title: "Badges"),
+                  HorizontalList(
+                    items: userData?["badges"] ?? [],
+                  ),
+
+                  // Buttons Section
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 20),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                      children: [
+                        ElevatedButton(
+                          onPressed: () {
+                            // Share functionality
+                          },
+                          child: const Text("Share"),
+                        ),
+                        ElevatedButton(
+                          onPressed: () {
+                            // Edit functionality
+                          },
+                          child: const Text("Edit"),
+                        ),
+                      ],
+                    ),
+                  ),
                 ],
               ),
             ),
-
-            // Followers Section
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 10),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                children: [
-                  _buildStatItem("Followers", "11"),
-                  _buildStatItem("Fans", "2"),
-                  _buildStatItem("Visitors", "22"),
-                ],
-              ),
-            ),
-
-            // Gifts Section
-            const SectionTitle(title: "Gifts"),
-            HorizontalList(
-              items: userData?["gift"] ?? [],
-            ),
-
-            // Badges Section
-            const SectionTitle(title: "Badges"),
-            HorizontalList(
-              items: userData?["badges"] ?? [],
-            ),
-
-            // Buttons Section
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 20),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                children: [
-                  ElevatedButton(
-                    onPressed: () {
-                      // Share functionality
-                    },
-                    child: const Text("Share"),
-                  ),
-                  ElevatedButton(
-                    onPressed: () {
-                      // Edit functionality
-                    },
-                    child: const Text("Edit"),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
     );
   }
 

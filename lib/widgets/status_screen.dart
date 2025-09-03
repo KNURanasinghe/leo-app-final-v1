@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:cached_network_image/cached_network_image.dart';
@@ -38,17 +39,20 @@ class _StatusScreenState extends State<StatusScreen>
   List<StatusUser> _statusUsers = [];
   Map<String, UserProfile> _userProfiles = {};
   bool _isLoading = true;
+  bool _hasInitialDataLoaded = false; // Add this flag
   late AnimationController _animationController;
   late Animation<double> _animation;
   final String _pocketbaseUrl = 'http://145.223.21.62:8090';
   String? username;
   String? profileImg;
 
+  // Add timeout for initial loading
+  Timer? _initialLoadTimeout;
+
   @override
   void initState() {
     super.initState();
     _setupSocketListeners();
-    _loadStatuses();
 
     // Setup animation for status rings
     _animationController = AnimationController(
@@ -62,11 +66,28 @@ class _StatusScreenState extends State<StatusScreen>
         curve: Curves.easeInOut,
       ),
     );
+
+    // Start initial load with timeout
+    _loadStatuses();
+    _startInitialLoadTimeout();
+  }
+
+  void _startInitialLoadTimeout() {
+    _initialLoadTimeout = Timer(const Duration(seconds: 3), () {
+      if (mounted && _isLoading && !_hasInitialDataLoaded) {
+        print('⏱️ Status screen initial load timeout - showing current data');
+        setState(() {
+          _isLoading = false;
+          _hasInitialDataLoaded = true;
+        });
+      }
+    });
   }
 
   @override
   void dispose() {
     _animationController.dispose();
+    _initialLoadTimeout?.cancel();
     super.dispose();
   }
 
@@ -77,12 +98,20 @@ class _StatusScreenState extends State<StatusScreen>
 
       setState(() {
         _statusUsers = users;
-        _isLoading = false;
+        if (!_hasInitialDataLoaded) {
+          _isLoading = false;
+          _hasInitialDataLoaded = true;
+          _initialLoadTimeout?.cancel(); // Cancel timeout since we got data
+        }
       });
     };
-  }
 
-  // Updated _fetchUserProfiles method for StatusScreen class
+    // Add connection handler to ensure we request data when connected
+    _socketService.onConnect = () {
+      print("Socket connected, requesting active statuses");
+      _socketService.getActiveStatuses();
+    };
+  }
 
   Future<void> _fetchUserProfiles(List<String> userIds) async {
     if (userIds.isEmpty) return;
@@ -140,10 +169,20 @@ class _StatusScreenState extends State<StatusScreen>
 
   void _loadStatuses() {
     print("Requesting active statuses...");
-    setState(() {
-      _isLoading = true;
-    });
-    _socketService.getActiveStatuses();
+
+    // Only show loading on initial load or manual refresh
+    if (!_hasInitialDataLoaded) {
+      setState(() {
+        _isLoading = true;
+      });
+    }
+
+    // Ensure socket is connected before requesting
+    if (!_socketService.isConnected) {
+      _socketService.connect(widget.currentUserId);
+    } else {
+      _socketService.getActiveStatuses();
+    }
   }
 
   void _createStatus() async {
@@ -203,7 +242,6 @@ class _StatusScreenState extends State<StatusScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      // backgroundColor: StatusTheme.backgroundBlue,
       appBar: AppBar(
         elevation: 0,
         backgroundColor: StatusTheme.kPrimaryColor,
@@ -217,334 +255,28 @@ class _StatusScreenState extends State<StatusScreen>
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh, color: Colors.white),
-            onPressed: _loadStatuses,
+            onPressed: () {
+              setState(() {
+                _isLoading = true;
+                _hasInitialDataLoaded = false;
+              });
+              _loadStatuses();
+              _startInitialLoadTimeout();
+            },
           ),
         ],
       ),
       body: Stack(
         children: [
           // Status list
-          _isLoading
+          _isLoading && !_hasInitialDataLoaded
               ? const Center(
                   child: CircularProgressIndicator(
                     valueColor:
                         AlwaysStoppedAnimation<Color>(StatusTheme.primaryBlue),
                   ),
                 )
-              : ListView(
-                  children: [
-                    // Header
-                    // Container(
-                    //   padding: const EdgeInsets.symmetric(
-                    //       vertical: 8, horizontal: 8),
-                    //   decoration: const BoxDecoration(
-                    //     color: StatusTheme.primaryBlue,
-                    //     borderRadius: BorderRadius.only(
-                    //       bottomLeft: Radius.circular(20),
-                    //       bottomRight: Radius.circular(20),
-                    //     ),
-                    //   ),
-                    //   child: const Text(
-                    //     'Share moments with friends',
-                    //     textAlign: TextAlign.center,
-                    //     style: TextStyle(
-                    //       color: Colors.white,
-                    //       fontSize: 14,
-                    //       fontWeight: FontWeight.w500,
-                    //     ),
-                    //   ),
-                    // ),
-
-                    const SizedBox(height: 16),
-
-                    // My status
-                    Card(
-                      margin: const EdgeInsets.symmetric(
-                          horizontal: 16, vertical: 8),
-                      elevation: 2,
-                      shadowColor: StatusTheme.lightBlue.withOpacity(0.3),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(15),
-                      ),
-                      child: ListTile(
-                        contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 16, vertical: 8),
-                        leading: Stack(
-                          children: [
-                            _hasMyStatus()
-                                ? AnimatedBuilder(
-                                    animation: _animation,
-                                    builder: (context, child) {
-                                      return Container(
-                                        padding: const EdgeInsets.all(3),
-                                        decoration: BoxDecoration(
-                                          gradient: const LinearGradient(
-                                            colors: [
-                                              StatusTheme.accentBlue,
-                                              StatusTheme.lightBlue,
-                                            ],
-                                          ),
-                                          borderRadius:
-                                              BorderRadius.circular(50),
-                                          boxShadow: [
-                                            BoxShadow(
-                                              color: StatusTheme.accentBlue
-                                                  .withOpacity(0.5),
-                                              spreadRadius: _animation.value,
-                                              blurRadius: 4,
-                                            ),
-                                          ],
-                                        ),
-                                        child: CircleAvatar(
-                                          radius: 22,
-                                          backgroundColor: Colors.white,
-                                          child: _buildUserAvatar(
-                                            widget.currentUserId,
-                                            radius: 20,
-                                          ),
-                                        ),
-                                      );
-                                    },
-                                  )
-                                : CircleAvatar(
-                                    radius: 25,
-                                    backgroundColor: StatusTheme.kPrimaryColor,
-                                    child: _buildUserAvatar(
-                                      widget.currentUserId,
-                                      radius: 23,
-                                      showDefaultIcon: true,
-                                    ),
-                                  ),
-                            if (!_hasMyStatus())
-                              Positioned(
-                                right: 0,
-                                bottom: 0,
-                                child: Container(
-                                  padding: const EdgeInsets.all(2),
-                                  decoration: BoxDecoration(
-                                    color: StatusTheme.kPrimaryColor,
-                                    borderRadius: BorderRadius.circular(12),
-                                    boxShadow: [
-                                      BoxShadow(
-                                        color: StatusTheme.accentBlue
-                                            .withOpacity(0.5),
-                                        spreadRadius: 1,
-                                        blurRadius: 2,
-                                      ),
-                                    ],
-                                  ),
-                                  child: const Icon(
-                                    Icons.add,
-                                    size: 14,
-                                    color: Colors.white,
-                                  ),
-                                ),
-                              ),
-                          ],
-                        ),
-                        title: Text(
-                          _userProfiles[widget.currentUserId]?.name ??
-                              'My Status',
-                          style: const TextStyle(
-                            fontWeight: FontWeight.w600,
-                            color: StatusTheme.textDark,
-                            fontSize: 16,
-                          ),
-                        ),
-                        subtitle: _hasMyStatus()
-                            ? Padding(
-                                padding: const EdgeInsets.only(top: 4),
-                                child: Text(
-                                  _getTimeAgo(_getMyStatusUser()!
-                                      .latestStatus['timestamp']),
-                                  style: const TextStyle(
-                                    color: StatusTheme.textLight,
-                                    fontSize: 13,
-                                  ),
-                                ),
-                              )
-                            : const Padding(
-                                padding: EdgeInsets.only(top: 4),
-                                child: Text(
-                                  'Tap to add status update',
-                                  style: TextStyle(
-                                    color: StatusTheme.textLight,
-                                    fontSize: 13,
-                                  ),
-                                ),
-                              ),
-                        trailing: _hasMyStatus()
-                            ? const Icon(
-                                Icons.more_vert_outlined,
-                                color: StatusTheme.kPrimaryColor,
-                              )
-                            : const Icon(
-                                Icons.add_circle_outline,
-                                color: StatusTheme.kPrimaryColor,
-                              ),
-                        onTap: () {
-                          if (_hasMyStatus()) {
-                            // Use your own profile from the _userProfiles map
-                            final myProfile =
-                                _userProfiles[widget.currentUserId];
-                            final myName = myProfile?.name ?? 'My Status';
-                            final myImageUrl = myProfile?.avatarUrl ?? '';
-
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => StatusViewScreen(
-                                  currentUserId: widget.currentUserId,
-                                  statusUserId: widget.currentUserId,
-                                  userName: myName,
-                                  imageUrl: myImageUrl,
-                                ),
-                              ),
-                            );
-                          } else {
-                            _createStatus();
-                          }
-                        },
-                      ),
-                    ),
-
-                    const Padding(
-                      padding: EdgeInsets.all(16.0),
-                      child: Text(
-                        'Recent Updates',
-                        style: TextStyle(
-                          fontWeight: FontWeight.w600,
-                          color: StatusTheme.textDark,
-                          fontSize: 14,
-                        ),
-                      ),
-                    ),
-
-                    // Other users' statuses
-                    ..._statusUsers
-                        .where((user) => user.userId != widget.currentUserId)
-                        .map((user) => Card(
-                              margin: const EdgeInsets.symmetric(
-                                  horizontal: 16, vertical: 4),
-                              elevation: 1,
-                              shadowColor:
-                                  StatusTheme.lightBlue.withOpacity(0.2),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              child: ListTile(
-                                contentPadding: const EdgeInsets.symmetric(
-                                    horizontal: 16, vertical: 8),
-                                leading: AnimatedBuilder(
-                                  animation: _animation,
-                                  builder: (context, child) {
-                                    return Container(
-                                      padding: const EdgeInsets.all(3),
-                                      decoration: BoxDecoration(
-                                        gradient: const LinearGradient(
-                                          colors: [
-                                            StatusTheme.accentBlue,
-                                            StatusTheme.primaryBlue,
-                                          ],
-                                        ),
-                                        borderRadius: BorderRadius.circular(50),
-                                        boxShadow: [
-                                          BoxShadow(
-                                            color: StatusTheme.kPrimaryColor
-                                                .withOpacity(0.3),
-                                            spreadRadius: _animation.value,
-                                            blurRadius: 4,
-                                          ),
-                                        ],
-                                      ),
-                                      child: CircleAvatar(
-                                        radius: 22,
-                                        backgroundColor: Colors.white,
-                                        child: _buildUserAvatar(
-                                          user.userId,
-                                          radius: 20,
-                                        ),
-                                      ),
-                                    );
-                                  },
-                                ),
-                                title: Text(
-                                  _userProfiles[user.userId]?.name ??
-                                      'User ${user.userId}',
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.w500,
-                                    color: StatusTheme.textDark,
-                                    fontSize: 15,
-                                  ),
-                                ),
-                                subtitle: Padding(
-                                  padding: const EdgeInsets.only(top: 4),
-                                  child: Text(
-                                    _getTimeAgo(user.latestStatus['timestamp']),
-                                    style: const TextStyle(
-                                      color: StatusTheme.textLight,
-                                      fontSize: 12,
-                                    ),
-                                  ),
-                                ),
-                                trailing: const Icon(
-                                  Icons.arrow_forward_ios,
-                                  color: StatusTheme.kPrimaryColor,
-                                  size: 16,
-                                ),
-                                onTap: () => _viewUserStatus(user.userId),
-                              ),
-                            )),
-
-                    if (_statusUsers.isEmpty ||
-                        (_statusUsers.length == 1 &&
-                            _statusUsers[0].userId == widget.currentUserId))
-                      Container(
-                        margin: const EdgeInsets.all(32.0),
-                        padding: const EdgeInsets.all(24),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(15),
-                          boxShadow: [
-                            BoxShadow(
-                              color: StatusTheme.lightBlue.withOpacity(0.1),
-                              blurRadius: 10,
-                              spreadRadius: 1,
-                            ),
-                          ],
-                        ),
-                        child: Column(
-                          children: [
-                            const Icon(
-                              Icons.info_outline,
-                              color: StatusTheme.textLight,
-                              size: 40,
-                            ),
-                            const SizedBox(height: 16),
-                            const Text(
-                              'No status updates from other users',
-                              textAlign: TextAlign.center,
-                              style: TextStyle(
-                                color: StatusTheme.textLight,
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              'Be the first to share a status with your friends',
-                              textAlign: TextAlign.center,
-                              style: TextStyle(
-                                color: StatusTheme.textLight.withOpacity(0.7),
-                                fontSize: 12,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-
-                    const SizedBox(height: 70), // Space for FAB
-                  ],
-                ),
+              : _buildStatusList(),
 
           // FAB for creating status
           Positioned(
@@ -570,6 +302,313 @@ class _StatusScreenState extends State<StatusScreen>
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildStatusList() {
+    return ListView(
+      children: [
+        const SizedBox(height: 16),
+
+        // My status
+        Card(
+          margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          elevation: 2,
+          shadowColor: StatusTheme.lightBlue.withOpacity(0.3),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(15),
+          ),
+          child: ListTile(
+            contentPadding:
+                const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            leading: Stack(
+              children: [
+                _hasMyStatus()
+                    ? AnimatedBuilder(
+                        animation: _animation,
+                        builder: (context, child) {
+                          return Container(
+                            padding: const EdgeInsets.all(3),
+                            decoration: BoxDecoration(
+                              gradient: const LinearGradient(
+                                colors: [
+                                  StatusTheme.accentBlue,
+                                  StatusTheme.lightBlue,
+                                ],
+                              ),
+                              borderRadius: BorderRadius.circular(50),
+                              boxShadow: [
+                                BoxShadow(
+                                  color:
+                                      StatusTheme.accentBlue.withOpacity(0.5),
+                                  spreadRadius: _animation.value,
+                                  blurRadius: 4,
+                                ),
+                              ],
+                            ),
+                            child: CircleAvatar(
+                              radius: 22,
+                              backgroundColor: Colors.white,
+                              child: _buildUserAvatar(
+                                widget.currentUserId,
+                                radius: 20,
+                              ),
+                            ),
+                          );
+                        },
+                      )
+                    : CircleAvatar(
+                        radius: 25,
+                        backgroundColor: StatusTheme.kPrimaryColor,
+                        child: _buildUserAvatar(
+                          widget.currentUserId,
+                          radius: 23,
+                          showDefaultIcon: true,
+                        ),
+                      ),
+                if (!_hasMyStatus())
+                  Positioned(
+                    right: 0,
+                    bottom: 0,
+                    child: Container(
+                      padding: const EdgeInsets.all(2),
+                      decoration: BoxDecoration(
+                        color: StatusTheme.kPrimaryColor,
+                        borderRadius: BorderRadius.circular(12),
+                        boxShadow: [
+                          BoxShadow(
+                            color: StatusTheme.accentBlue.withOpacity(0.5),
+                            spreadRadius: 1,
+                            blurRadius: 2,
+                          ),
+                        ],
+                      ),
+                      child: const Icon(
+                        Icons.add,
+                        size: 14,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+            title: Text(
+              _userProfiles[widget.currentUserId]?.name ?? 'My Status',
+              style: const TextStyle(
+                fontWeight: FontWeight.w600,
+                color: StatusTheme.textDark,
+                fontSize: 16,
+              ),
+            ),
+            subtitle: _hasMyStatus()
+                ? Padding(
+                    padding: const EdgeInsets.only(top: 4),
+                    child: Text(
+                      _getTimeAgo(
+                          _getMyStatusUser()!.latestStatus['timestamp']),
+                      style: const TextStyle(
+                        color: StatusTheme.textLight,
+                        fontSize: 13,
+                      ),
+                    ),
+                  )
+                : const Padding(
+                    padding: EdgeInsets.only(top: 4),
+                    child: Text(
+                      'Tap to add status update',
+                      style: TextStyle(
+                        color: StatusTheme.textLight,
+                        fontSize: 13,
+                      ),
+                    ),
+                  ),
+            trailing: _hasMyStatus()
+                ? const Icon(
+                    Icons.more_vert_outlined,
+                    color: StatusTheme.kPrimaryColor,
+                  )
+                : const Icon(
+                    Icons.add_circle_outline,
+                    color: StatusTheme.kPrimaryColor,
+                  ),
+            onTap: () {
+              if (_hasMyStatus()) {
+                // Use your own profile from the _userProfiles map
+                final myProfile = _userProfiles[widget.currentUserId];
+                final myName = myProfile?.name ?? 'My Status';
+                final myImageUrl = myProfile?.avatarUrl ?? '';
+
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => StatusViewScreen(
+                      currentUserId: widget.currentUserId,
+                      statusUserId: widget.currentUserId,
+                      userName: myName,
+                      imageUrl: myImageUrl,
+                    ),
+                  ),
+                );
+              } else {
+                _createStatus();
+              }
+            },
+          ),
+        ),
+
+        // Recent Updates Section Header
+        if (_statusUsers
+            .where((user) => user.userId != widget.currentUserId)
+            .isNotEmpty)
+          const Padding(
+            padding: EdgeInsets.all(16.0),
+            child: Text(
+              'Recent Updates',
+              style: TextStyle(
+                fontWeight: FontWeight.w600,
+                color: StatusTheme.textDark,
+                fontSize: 14,
+              ),
+            ),
+          ),
+
+        // Other users' statuses
+        ..._statusUsers
+            .where((user) => user.userId != widget.currentUserId)
+            .map((user) => Card(
+                  margin:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                  elevation: 1,
+                  shadowColor: StatusTheme.lightBlue.withOpacity(0.2),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: ListTile(
+                    contentPadding:
+                        const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    leading: AnimatedBuilder(
+                      animation: _animation,
+                      builder: (context, child) {
+                        return Container(
+                          padding: const EdgeInsets.all(3),
+                          decoration: BoxDecoration(
+                            gradient: const LinearGradient(
+                              colors: [
+                                StatusTheme.accentBlue,
+                                StatusTheme.primaryBlue,
+                              ],
+                            ),
+                            borderRadius: BorderRadius.circular(50),
+                            boxShadow: [
+                              BoxShadow(
+                                color:
+                                    StatusTheme.kPrimaryColor.withOpacity(0.3),
+                                spreadRadius: _animation.value,
+                                blurRadius: 4,
+                              ),
+                            ],
+                          ),
+                          child: CircleAvatar(
+                            radius: 22,
+                            backgroundColor: Colors.white,
+                            child: _buildUserAvatar(
+                              user.userId,
+                              radius: 20,
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                    title: Text(
+                      _userProfiles[user.userId]?.name ?? 'User ${user.userId}',
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w500,
+                        color: StatusTheme.textDark,
+                        fontSize: 15,
+                      ),
+                    ),
+                    subtitle: Padding(
+                      padding: const EdgeInsets.only(top: 4),
+                      child: Text(
+                        _getTimeAgo(user.latestStatus['timestamp']),
+                        style: const TextStyle(
+                          color: StatusTheme.textLight,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ),
+                    trailing: const Icon(
+                      Icons.arrow_forward_ios,
+                      color: StatusTheme.kPrimaryColor,
+                      size: 16,
+                    ),
+                    onTap: () => _viewUserStatus(user.userId),
+                  ),
+                )),
+
+        // Empty state when no statuses available
+        if (_statusUsers.isEmpty ||
+            (_statusUsers.length == 1 &&
+                _statusUsers[0].userId == widget.currentUserId))
+          Container(
+            margin: const EdgeInsets.all(32.0),
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(15),
+              boxShadow: [
+                BoxShadow(
+                  color: StatusTheme.lightBlue.withOpacity(0.1),
+                  blurRadius: 10,
+                  spreadRadius: 1,
+                ),
+              ],
+            ),
+            child: Column(
+              children: [
+                const Icon(
+                  Icons.photo_camera_outlined,
+                  color: StatusTheme.textLight,
+                  size: 48,
+                ),
+                const SizedBox(height: 16),
+                const Text(
+                  'No status updates yet',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: StatusTheme.textDark,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 16,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Share your moments with friends by creating your first status',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: StatusTheme.textLight.withOpacity(0.8),
+                    fontSize: 14,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                ElevatedButton.icon(
+                  onPressed: _createStatus,
+                  icon: const Icon(Icons.add_a_photo, size: 18),
+                  label: const Text('Create Status'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: StatusTheme.kPrimaryColor,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+        const SizedBox(height: 70), // Space for FAB
+      ],
     );
   }
 

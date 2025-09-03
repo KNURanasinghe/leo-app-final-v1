@@ -267,7 +267,7 @@ class _AdminChatScreenState extends State<AdminChatScreen> {
         title: Text(isOwnAdminPage
             ? 'Admin Broadcast Center'
             : 'Announcements from ${widget.adminId}'),
-        backgroundColor: Colors.deepOrange,
+        backgroundColor: Colors.blue[700],
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh),
@@ -284,14 +284,14 @@ class _AdminChatScreenState extends State<AdminChatScreen> {
             color: Colors.amber.shade100,
             child: Row(
               children: [
-                Icon(Icons.info_outline, color: Colors.amber.shade800),
+                Icon(Icons.info_outline, color: Colors.blue.shade800),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
                     isOwnAdminPage
                         ? 'Messages sent from here will be broadcast to all users. Users cannot reply to broadcast messages.'
                         : 'These are announcements from administrators. You cannot reply to these messages.',
-                    style: TextStyle(color: Colors.amber.shade900),
+                    style: TextStyle(color: Colors.blue.shade900),
                   ),
                 ),
               ],
@@ -338,7 +338,7 @@ class _AdminChatScreenState extends State<AdminChatScreen> {
                       ? const CircularProgressIndicator()
                       : FloatingActionButton(
                           onPressed: _sendBroadcast,
-                          backgroundColor: Colors.deepOrange,
+                          backgroundColor: Colors.blue[700],
                           child: const Icon(Icons.campaign),
                         ),
                 ],
@@ -438,13 +438,13 @@ class _AdminChatScreenState extends State<AdminChatScreen> {
             // Broadcast header
             Row(
               children: [
-                const Icon(Icons.campaign, size: 16, color: Colors.deepOrange),
+                Icon(Icons.campaign, size: 16, color: Colors.blue[700]),
                 const SizedBox(width: 8),
                 Text(
                   'From: $displayName',
                   style: TextStyle(
                     fontWeight: FontWeight.bold,
-                    color: Colors.deepOrange.shade800,
+                    color: Colors.blue.shade800,
                   ),
                 ),
                 const Spacer(),

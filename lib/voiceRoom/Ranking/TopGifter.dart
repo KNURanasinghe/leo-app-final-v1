@@ -4,30 +4,31 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 
-const String GIFTER_API_URL = 'http://145.223.21.62:6002';  // New port for gifter rankings
+const String GIFTER_API_URL =
+    'http://145.223.21.62:6002'; // New port for gifter rankings
 
 class TopGifterCard extends StatelessWidget {
   final Map<String, dynamic> userDetails;
   final double totalAmount;
 
   const TopGifterCard({
-    Key? key,
+    super.key,
     required this.userDetails,
     required this.totalAmount,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      margin: EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-      padding: EdgeInsets.all(12),
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: [
-            Color(0xFF9370DB).withOpacity(0.95),  // Medium purple
-            Color(0xFF4B0082).withOpacity(0.90),
+            const Color(0xFF9370DB).withOpacity(0.95), // Medium purple
+            const Color(0xFF4B0082).withOpacity(0.90),
           ],
         ),
         borderRadius: BorderRadius.circular(12),
@@ -36,7 +37,7 @@ class TopGifterCard extends StatelessWidget {
             color: Colors.blue.withOpacity(0.2),
             spreadRadius: 1,
             blurRadius: 4,
-            offset: Offset(0, 2),
+            offset: const Offset(0, 2),
           ),
         ],
       ),
@@ -58,7 +59,7 @@ class TopGifterCard extends StatelessWidget {
                 child: Image.network(
                   'http://145.223.21.62:8090/api/files/${userDetails['collectionId']}/${userDetails['id']}/${userDetails['avatar']}',
                   fit: BoxFit.cover,
-                  errorBuilder: (context, error, stackTrace) => Icon(
+                  errorBuilder: (context, error, stackTrace) => const Icon(
                     Icons.person,
                     color: Colors.white,
                     size: 25,
@@ -66,13 +67,13 @@ class TopGifterCard extends StatelessWidget {
                 ),
               ),
             ),
-            SizedBox(width: 12),
+            const SizedBox(width: 12),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Row(
+                  const Row(
                     children: [
                       Icon(
                         Icons.workspace_premium,
@@ -91,10 +92,10 @@ class TopGifterCard extends StatelessWidget {
                       ),
                     ],
                   ),
-                  SizedBox(height: 4),
+                  const SizedBox(height: 4),
                   Text(
                     userDetails['firstname'] ?? 'Unknown',
-                    style: TextStyle(
+                    style: const TextStyle(
                       color: Colors.white,
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
@@ -114,7 +115,7 @@ class TopGifterCard extends StatelessWidget {
               ),
             ),
             Container(
-              padding: EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
               decoration: BoxDecoration(
                 color: Colors.white.withOpacity(0.15),
                 borderRadius: BorderRadius.circular(20),
@@ -131,10 +132,10 @@ class TopGifterCard extends StatelessWidget {
                     width: 16,
                     height: 16,
                   ),
-                  SizedBox(width: 4),
+                  const SizedBox(width: 4),
                   Text(
-                    '${totalAmount.toStringAsFixed(0)}',
-                    style: TextStyle(
+                    totalAmount.toStringAsFixed(0),
+                    style: const TextStyle(
                       color: Colors.white,
                       fontSize: 14,
                       fontWeight: FontWeight.bold,
@@ -151,11 +152,14 @@ class TopGifterCard extends StatelessWidget {
 }
 
 class RankingBottomSheet extends StatefulWidget {
+  const RankingBottomSheet({super.key});
+
   @override
   _RankingBottomSheetState createState() => _RankingBottomSheetState();
 }
 
-class _RankingBottomSheetState extends State<RankingBottomSheet> with SingleTickerProviderStateMixin {
+class _RankingBottomSheetState extends State<RankingBottomSheet>
+    with SingleTickerProviderStateMixin {
   late TabController _tabController;
   bool isLoading = true;
   Map<String, dynamic>? lastWeekTopGifter;
@@ -184,13 +188,16 @@ class _RankingBottomSheetState extends State<RankingBottomSheet> with SingleTick
     setState(() {
       switch (_tabController.index) {
         case 0:
-          refreshMessage = 'This ranking will refresh every day at 00:00 (GMT+5:30)';
+          refreshMessage =
+              'This ranking will refresh every day at 00:00 (GMT+5:30)';
           break;
         case 1:
-          refreshMessage = 'This ranking will refresh every Sunday at 00:00 (GMT+5:30)';
+          refreshMessage =
+              'This ranking will refresh every Sunday at 00:00 (GMT+5:30)';
           break;
         case 2:
-          refreshMessage = 'This ranking will refresh at the end of every month (GMT+5:30)';
+          refreshMessage =
+              'This ranking will refresh at the end of every month (GMT+5:30)';
           break;
       }
     });
@@ -228,9 +235,8 @@ class _RankingBottomSheetState extends State<RankingBottomSheet> with SingleTick
 
   Future<void> _fetchDailyRankings() async {
     try {
-      final response = await http.get(
-          Uri.parse('$GIFTER_API_URL/api/gifters/daily')
-      );
+      final response =
+          await http.get(Uri.parse('$GIFTER_API_URL/api/gifters/daily'));
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
@@ -247,9 +253,8 @@ class _RankingBottomSheetState extends State<RankingBottomSheet> with SingleTick
 
   Future<void> _fetchWeeklyRankings() async {
     try {
-      final response = await http.get(
-          Uri.parse('$GIFTER_API_URL/api/gifters/weekly')
-      );
+      final response =
+          await http.get(Uri.parse('$GIFTER_API_URL/api/gifters/weekly'));
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
@@ -266,9 +271,8 @@ class _RankingBottomSheetState extends State<RankingBottomSheet> with SingleTick
 
   Future<void> _fetchMonthlyRankings() async {
     try {
-      final response = await http.get(
-          Uri.parse('$GIFTER_API_URL/api/gifters/monthly')
-      );
+      final response =
+          await http.get(Uri.parse('$GIFTER_API_URL/api/gifters/monthly'));
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
@@ -285,13 +289,14 @@ class _RankingBottomSheetState extends State<RankingBottomSheet> with SingleTick
 
   Future<void> _fetchLastWeekTopGifter() async {
     try {
-      final response = await http.get(
-          Uri.parse('$GIFTER_API_URL/api/gifters/last-week')
-      );
+      final response =
+          await http.get(Uri.parse('$GIFTER_API_URL/api/gifters/last-week'));
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
-        if (data['success'] == true && data['data'] != null && data['data'].isNotEmpty) {
+        if (data['success'] == true &&
+            data['data'] != null &&
+            data['data'].isNotEmpty) {
           final topGifter = data['data'][0];
           setState(() {
             lastWeekTopGifter = {
@@ -313,6 +318,7 @@ class _RankingBottomSheetState extends State<RankingBottomSheet> with SingleTick
     _tabController.dispose();
     super.dispose();
   }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -327,10 +333,10 @@ class _RankingBottomSheetState extends State<RankingBottomSheet> with SingleTick
             ),
           // Tab bar
           Container(
-            margin: EdgeInsets.only(top: 8),
+            margin: const EdgeInsets.only(top: 8),
             child: TabBar(
               controller: _tabController,
-              tabs: [
+              tabs: const [
                 Tab(text: 'Today'),
                 Tab(text: 'This Week'),
                 Tab(text: 'This Month'),
@@ -338,22 +344,23 @@ class _RankingBottomSheetState extends State<RankingBottomSheet> with SingleTick
               labelColor: Colors.blue,
               unselectedLabelColor: Colors.grey,
               indicatorSize: TabBarIndicatorSize.label,
-              labelStyle: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+              labelStyle:
+                  const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
             ),
           ),
 
           // Content
           Expanded(
             child: isLoading
-                ? Center(child: CircularProgressIndicator())
+                ? const Center(child: CircularProgressIndicator())
                 : TabBarView(
-              controller: _tabController,
-              children: [
-                _buildRankingList(dailyRankings),
-                _buildRankingList(weeklyRankings),
-                _buildRankingList(monthlyRankings),
-              ],
-            ),
+                    controller: _tabController,
+                    children: [
+                      _buildRankingList(dailyRankings),
+                      _buildRankingList(weeklyRankings),
+                      _buildRankingList(monthlyRankings),
+                    ],
+                  ),
           ),
         ],
       ),
@@ -365,7 +372,7 @@ class _RankingBottomSheetState extends State<RankingBottomSheet> with SingleTick
       children: [
         // Refresh time notice with consistent styling
         Container(
-          padding: EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+          padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
           width: double.infinity,
           decoration: BoxDecoration(
             gradient: LinearGradient(
@@ -386,7 +393,7 @@ class _RankingBottomSheetState extends State<RankingBottomSheet> with SingleTick
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              SizedBox(width: 8),
+              const SizedBox(width: 8),
               Expanded(
                 child: Text(
                   refreshMessage,
@@ -405,30 +412,30 @@ class _RankingBottomSheetState extends State<RankingBottomSheet> with SingleTick
         // Rankings list
         Expanded(
           child: ListView.builder(
-            padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             itemCount: rankings.length,
             itemBuilder: (context, index) {
               final ranking = rankings[index];
               final userDetail = ranking['userDetails'];
 
               return Container(
-                margin: EdgeInsets.symmetric(vertical: 8),
+                margin: const EdgeInsets.symmetric(vertical: 8),
                 child: Row(
                   children: [
                     // Rank number or medal
                     Container(
                       width: 30,
-                      margin: EdgeInsets.only(right: 12),
+                      margin: const EdgeInsets.only(right: 12),
                       child: index < 3
                           ? Image.asset('assets/images/medal${index + 1}.png')
                           : Text(
-                        '${index + 1}',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w500,
-                          color: Colors.grey[600],
-                        ),
-                      ),
+                              '${index + 1}',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w500,
+                                color: Colors.grey[600],
+                              ),
+                            ),
                     ),
 
                     // Profile image with error handling
@@ -442,9 +449,11 @@ class _RankingBottomSheetState extends State<RankingBottomSheet> with SingleTick
                       child: ClipRRect(
                         borderRadius: BorderRadius.circular(25),
                         child: CachedNetworkImage(
-                          imageUrl: 'http://145.223.21.62:8090/api/files/${userDetail['collectionId']}/${userDetail['id']}/${userDetail['avatar']}',
+                          imageUrl:
+                              'http://145.223.21.62:8090/api/files/${userDetail['collectionId']}/${userDetail['id']}/${userDetail['avatar']}',
                           fit: BoxFit.cover,
-                          placeholder: (context, url) => CircularProgressIndicator(),
+                          placeholder: (context, url) =>
+                              const CircularProgressIndicator(),
                           errorWidget: (context, url, error) => Icon(
                             Icons.person,
                             color: Colors.grey[400],
@@ -454,7 +463,7 @@ class _RankingBottomSheetState extends State<RankingBottomSheet> with SingleTick
                       ),
                     ),
 
-                    SizedBox(width: 12),
+                    const SizedBox(width: 12),
 
                     // Name and motto
                     Expanded(
@@ -463,7 +472,7 @@ class _RankingBottomSheetState extends State<RankingBottomSheet> with SingleTick
                         children: [
                           Text(
                             userDetail['firstname'] ?? 'Unknown',
-                            style: TextStyle(
+                            style: const TextStyle(
                               fontWeight: FontWeight.w600,
                               fontSize: 15,
                             ),
@@ -483,7 +492,8 @@ class _RankingBottomSheetState extends State<RankingBottomSheet> with SingleTick
 
                     // Diamond amount
                     Container(
-                      padding: EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 10, vertical: 4),
                       decoration: BoxDecoration(
                         color: Colors.blue.withOpacity(0.1),
                         borderRadius: BorderRadius.circular(20),
@@ -496,7 +506,7 @@ class _RankingBottomSheetState extends State<RankingBottomSheet> with SingleTick
                             width: 16,
                             height: 16,
                           ),
-                          SizedBox(width: 4),
+                          const SizedBox(width: 4),
                           Text(
                             '${ranking['total'].toStringAsFixed(0)}',
                             style: TextStyle(
@@ -517,5 +527,4 @@ class _RankingBottomSheetState extends State<RankingBottomSheet> with SingleTick
       ],
     );
   }
-
 }
