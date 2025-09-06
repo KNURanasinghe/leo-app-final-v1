@@ -98,8 +98,8 @@ class _DemoChattingPageState extends State<DemoChattingMessageListPage> {
         setState(() {
           // Can chat if request is approved or either user is admin
           _canChat = data['status'] == 'approved' ||
-              AppConstants.adminUsers.contains(widget.currentUserId) ||
-              AppConstants.adminUsers.contains(widget.receiverId);
+              AppConstants.adminUsers.containsKey(widget.currentUserId) ||
+              AppConstants.adminUsers.containsKey(widget.receiverId);
           _isCheckingChatPermission = false;
         });
 
@@ -115,8 +115,9 @@ class _DemoChattingPageState extends State<DemoChattingMessageListPage> {
       if (mounted && _isCheckingChatPermission) {
         // Default to allowing chat for admins
         setState(() {
-          _canChat = AppConstants.adminUsers.contains(widget.currentUserId) ||
-              AppConstants.adminUsers.contains(widget.receiverId);
+          _canChat =
+              AppConstants.adminUsers.containsKey(widget.currentUserId) ||
+                  AppConstants.adminUsers.containsKey(widget.receiverId);
           _isCheckingChatPermission = false;
         });
 

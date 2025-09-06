@@ -34,13 +34,19 @@ class AppConstants {
   //   'bmjsc6jg8znd3as',
   // ];
 
-  static const List<String> adminUsers = [
-    'mt2efg6pqk4eysg',
-    'tialt8tmiab76a6',
-    'bmjsc6jg8znd3as',
-  ];
+  static const Map<String, String> adminUsers = {
+    'w0rtse2a0wk7fgh': 'Leo Team',
+    'fbcet92ecextmih': 'Leo Activity',
+    'odpu2r0ntygp0zn': 'Leo System Notification',
+  };
+
   static bool isAdmin(String userId) {
-    return adminUsers.contains(userId);
+    return adminUsers.containsKey(userId);
+  }
+
+// Get admin name by user ID
+  static String? getAdminName(String userId) {
+    return adminUsers[userId];
   }
 
   // ///zegocloud appID

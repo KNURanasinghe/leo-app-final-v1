@@ -36,7 +36,7 @@ class _AdminChatScreenState extends State<AdminChatScreen> {
 
     // Check if current user is admin
     _isCurrentUserAdmin =
-        AppConstants.adminUsers.contains(widget.currentUserId);
+        AppConstants.adminUsers.containsKey(widget.currentUserId);
 
     // Make sure socket is connected with retry
     _connectAndSetupWithRetry();

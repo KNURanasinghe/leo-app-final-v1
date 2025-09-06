@@ -82,7 +82,7 @@ class _AdminListScreenState extends State<AdminListScreen>
     _setupChatRequestListeners();
     // Check if current user is admin
     _isCurrentUserAdmin =
-        AppConstants.adminUsers.contains(widget.currentUserId);
+        AppConstants.adminUsers.containsKey(widget.currentUserId);
 
     // Initialize the TabController with a specific length and vsync
     _tabController = TabController(length: 2, vsync: this);
@@ -98,7 +98,7 @@ class _AdminListScreenState extends State<AdminListScreen>
     });
 
     // Properly separate regular users and admin users
-    _adminUsers = AppConstants.adminUsers
+    _adminUsers = AppConstants.adminUsers.keys
         .where((user) => user != widget.currentUserId)
         .toList();
 
@@ -637,6 +637,9 @@ class _AdminListScreenState extends State<AdminListScreen>
     // Use the dedicated broadcast unread count
     final unreadCount = _broadcastUnreadCounts[adminId] ?? 0;
 
+    // Get admin name using the helper method
+    final adminName = AppConstants.getAdminName(adminId);
+
     return ListTile(
       leading: Stack(
         children: [
@@ -668,7 +671,7 @@ class _AdminListScreenState extends State<AdminListScreen>
         ],
       ),
       title: Text(
-        'Admin ${adminId.substring(0, 5)}',
+        adminName!, // Show admin name instead of ID
         style: TextStyle(
           fontWeight: unreadCount > 0 ? FontWeight.bold : FontWeight.normal,
           color: unreadCount > 0 ? Colors.black : Colors.black87,
@@ -744,7 +747,7 @@ class _AdminListScreenState extends State<AdminListScreen>
           _broadcastUnreadCounts.remove(adminId);
         });
 
-        // Navigate to admin chat screen with both adminId and currentUserId
+        // Navigate to admin chat screen with adminId (still use ID for functionality)
         _isOnAdminListScreen = false;
         _stopPeriodicRefresh();
 
@@ -752,7 +755,7 @@ class _AdminListScreenState extends State<AdminListScreen>
           context,
           MaterialPageRoute(
             builder: (context) => AdminChatScreen(
-              adminId: adminId,
+              adminId: adminId, // Still pass the ID for functionality
               currentUserId: widget.currentUserId,
             ),
           ),

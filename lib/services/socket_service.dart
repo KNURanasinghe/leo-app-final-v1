@@ -116,7 +116,7 @@ class SocketService {
   ChatRequestsListCallback? onChatRequestsList;
   IO.Socket get socket => _socket;
   bool isAdmin(String userId) {
-    return AppConstants.adminUsers.contains(userId);
+    return AppConstants.adminUsers.containsKey(userId);
   }
 
   // Singleton pattern

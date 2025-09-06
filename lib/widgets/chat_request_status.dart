@@ -102,8 +102,8 @@ class _ChatRequestStatusWidgetState extends State<ChatRequestStatusWidget> {
 
   void _checkRequestStatus() {
     // First check if this is an admin (admins don't need requests)
-    if (AppConstants.adminUsers.contains(widget.currentUserId) ||
-        AppConstants.adminUsers.contains(widget.receiverId)) {
+    if (AppConstants.adminUsers.containsKey(widget.currentUserId) ||
+        AppConstants.adminUsers.containsKey(widget.receiverId)) {
       setState(() {
         _requestStatus = 'approved';
       });

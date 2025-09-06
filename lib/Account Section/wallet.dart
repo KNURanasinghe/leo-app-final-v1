@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart' as material;
+import 'package:flutter/material.dart';
 import 'dart:convert';
 import 'package:flutter/widgets.dart';
 import 'package:http/http.dart' as http;
+import 'package:leo_app_01/Account%20Section/webx_payment_screen.dart';
 
 class WalletScreen extends material.StatefulWidget {
   final String userId;
@@ -16,74 +18,12 @@ class _WalletScreenState extends material.State<WalletScreen> {
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
 
   String API_BASE_URL = 'http://145.223.21.62:6007';
-  String? _selectedPaymentMethod;
+  String? _selectedPaymentMethod = 'WebXPay'; // Default to WebXPay
   int? _diamondAmount;
   final TextEditingController firstNameController = TextEditingController();
   final TextEditingController lastNameController = TextEditingController();
   final TextEditingController contactNumberController = TextEditingController();
   final TextEditingController emailAddressController = TextEditingController();
-
-  Future<void> _updateUserDiamonds(int newDiamondAmount) async {
-    try {
-      var response = await http.patch(
-        Uri.parse(
-            'http://145.223.21.62:8090/api/collections/users/records/${widget.userId}'),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({'wallet': newDiamondAmount}),
-      );
-
-      if (response.statusCode == 200) {
-        _fetchDiamondAmount();
-        material.ScaffoldMessenger.of(context).showSnackBar(
-          const material.SnackBar(
-              content: material.Text("User diamonds updated successfully")),
-        );
-      } else {
-        print('Failed to update user diamonds: ${response.statusCode}');
-      }
-    } catch (e) {
-      print('Error updating user diamonds: $e');
-    }
-  }
-
-  Future<void> _addRechargeHistory(int diamonds, int price) async {
-    try {
-      var response = await http.post(
-        Uri.parse('$API_BASE_URL/api/recharge'),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
-          'userId': widget.userId,
-          'diamond_amount': diamonds,
-          'price_of_the_diamond': price,
-        }),
-      );
-
-      if (response.statusCode == 200) {
-        material.ScaffoldMessenger.of(context).showSnackBar(
-          const material.SnackBar(
-              content: Text("Recharge history added successfully")),
-        );
-      } else {
-        print('Failed to add recharge history: ${response.statusCode}');
-        // Parse error message from Node.js server
-        final errorData = jsonDecode(response.body);
-        print('Error details: ${errorData['details']}');
-      }
-    } catch (e) {
-      print('Error adding recharge history: $e');
-    }
-  }
-
-  Future<void> _processRecharge(int diamonds, int price) async {
-    int updatedDiamondAmount = (_diamondAmount ?? 0) + diamonds;
-
-    await _updateUserDiamonds(updatedDiamondAmount);
-    await _addRechargeHistory(diamonds, price);
-
-    setState(() {
-      _diamondAmount = updatedDiamondAmount;
-    });
-  }
 
   @override
   void initState() {
@@ -113,37 +53,138 @@ class _WalletScreenState extends material.State<WalletScreen> {
     }
   }
 
+  Future<void> _updateUserDiamonds(int newDiamondAmount) async {
+    try {
+      var response = await http.patch(
+        Uri.parse(
+            'http://145.223.21.62:8090/api/collections/users/records/${widget.userId}'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'wallet': newDiamondAmount}),
+      );
+
+      if (response.statusCode == 200) {
+        _fetchDiamondAmount();
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("User diamonds updated successfully")),
+        );
+      } else {
+        print('Failed to update user diamonds: ${response.statusCode}');
+      }
+    } catch (e) {
+      print('Error updating user diamonds: $e');
+    }
+  }
+
+  Future<void> _addRechargeHistory(
+      int diamonds, int price, String? transactionId) async {
+    try {
+      var response = await http.post(
+        Uri.parse('$API_BASE_URL/api/recharge'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'userId': widget.userId,
+          'diamond_amount': diamonds,
+          'price_of_the_diamond': price,
+          'transaction_id': transactionId,
+          'payment_method': 'WebXPay',
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Recharge history added successfully")),
+        );
+      } else {
+        print('Failed to add recharge history: ${response.statusCode}');
+        final errorData = jsonDecode(response.body);
+        print('Error details: ${errorData['details']}');
+      }
+    } catch (e) {
+      print('Error adding recharge history: $e');
+    }
+  }
+
+  void _processWebXPayRecharge(int diamonds, int price) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => WebXPayPaymentScreen(
+          userId: widget.userId,
+          diamonds: diamonds,
+          price: price,
+          onPaymentComplete: (bool success, String? transactionId) {
+            if (success) {
+              _handleSuccessfulPayment(diamonds, price, transactionId);
+            } else {
+              _handleFailedPayment();
+            }
+          },
+        ),
+      ),
+    );
+  }
+
+  void _handleSuccessfulPayment(
+      int diamonds, int price, String? transactionId) {
+    // Update user diamonds
+    int updatedDiamondAmount = (_diamondAmount ?? 0) + diamonds;
+    _updateUserDiamonds(updatedDiamondAmount);
+    _addRechargeHistory(diamonds, price, transactionId);
+
+    setState(() {
+      _diamondAmount = updatedDiamondAmount;
+    });
+
+    // Show success message
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+            'Payment successful! $diamonds diamonds added to your wallet.'),
+        backgroundColor: Colors.green,
+        duration: const Duration(seconds: 3),
+      ),
+    );
+  }
+
+  void _handleFailedPayment() {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Payment failed. Please try again.'),
+        backgroundColor: Colors.red,
+        duration: Duration(seconds: 3),
+      ),
+    );
+  }
+
   @override
-  material.Widget build(material.BuildContext context) {
-    return material.Scaffold(
-      body: material.Container(
-        decoration: material.BoxDecoration(
-          gradient: material.LinearGradient(
-            begin: material.Alignment.topLeft,
-            end: material.Alignment.bottomRight,
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
             colors: [
-              material.Colors.blue.shade300,
-              material.Colors.blue.shade800,
+              Colors.blue.shade300,
+              Colors.blue.shade800,
             ],
           ),
         ),
-        child: material.Stack(
+        child: Stack(
           children: [
-            material.Column(
+            Column(
               children: [
-                material.Container(
-                  margin: const material.EdgeInsets.only(top: 46, right: 46),
+                Container(
+                  margin: const EdgeInsets.only(top: 46, right: 46),
                   height: 200,
-                  child: material.Stack(
+                  child: Stack(
                     children: [
-                      material.Align(
-                        alignment: material.Alignment.centerRight,
-                        child: material.Container(
+                      Align(
+                        alignment: Alignment.centerRight,
+                        child: Container(
                           width: 150,
-                          decoration: const material.BoxDecoration(
-                            image: material.DecorationImage(
-                              image: material.AssetImage(
-                                  'assets/images/wallet_img.png'),
+                          decoration: const BoxDecoration(
+                            image: DecorationImage(
+                              image: AssetImage('assets/images/wallet_img.png'),
                               opacity: 0.7,
                             ),
                           ),
@@ -152,108 +193,107 @@ class _WalletScreenState extends material.State<WalletScreen> {
                     ],
                   ),
                 ),
-                material.Expanded(
-                  child: material.Container(
-                    color: material.Colors.transparent,
+                Expanded(
+                  child: Container(
+                    color: Colors.transparent,
                   ),
                 ),
               ],
             ),
-            material.Column(
+            Column(
               children: [
-                material.AppBar(
-                  backgroundColor: material.Colors.transparent,
+                AppBar(
+                  backgroundColor: Colors.transparent,
                   elevation: 0,
-                  leading: material.IconButton(
-                    icon: const material.Icon(material.Icons.arrow_back,
-                        color: material.Colors.white),
+                  leading: IconButton(
+                    icon: const Icon(Icons.arrow_back, color: Colors.white),
                     onPressed: () {
-                      material.Navigator.pop(context);
+                      Navigator.pop(context);
                     },
                   ),
                   actions: [
-                    material.IconButton(
-                      icon: const material.Icon(material.Icons.menu_rounded,
-                          color: material.Colors.white),
+                    IconButton(
+                      icon: const Icon(Icons.menu_rounded, color: Colors.white),
                       onPressed: () {},
                     ),
                   ],
-                  title: const material.Text(
+                  title: const Text(
                     'Wallet',
-                    style: material.TextStyle(
-                      color: material.Colors.white,
-                      fontWeight: material.FontWeight.bold,
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
                     ),
                   ),
                 ),
-                material.Container(
-                  alignment: material.Alignment.topLeft,
-                  margin: const material.EdgeInsets.only(left: 20),
+                Container(
+                  alignment: Alignment.topLeft,
+                  margin: const EdgeInsets.only(left: 20),
                   child: _diamondAmount != null
                       ? _buildBalanceWidget(_diamondAmount!)
-                      : const material.CircularProgressIndicator(),
+                      : const CircularProgressIndicator(),
                 ),
-                material.Expanded(
-                  child: material.Container(
-                    padding: const material.EdgeInsets.all(16),
-                    decoration: material.BoxDecoration(
-                      gradient: material.LinearGradient(
-                        begin: material.Alignment.topLeft,
-                        end: material.Alignment.bottomRight,
+                Expanded(
+                  child: Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
                         colors: [
-                          material.Colors.blue.shade200,
-                          material.Colors.blue.shade800,
+                          Colors.blue.shade200,
+                          Colors.blue.shade800,
                         ],
                       ),
-                      borderRadius: const material.BorderRadius.vertical(
-                          top: material.Radius.circular(30)),
+                      borderRadius:
+                          const BorderRadius.vertical(top: Radius.circular(30)),
                     ),
-                    child: material.Column(
-                      crossAxisAlignment: material.CrossAxisAlignment.start,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const material.SizedBox(height: 16),
-                        const material.Row(
-                          mainAxisAlignment:
-                              material.MainAxisAlignment.spaceBetween,
+                        const SizedBox(height: 16),
+                        const Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            material.Text(
+                            Text(
                               'Recharge Channel',
-                              style: material.TextStyle(
+                              style: TextStyle(
                                 fontSize: 18,
-                                fontWeight: material.FontWeight.bold,
-                                color: material.Colors.white,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
                               ),
                             ),
-                            material.Row(
+                            Row(
                               children: [
-                                material.Text('Saudi Arabia',
-                                    style: material.TextStyle(
-                                        color: material.Colors.white)),
-                                material.SizedBox(width: 8),
-                                material.Icon(material.Icons.arrow_drop_down,
-                                    color: material.Colors.white),
+                                Text('Sri Lanka',
+                                    style: TextStyle(color: Colors.white)),
+                                SizedBox(width: 8),
+                                Icon(Icons.arrow_drop_down,
+                                    color: Colors.white),
                               ],
                             ),
                           ],
                         ),
-                        const material.SizedBox(height: 8),
+                        const SizedBox(height: 8),
+                        _buildRechargeChannel('WebXPay',
+                            'assets/images/webxpay_logo.png', 'WebXPay'),
                         _buildRechargeChannel('Google Pay',
                             'assets/images/google_pay.png', 'GPay'),
                         _buildRechargeChannel('VISA/MASTERCARD',
                             'assets/images/visa_mastercard.png', 'Visa'),
-                        const material.SizedBox(height: 16),
-                        material.Expanded(
-                          child: material.GridView.count(
+                        const SizedBox(height: 16),
+                        Expanded(
+                          child: GridView.count(
                             crossAxisCount: 3,
                             crossAxisSpacing: 8,
                             mainAxisSpacing: 8,
                             children: [
-                              _buildDiamondPackage(context, 50, 10),
-                              _buildDiamondPackage(context, 100, 50),
-                              _buildDiamondPackage(context, 200, 150),
-                              _buildDiamondPackage(context, 500, 300),
-                              _buildDiamondPackage(context, 63000, 500),
-                              _buildDiamondPackage(context, 126000, 1000),
+                              _buildDiamondPackage(
+                                  context, 50, 100), // LKR pricing
+                              _buildDiamondPackage(context, 100, 500),
+                              _buildDiamondPackage(context, 200, 1500),
+                              _buildDiamondPackage(context, 500, 3000),
+                              _buildDiamondPackage(context, 63000, 5000),
+                              _buildDiamondPackage(context, 126000, 10000),
                             ],
                           ),
                         ),
@@ -269,28 +309,28 @@ class _WalletScreenState extends material.State<WalletScreen> {
     );
   }
 
-  material.Widget _buildBalanceWidget(int diamondAmount) {
-    return material.Container(
-      color: material.Colors.transparent,
-      padding: const material.EdgeInsets.all(16),
-      child: material.Column(
-        crossAxisAlignment: material.CrossAxisAlignment.start,
+  Widget _buildBalanceWidget(int diamondAmount) {
+    return Container(
+      color: Colors.transparent,
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const material.Text(
+          const Text(
             'Balance',
-            style: material.TextStyle(
+            style: TextStyle(
               fontSize: 32,
-              fontWeight: material.FontWeight.bold,
-              color: material.Colors.white,
+              fontWeight: FontWeight.bold,
+              color: Colors.white,
             ),
           ),
-          const material.SizedBox(height: 8),
-          material.Text(
+          const SizedBox(height: 8),
+          Text(
             diamondAmount.toString(),
-            style: const material.TextStyle(
+            style: const TextStyle(
               fontSize: 32,
-              fontWeight: material.FontWeight.bold,
-              color: material.Colors.white,
+              fontWeight: FontWeight.bold,
+              color: Colors.white,
             ),
           ),
         ],
@@ -298,15 +338,14 @@ class _WalletScreenState extends material.State<WalletScreen> {
     );
   }
 
-  material.Widget _buildRechargeChannel(
-      String name, String asset, String value) {
-    return material.Container(
-      margin: const material.EdgeInsets.symmetric(vertical: 4),
-      decoration: material.BoxDecoration(
-        color: material.Colors.white,
-        borderRadius: material.BorderRadius.circular(8),
+  Widget _buildRechargeChannel(String name, String asset, String value) {
+    return Container(
+      margin: const EdgeInsets.symmetric(vertical: 4),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(8),
       ),
-      child: material.RadioListTile<String>(
+      child: RadioListTile<String>(
         value: value,
         groupValue: _selectedPaymentMethod,
         onChanged: (String? newValue) {
@@ -314,46 +353,61 @@ class _WalletScreenState extends material.State<WalletScreen> {
             _selectedPaymentMethod = newValue;
           });
         },
-        title: material.Text(
+        title: Text(
           name,
-          style: const material.TextStyle(color: material.Colors.blue),
+          style: const TextStyle(color: Colors.blue),
         ),
-        secondary: material.Image.asset(asset, width: 40),
-        activeColor: material.Colors.blue,
-        contentPadding: const material.EdgeInsets.symmetric(horizontal: 16),
+        secondary: Image.asset(asset, width: 40, height: 40,
+            errorBuilder: (context, error, stackTrace) {
+          return const Icon(Icons.payment, color: Colors.blue, size: 40);
+        }),
+        activeColor: Colors.blue,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16),
       ),
     );
   }
 
-  material.Widget _buildDiamondPackage(
-      material.BuildContext context, int diamonds, int price) {
-    return material.GestureDetector(
-      onTap: () => _processRecharge(diamonds, price),
-      child: material.Card(
-        color: material.Colors.white,
-        child: material.Column(
-          mainAxisAlignment: material.MainAxisAlignment.center,
-          crossAxisAlignment: material.CrossAxisAlignment.center,
+  Widget _buildDiamondPackage(BuildContext context, int diamonds, int price) {
+    return GestureDetector(
+      onTap: () {
+        if (_selectedPaymentMethod == 'WebXPay') {
+          _processWebXPayRecharge(diamonds, price);
+        } else {
+          // Handle other payment methods as before
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+                content: Text('Please select WebXPay as payment method')),
+          );
+        }
+      },
+      child: Card(
+        color: Colors.white,
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            material.Image.asset(
+            Image.asset(
               'assets/images/diamond.png',
               width: 50,
+              errorBuilder: (context, error, stackTrace) {
+                return const Icon(Icons.diamond, color: Colors.blue, size: 50);
+              },
             ),
-            const material.SizedBox(height: 2),
-            material.Text(
+            const SizedBox(height: 2),
+            Text(
               '$diamonds',
-              style: const material.TextStyle(
+              style: const TextStyle(
                 fontSize: 18,
-                fontWeight: material.FontWeight.bold,
+                fontWeight: FontWeight.bold,
               ),
             ),
-            const material.SizedBox(height: 2),
-            material.Text(
-              'USD $price',
-              style: const material.TextStyle(
+            const SizedBox(height: 2),
+            Text(
+              'LKR $price',
+              style: const TextStyle(
                 fontSize: 14,
-                fontWeight: material.FontWeight.w600,
-                color: material.Colors.blue,
+                fontWeight: FontWeight.w600,
+                color: Colors.blue,
               ),
             ),
           ],
