@@ -162,6 +162,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       }
 
       final receivedGifts = json.decode(receivedResponse.body)['items'] as List;
+      print('received gif $receivedGifts');
 
       // Count gifts
       for (var received in receivedGifts) {

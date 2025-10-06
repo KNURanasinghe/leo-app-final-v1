@@ -11,15 +11,10 @@ import '../widgets/language_page.dart';
 import 'constants.dart';
 import 'edit profile/theme.dart';
 import 'edit profile/widgets/account_edit_tile.dart';
-import 'edit profile/widgets/back_button.dart';
 import 'edit profile/widgets/body_container.dart';
 import 'edit profile/widgets/text_with_arrow.dart';
 import 'wallet.dart';
-import '../level/rankingpage.dart';
-import '../nobel/profilepage.dart';
 import 'Myitems.dart';
-import 'achievement/achievement_screen.dart';
-import 'invite friends/invite_screen.dart';
 import 'edit profile/main_profile.dart';
 
 class AccountScreen1 extends StatefulWidget {
@@ -48,7 +43,7 @@ class _AccountScreen1State extends State<AccountScreen1> {
       final response = await http.get(
         Uri.parse('$baseUrl/api/collections/users/records/$userId'),
       );
-
+      print('response users 1 ${json.decode(response.body)}');
       if (response.statusCode == 200) {
         setState(() {
           userData = json.decode(response.body);
@@ -110,7 +105,10 @@ class _AccountScreen1State extends State<AccountScreen1> {
 
   Widget _buildProfileSection(BuildContext context) {
     String? avatarUrl;
-    if (userData != null && userData!['avatar'] != null) {
+    print('userdata avatrt ${userData!['avatar']}');
+    if (userData != null &&
+        userData!['avatar'] != null &&
+        userData!['avatar'].toString().isNotEmpty) {
       avatarUrl =
           '$baseUrl/api/files/${userData!['collectionId']}/${userData!['id']}/${userData!['avatar']}';
     }
@@ -138,7 +136,8 @@ class _AccountScreen1State extends State<AccountScreen1> {
         }
       }
     }
-
+    print('Display ID: $displayId');
+    print('Avatar URL: $avatarUrl');
     return Material(
       color: darkModeEnabled ? kDarkBoxColor : kLightBlueColor,
       shadowColor: Colors.black26,
@@ -164,8 +163,8 @@ class _AccountScreen1State extends State<AccountScreen1> {
                           height: 60.w,
                           fit: BoxFit.cover,
                         )
-                      : Image.asset(
-                          'assets/images/avatar.png',
+                      : Image.network(
+                          'https://img.freepik.com/free-vector/portrait-boy-with-brown-hair-brown-eyes_1308-146018.jpg',
                           width: 60.w,
                           height: 60.w,
                           fit: BoxFit.cover,

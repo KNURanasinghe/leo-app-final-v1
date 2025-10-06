@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'dart:async';
+import 'dart:math';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'ProfileCreationScreen.dart';
 import 'package:leo_app_01/services/firebase_service.dart'; // Import your FirebaseService
@@ -24,9 +26,18 @@ class _OtpScreenState extends State<OtpScreen> {
   // Add FirebaseService instance
   final FirebaseService _firebaseService = FirebaseService();
 
+  // Resend OTP related variables
+  bool _canResend = true;
+  int _remainingSeconds = 0;
+  Timer? _resendTimer;
+  String _currentOtp = '';
+  bool _isResending = false;
+
   @override
   void initState() {
     super.initState();
+    _currentOtp = widget.otp; // Initialize with the original OTP
+
     for (int i = 0; i < 5; i++) {
       _focusNodes[i].addListener(() {
         if (_controllers[i].text.length == 1) {
@@ -44,7 +55,122 @@ class _OtpScreenState extends State<OtpScreen> {
     for (var node in _focusNodes) {
       node.dispose();
     }
+    _resendTimer?.cancel();
     super.dispose();
+  }
+
+  // Generate a new OTP
+  String generateOTP() {
+    Random random = Random();
+    return (100000 + random.nextInt(900000)).toString();
+  }
+
+  // Start the resend cooldown timer
+  void _startResendTimer() {
+    setState(() {
+      _canResend = false;
+      _remainingSeconds = 60; // 1 minute cooldown
+    });
+
+    _resendTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      setState(() {
+        if (_remainingSeconds > 0) {
+          _remainingSeconds--;
+        } else {
+          _canResend = true;
+          timer.cancel();
+        }
+      });
+    });
+  }
+
+  // Resend OTP function
+  Future<void> _resendOTP() async {
+    if (!_canResend || _isResending) return;
+
+    setState(() {
+      _isResending = true;
+    });
+
+    try {
+      // Generate new OTP
+      String newOtp = generateOTP();
+      print('Generated new OTP: $newOtp'); // For debugging
+
+      // Clean the phone number to match the format needed for the API
+      String cleanedNumber =
+          widget.phoneNumber.replaceAll(RegExp(r'[^0-9]'), '');
+
+      // Send OTP via Notify.lk API (same as in PhoneNumberScreen)
+      const String userId = '29316';
+      const String apiKey = 'RH9L1weIpJJODyQkFfSe';
+      const String senderId = 'NotifyDEMO';
+      const String url = 'https://app.notify.lk/api/v1/send';
+
+      String message =
+          'Your verification code is $newOtp. Please use this to verify your account.';
+
+      final Map<String, String> queryParams = {
+        'user_id': userId,
+        'api_key': apiKey,
+        'sender_id': senderId,
+        'to': cleanedNumber,
+        'message': message,
+      };
+
+      // Send OTP via Notify.lk API
+      final response = await http.post(
+        Uri.parse(url).replace(queryParameters: queryParams),
+      );
+
+      print("Resend API Response: ${response.statusCode}");
+
+      if (response.statusCode == 200) {
+        // Update the current OTP
+        setState(() {
+          _currentOtp = newOtp;
+        });
+
+        // Clear all OTP input fields
+        for (var controller in _controllers) {
+          controller.clear();
+        }
+
+        // Focus on the first field
+        FocusScope.of(context).requestFocus(_focusNodes[0]);
+
+        // Start the cooldown timer
+        _startResendTimer();
+
+        // Show success message
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('New verification code sent successfully!'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      } else {
+        // Show error message
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Failed to resend OTP. Please try again.'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } catch (e) {
+      print('Error resending OTP: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error: ${e.toString()}'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    } finally {
+      setState(() {
+        _isResending = false;
+      });
+    }
   }
 
   Future<void> updatePhoneNumber() async {
@@ -242,16 +368,21 @@ class _OtpScreenState extends State<OtpScreen> {
                         ),
                         const SizedBox(height: 32),
                         Center(
-                          child: TextButton(
-                            onPressed: () {
-                              // Resend OTP logic
-                              print('Resending OTP: ${widget.otp}');
-                            },
-                            child: Text(
-                              'Didn\'t receive the code? Resend',
-                              style: TextStyle(color: Colors.blue[700]),
-                            ),
-                          ),
+                          child: _isResending
+                              ? const CircularProgressIndicator()
+                              : TextButton(
+                                  onPressed: _canResend ? _resendOTP : null,
+                                  child: Text(
+                                    _canResend
+                                        ? 'Didn\'t receive the code? Resend'
+                                        : 'Resend in ${_remainingSeconds}s',
+                                    style: TextStyle(
+                                      color: _canResend
+                                          ? Colors.blue[700]
+                                          : Colors.grey,
+                                    ),
+                                  ),
+                                ),
                         ),
                         const Spacer(),
                         Center(
@@ -268,7 +399,7 @@ class _OtpScreenState extends State<OtpScreen> {
                               String enteredOtp = _controllers
                                   .map((controller) => controller.text)
                                   .join();
-                              if (enteredOtp == widget.otp) {
+                              if (enteredOtp == _currentOtp) {
                                 updatePhoneNumber();
                               } else {
                                 ScaffoldMessenger.of(context).showSnackBar(

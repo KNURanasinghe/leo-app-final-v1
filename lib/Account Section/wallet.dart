@@ -274,8 +274,8 @@ class _WalletScreenState extends material.State<WalletScreen> {
                           ],
                         ),
                         const SizedBox(height: 8),
-                        _buildRechargeChannel('WebXPay',
-                            'assets/images/webxpay_logo.png', 'WebXPay'),
+                        // _buildRechargeChannel('WebXPay',
+                        //     'assets/images/webxpay_logo.png', 'WebXPay'),
                         _buildRechargeChannel('Google Pay',
                             'assets/images/google_pay.png', 'GPay'),
                         _buildRechargeChannel('VISA/MASTERCARD',
@@ -368,49 +368,68 @@ class _WalletScreenState extends material.State<WalletScreen> {
   }
 
   Widget _buildDiamondPackage(BuildContext context, int diamonds, int price) {
+    // Get screen width for responsive sizing
+    final screenWidth = MediaQuery.of(context).size.width;
+
+    // Calculate responsive sizes
+    final imageSize =
+        screenWidth < 360 ? 35.0 : (screenWidth < 600 ? 45.0 : 50.0);
+    final diamondFontSize =
+        screenWidth < 360 ? 14.0 : (screenWidth < 600 ? 16.0 : 18.0);
+    final priceFontSize =
+        screenWidth < 360 ? 12.0 : (screenWidth < 600 ? 13.0 : 14.0);
+    final verticalSpacing = screenWidth < 360 ? 4.0 : 8.0;
+    final cardPadding = screenWidth < 360 ? 8.0 : 12.0;
+
     return GestureDetector(
       onTap: () {
-        if (_selectedPaymentMethod == 'WebXPay') {
-          _processWebXPayRecharge(diamonds, price);
-        } else {
-          // Handle other payment methods as before
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-                content: Text('Please select WebXPay as payment method')),
-          );
-        }
+        _processWebXPayRecharge(diamonds, price);
       },
       child: Card(
         color: Colors.white,
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            Image.asset(
-              'assets/images/diamond.png',
-              width: 50,
-              errorBuilder: (context, error, stackTrace) {
-                return const Icon(Icons.diamond, color: Colors.blue, size: 50);
-              },
-            ),
-            const SizedBox(height: 2),
-            Text(
-              '$diamonds',
-              style: const TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
+        elevation: 2,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Container(
+          padding: EdgeInsets.all(cardPadding),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Image.asset(
+                'assets/images/diamond.png',
+                width: imageSize,
+                height: imageSize,
+                errorBuilder: (context, error, stackTrace) {
+                  return Icon(
+                    Icons.diamond,
+                    color: Colors.blue,
+                    size: imageSize,
+                  );
+                },
               ),
-            ),
-            const SizedBox(height: 2),
-            Text(
-              'LKR $price',
-              style: const TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
-                color: Colors.blue,
+              SizedBox(height: verticalSpacing),
+              Text(
+                '$diamonds',
+                style: TextStyle(
+                  fontSize: diamondFontSize,
+                  fontWeight: FontWeight.bold,
+                ),
+                textAlign: TextAlign.center,
               ),
-            ),
-          ],
+              SizedBox(height: verticalSpacing / 2),
+              Text(
+                'LKR $price',
+                style: TextStyle(
+                  fontSize: priceFontSize,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.blue,
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
         ),
       ),
     );

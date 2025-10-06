@@ -49,6 +49,39 @@ class _AdminListScreenState extends State<AdminListScreen>
   int _pendingChatRequests = 0;
   bool _isLoadingChatRequests = true;
 
+  final bool _isInitialLoad = true;
+
+  // New method for background refresh without loading indicators
+  void _backgroundRefresh() {
+    // Don't modify loading states during background refresh
+    _fetchBroadcastMessagesBackground();
+    _socketService.getBroadcastUnreadCounts(widget.currentUserId);
+    _socketService.getUnreadCounts(widget.currentUserId);
+    _socketService.getUserStatus();
+
+    // Load chat requests in background
+    _socketService.getPendingChatRequests(widget.currentUserId);
+
+    // Get regular chats only for admin users
+    if (_isCurrentUserAdmin) {
+      _fetchUserMessagesBackground();
+    }
+  }
+
+  // Background version that doesn't create placeholders or modify loading states
+  void _fetchBroadcastMessagesBackground() {
+    for (final adminId in _adminUsers) {
+      _socketService.getBroadcastHistoryForAdmin(adminId);
+      // No placeholder creation or loading state modification
+    }
+  }
+
+  void _fetchUserMessagesBackground() {
+    for (final userId in _regularUsers) {
+      _socketService.getChatHistory(widget.currentUserId, userId, limit: 1);
+    }
+  }
+
   void _startPeriodicRefresh() {
     // Cancel any existing timer first
     _stopPeriodicRefresh();
@@ -116,8 +149,10 @@ class _AdminListScreenState extends State<AdminListScreen>
     Future.delayed(const Duration(seconds: 5), () {
       if (mounted && _isLoading) {
         setState(() {
-          _isLoading = false;
-          _isBroadCastLoading = false;
+          if (_isInitialLoad) {
+            _isLoading = false;
+            _isBroadCastLoading = false;
+          }
           _isLoadingChatRequests = false;
         });
       }
@@ -403,7 +438,7 @@ class _AdminListScreenState extends State<AdminListScreen>
           messageId: 'placeholder_$adminId',
           senderId: adminId,
           receiverId: 'broadcast',
-          message: 'Loading broadcasts...',
+          message: 'No announcements yet',
           timestamp: DateTime.now().millisecondsSinceEpoch,
           messageType: AppConstants.messageTypeText,
           isBroadcast: true,
@@ -485,9 +520,12 @@ class _AdminListScreenState extends State<AdminListScreen>
 
   Widget _buildChatsTab() {
     // Only show loading indicator on first load, when we have no data
+    // Only show loading indicator on first load
     if ((_isLoading && _isBroadCastLoading) &&
         !_dataInitialized &&
-        _latestBroadcasts.isEmpty) {
+        _latestBroadcasts.isEmpty &&
+        _isInitialLoad) {
+      // ← Added _isInitialLoad check
       return const Center(child: CircularProgressIndicator());
     }
 
@@ -632,8 +670,9 @@ class _AdminListScreenState extends State<AdminListScreen>
     final hasLatestBroadcast = _latestBroadcasts.containsKey(adminId);
     final latestBroadcast =
         hasLatestBroadcast ? _latestBroadcasts[adminId]! : null;
-    final isLoading = latestBroadcast?.message == 'Loading broadcasts...';
-
+    // final isLoading =
+    // latestBroadcast?.message == 'Loading broadcasts...' && _isInitialLoad;
+// ← Only show loading on initial load
     // Use the dedicated broadcast unread count
     final unreadCount = _broadcastUnreadCounts[adminId] ?? 0;
 
@@ -677,40 +716,23 @@ class _AdminListScreenState extends State<AdminListScreen>
           color: unreadCount > 0 ? Colors.black : Colors.black87,
         ),
       ),
-      subtitle: isLoading
-          ? Row(
-              children: [
-                SizedBox(
-                  width: 12,
-                  height: 12,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    color: Colors.grey.shade600,
-                  ),
-                ),
-                const SizedBox(width: 8),
-                const Text('Loading...'),
-              ],
-            )
-          : Text(
-              latestBroadcast?.message ?? 'No recent messages',
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                fontStyle:
-                    unreadCount > 0 ? FontStyle.normal : FontStyle.italic,
-                fontWeight:
-                    unreadCount > 0 ? FontWeight.bold : FontWeight.normal,
-                color: unreadCount > 0 ? Colors.black : Colors.grey.shade700,
-              ),
-            ),
+      subtitle: Text(
+        latestBroadcast?.message ?? 'No recent messages',
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: TextStyle(
+          fontStyle: unreadCount > 0 ? FontStyle.normal : FontStyle.italic,
+          fontWeight: unreadCount > 0 ? FontWeight.bold : FontWeight.normal,
+          color: unreadCount > 0 ? Colors.black : Colors.grey.shade700,
+        ),
+      ),
       trailing: Column(
         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         crossAxisAlignment: CrossAxisAlignment.end,
         mainAxisSize: MainAxisSize.min,
         children: [
           // Show timestamp
-          if (hasLatestBroadcast && !isLoading)
+          if (hasLatestBroadcast)
             Text(
               _formatTimestamp(latestBroadcast!.timestamp),
               style: TextStyle(
@@ -764,7 +786,7 @@ class _AdminListScreenState extends State<AdminListScreen>
           _isOnAdminListScreen = true;
 
           // Don't show loading indicator, just refresh in background
-          _refreshData();
+          _backgroundRefresh();
           _startPeriodicRefresh();
         });
       },

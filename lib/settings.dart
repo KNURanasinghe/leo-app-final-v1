@@ -269,6 +269,7 @@ class SettingsPage extends StatelessWidget {
             context,
             icon: Icons.delete_forever,
             title: 'Delete Account',
+            isDestructive: true,
             onTap: () async {
               // We'll use this to track whether the dialog is active
               bool isDialogActive = true;
@@ -280,6 +281,7 @@ class SettingsPage extends StatelessWidget {
                   // Initialize countdown variables
                   int remainingSeconds = 60;
                   Timer? countdownTimer;
+                  bool isCountdownComplete = false;
 
                   // We need to use StatefulBuilder to update the countdown timer
                   return StatefulBuilder(builder:
@@ -294,9 +296,9 @@ class SettingsPage extends StatelessWidget {
                             if (remainingSeconds > 0) {
                               remainingSeconds--;
                             } else {
-                              // Time's up, proceed with deletion
+                              // Time's up - enable the confirm button
+                              isCountdownComplete = true;
                               timer.cancel();
-                              Navigator.of(dialogContext).pop(true);
                             }
                           });
                         } else {
@@ -400,21 +402,29 @@ class SettingsPage extends StatelessWidget {
                                   // Confirm Button with countdown incorporated into the button text
                                   Expanded(
                                     child: TextButton(
-                                      onPressed: () {
-                                        isDialogActive = false;
-                                        countdownTimer?.cancel();
-                                        Navigator.of(dialogContext).pop(true);
-                                      },
+                                      onPressed: isCountdownComplete
+                                          ? () {
+                                              // Only proceed if countdown is complete
+                                              isDialogActive = false;
+                                              countdownTimer?.cancel();
+                                              Navigator.of(dialogContext)
+                                                  .pop(true);
+                                            }
+                                          : null, // Disable button while countdown is active
                                       style: TextButton.styleFrom(
                                         foregroundColor: Colors.white,
                                         padding: const EdgeInsets.symmetric(
                                             vertical: 12),
                                       ),
                                       child: Text(
-                                        'Confirm (${remainingSeconds}s)',
-                                        style: const TextStyle(
+                                        isCountdownComplete
+                                            ? 'Confirm'
+                                            : 'Confirm (${remainingSeconds}s)',
+                                        style: TextStyle(
                                           fontSize: 17,
-                                          color: Colors.grey,
+                                          color: isCountdownComplete
+                                              ? Colors.blue
+                                              : Colors.grey,
                                           fontWeight: FontWeight.w600,
                                         ),
                                       ),
@@ -544,7 +554,6 @@ class SettingsPage extends StatelessWidget {
                 print('Account deletion error: $e');
               }
             },
-            isDestructive: true,
           ),
           const SizedBox(height: 32),
         ],
